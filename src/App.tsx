@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Moon, Sun, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Copy, Download, Moon, Sun, X } from 'lucide-react'
 import {
   analyzeExpression,
   formatValue,
@@ -27,8 +27,13 @@ function useDarkMode() {
 }
 
 function App() {
-  const [expression, setExpression] = useState('(A AND B) OR NOT C')
+  const [expression, setExpression] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('expr') ?? '(A AND B) OR NOT C'
+  })
   const [format, setFormat] = useState<OutputFormat>('vf')
+  const [copyMessage, setCopyMessage] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const { dark, toggle: toggleDark } = useDarkMode()
 
   const analysis = useMemo(
@@ -37,7 +42,49 @@ function App() {
   )
 
   const insertAtCursor = (value: string) => {
-    setExpression((current) => current + value)
+    const input = inputRef.current
+    if (!input) {
+      setExpression((current) => current + value)
+      return
+    }
+
+    const start = input.selectionStart ?? expression.length
+    const end = input.selectionEnd ?? expression.length
+    const nextExpression = `${expression.slice(0, start)}${value}${expression.slice(end)}`
+    setExpression(nextExpression)
+
+    window.requestAnimationFrame(() => {
+      input.focus()
+      const cursor = start + value.length
+      input.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  const copyShareLink = async () => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('expr', expression)
+    await navigator.clipboard.writeText(url.toString())
+    setCopyMessage('Link copiado!')
+    window.setTimeout(() => setCopyMessage(''), 1800)
+  }
+
+  const downloadCsv = () => {
+    if (!analysis.ok) return
+
+    const headers = [...analysis.variables, 'Resultado']
+    const lines = [
+      headers.join(','),
+      ...analysis.rows.map((row) =>
+        row.map((value) => formatValue(value, format)).join(','),
+      ),
+    ]
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'tabela-verdade.csv'
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -68,6 +115,7 @@ function App() {
           </label>
           <div className="relative">
             <input
+              ref={inputRef}
               id="expression"
               type="text"
               value={expression}
@@ -154,6 +202,37 @@ function App() {
 
         {analysis.ok && (
           <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+              <div>
+                <h2 className="font-medium">Tabela verdade</h2>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {analysis.rowCount} linha(s) calculada(s)
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {copyMessage && (
+                  <span className="text-sm text-emerald-600 dark:text-emerald-400">
+                    {copyMessage}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={copyShareLink}
+                  className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                >
+                  <Copy size={16} />
+                  Copiar link
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadCsv}
+                  className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700"
+                >
+                  <Download size={16} />
+                  Exportar CSV
+                </button>
+              </div>
+            </div>
             {analysis.truncated && (
               <p className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
                 Tabela grande — exibindo apenas as primeiras {analysis.rowCount}{' '}
