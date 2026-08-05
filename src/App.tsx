@@ -26,6 +26,11 @@ function useDarkMode() {
   return { dark, toggle: () => setDark((value) => !value) }
 }
 
+function escapeCsvValue(value: string): string {
+  if (!/[",\n\r]/.test(value)) return value
+  return `"${value.replace(/"/g, '""')}"`
+}
+
 function App() {
   const [expression, setExpression] = useState(() => {
     const params = new URLSearchParams(window.location.search)
@@ -33,13 +38,35 @@ function App() {
   })
   const [format, setFormat] = useState<OutputFormat>('vf')
   const [copyMessage, setCopyMessage] = useState('')
+  const [fallbackShareUrl, setFallbackShareUrl] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const copyMessageTimeoutRef = useRef<number | null>(null)
   const { dark, toggle: toggleDark } = useDarkMode()
 
   const analysis = useMemo(
     () => analyzeExpression(expression, format),
     [expression, format],
   )
+
+  useEffect(() => {
+    return () => {
+      if (copyMessageTimeoutRef.current) {
+        window.clearTimeout(copyMessageTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const showCopyMessage = (message: string) => {
+    if (copyMessageTimeoutRef.current) {
+      window.clearTimeout(copyMessageTimeoutRef.current)
+    }
+
+    setCopyMessage(message)
+    copyMessageTimeoutRef.current = window.setTimeout(() => {
+      setCopyMessage('')
+      copyMessageTimeoutRef.current = null
+    }, 1800)
+  }
 
   const insertAtCursor = (value: string) => {
     const input = inputRef.current
@@ -62,10 +89,21 @@ function App() {
 
   const copyShareLink = async () => {
     const url = new URL(window.location.href)
-    url.searchParams.set('expr', expression)
-    await navigator.clipboard.writeText(url.toString())
-    setCopyMessage('Link copiado!')
-    window.setTimeout(() => setCopyMessage(''), 1800)
+    const trimmedExpression = expression.trim()
+    if (trimmedExpression) {
+      url.searchParams.set('expr', trimmedExpression)
+    } else {
+      url.searchParams.delete('expr')
+    }
+
+    try {
+      await navigator.clipboard.writeText(url.toString())
+      setFallbackShareUrl('')
+      showCopyMessage('Link copiado!')
+    } catch {
+      setFallbackShareUrl(url.toString())
+      showCopyMessage('Copie o link exibido.')
+    }
   }
 
   const downloadCsv = () => {
@@ -73,9 +111,9 @@ function App() {
 
     const headers = [...analysis.variables, 'Resultado']
     const lines = [
-      headers.join(','),
+      headers.map(escapeCsvValue).join(','),
       ...analysis.rows.map((row) =>
-        row.map((value) => formatValue(value, format)).join(','),
+        row.map((value) => escapeCsvValue(formatValue(value, format))).join(','),
       ),
     ]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
@@ -214,6 +252,16 @@ function App() {
                   <span className="text-sm text-emerald-600 dark:text-emerald-400">
                     {copyMessage}
                   </span>
+                )}
+                {fallbackShareUrl && (
+                  <input
+                    type="text"
+                    value={fallbackShareUrl}
+                    readOnly
+                    className="min-w-64 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 font-mono text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+                    aria-label="Link para copiar manualmente"
+                    onFocus={(event) => event.target.select()}
+                  />
                 )}
                 <button
                   type="button"
