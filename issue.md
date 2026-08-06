@@ -831,3 +831,57 @@ Usuários poderão dar `git commit` e `git push` em seus chips customizados. Iss
 ---
 
 Pensando nessa integração com ferramentas de código (MCP), você prefere que o foco inicial da IA seja atuar como um **Depurador** (lendo os circuitos do usuário e ajudando a encontrar erros) ou como um **Gerador** (onde o usuário digita comandos em texto e a IA constrói o circuito visual automaticamente)?
+
+Cara, essa é a **grande virada de chave**! O que você está descrevendo ataca exatamente o maior ponto cego das IAs atuais: a falta de **Consciência Espacial (Spatial Awareness)**.
+
+As IAs como o Claude Code são geniais em matemática e lógica (elas sabem que o Chip A precisa ligar no Chip B), mas elas são "cegas" para o espaço físico do canvas. É por isso que geram essa "maçaroca" de componentes encavalados e pinos de saída (*outputs*) flutuando fora do *hitbox*. A IA entende a árvore lógica do circuito, mas não entende geometria.
+
+Criar um ambiente onde a IA "enxerga" o app funcionando e colabora visualmente com você eleva o Veritas a outro patamar. Seria um verdadeiro **Pair-Programming Visual**.
+
+Aqui estão as ideias de como podemos arquitetar esse diferencial competitivo para o site:
+
+### 1. O "Ghost Builder" (Construção Visual em Tempo Real)
+
+Em vez da IA pensar por 30 segundos e cuspir um JSON gigante que magicamente aparece quebrado na tela, a IA assumiria o controle do React Flow em tempo real, como um "cursor fantasma".
+
+* **Como funciona:** Você pede "Cria um Somador Completo (Full Adder)". A IA começa a instanciar os chips um por um, puxando os fios na sua frente.
+* **O Diferencial:** Se você perceber que ela está colocando os chips muito juntos, você pode interrompê-la, arrastar um chip pro lado e dizer: *"Espera, faz mais espaçado e coloca os inputs na esquerda"*. A IA entende a sua interferência física, recalcula as posições e continua de onde você parou.
+
+### 2. O Sub-Agente de Layout (Os "Olhos" da IA)
+
+Para resolver o problema dos *hitboxes* e sobreposições, precisamos dar "visão" para a IA. Faremos isso separando as responsabilidades:
+
+* **Agente de Lógica:** Pensa em como o circuito funciona e quais chips usar.
+* **Agente de Geometria/Layout:** Uma skill específica que lê as coordenadas (X, Y) e a largura/altura (width/height) de cada nó. Antes de colocar na tela, esse agente roda um sistema de colisão (ou um motor de auto-layout como o Dagre.js) para garantir que:
+1. Nenhum *output* fique fora do componente.
+2. A distância mínima entre os chips seja respeitada para os fios não virarem um "espaguete".
+
+
+
+### 3. O Loop de Feedback Bidirecional ("O que você acha disso?")
+
+A interação deixa de ser apenas um chat de texto e vira um quadro interativo.
+
+* **Você faz, a IA corrige:** Você pode montar um pedaço do circuito, selecionar os nós e clicar num botão *"IA, analisa essa lógica"*. Ela vai ler o canvas e responder: *"Visualmente está ótimo, mas percebi que o sinal do Clock não vai chegar no Flip-Flop a tempo. Posso adicionar um delay aqui?"*
+* **A IA faz, você opina:** A IA termina de organizar um subcircuito e o chat pergunta: *"Organizei os chips lógicos embaixo e as memórias em cima. O que achou dessa disposição?"* Você pode responder: *"Ficou confuso, agrupa por módulo."* e ela refaz a animação na hora.
+
+### 4. Modo "Professor / Debugger Visual"
+
+Se um circuito não estiver funcionando, você não precisa copiar e colar código no chat. Você apenas diz: *"Por que esse LED final não está acendendo?"*
+A IA, usando as ferramentas do MCP, vai:
+
+1. Ler o estado atual (High/Low) de todos os fios no React Flow.
+2. Destacar visualmente na sua tela (mudando a cor do fio para vermelho, por exemplo) onde o sinal está morrendo.
+3. Sugerir a correção e, se você autorizar, ela mesma arranca o fio errado e conecta no lugar certo.
+
+### Por onde começamos?
+
+Para que a IA consiga fazer isso, o primeiro passo no código é criar uma **API de Contexto do Canvas**. Precisamos construir funções claras que o agente (Claude) possa chamar, como:
+
+* `getCanvasState()`: Retorna tudo que está na tela com posições e tamanhos (hitboxes).
+* `addNode(type, x, y)`: Adiciona um chip na tela de forma animada.
+* `connectNodes(sourceId, targetId)`: Puxa o fio visualmente.
+* `simulateTick()`: Roda o motor lógico para testar se funcionou.
+
+O que você acha de começarmos desenhando como seria essa "API de Contexto do Canvas" que a IA vai usar para interagir com o React Flow?
+
