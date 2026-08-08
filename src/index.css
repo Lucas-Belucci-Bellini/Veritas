@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+/* Dark mode is driven by a class on <html>, toggled by the theme switch. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-brand-50: #eef7ff;
+  --color-brand-100: #d9edff;
+  --color-brand-200: #bbdfff;
+  --color-brand-300: #8bcbff;
+  --color-brand-400: #54adff;
+  --color-brand-500: #2d8bff;
+  --color-brand-600: #176cf5;
+  --color-brand-700: #1355e1;
+  --color-brand-800: #1646b6;
+  --color-brand-900: #183e8f;
+
+  --color-truth: #10b981;
+  --color-false: #f43f5e;
+
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  /* The logical symbols look much better with a little extra breathing room. */
+  .expr {
+    font-feature-settings: 'ss01', 'calt' 0;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+    @apply dark:border-slate-800 dark:bg-slate-900/60;
+  }
+
+  .key {
+    @apply flex h-10 min-w-10 select-none items-center justify-center rounded-lg
+      border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700
+      transition active:scale-95 hover:border-brand-400 hover:text-brand-600;
+    @apply dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200
+      dark:hover:border-brand-500 dark:hover:text-brand-300;
+  }
+
+  .chip-tag {
+    @apply inline-flex items-center gap-1 rounded-full border border-slate-200
+      bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600;
+    @apply dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300;
+  }
+}
+
+/* React Flow needs a transparent backdrop so our own gradient shows through. */
+.react-flow__attribution {
+  display: none;
+}
