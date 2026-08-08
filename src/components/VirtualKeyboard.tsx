@@ -20,7 +20,7 @@ const OPERATOR_NAMES: Record<OperatorKey, string> = {
 }
 
 /** Texto que vai para o input ao clicar no botão, já espaçado. */
-export function operatorInsert(op: OperatorKey, notation: Notation): string {
+function operatorInsert(op: OperatorKey, notation: Notation): string {
   const glyph = OPERATOR_GLYPHS[op][notation]
   return op === 'not' ? `${glyph}` : ` ${glyph} `
 }

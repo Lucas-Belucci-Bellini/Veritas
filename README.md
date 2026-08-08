@@ -8,6 +8,9 @@ completa com os passos intermediários e o circuito de portas lógicas
 equivalente. Clicar numa linha da tabela acende o caminho da eletricidade no
 circuito.
 
+O plano completo do projeto está em [`issue.md`](./issue.md) e o roadmap
+resumido em [`plano.md`](./plano.md).
+
 ## O que já está pronto
 
 | Versão | Entrega |
@@ -65,6 +68,7 @@ npm run chips:import -- /caminho/dos/chips # ou aponte para outro projeto DLS
 npm install
 npm run dev        # servidor de desenvolvimento
 npm test           # testes do motor lógico
+npm run lint       # oxlint
 npm run build      # build de produção em dist/
 ```
 
