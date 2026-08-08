@@ -18,6 +18,9 @@ resumido em [`plano.md`](./plano.md).
 | v0.1.0 | Motor lógico: lexer, parser, AST, avaliador e geração das combinações |
 | v0.2.0 | Interface: barra de input com validação em tempo real, teclado virtual, tema claro/escuro, exportação |
 | v0.3.0 | Simulador visual: circuito gerado da AST com React Flow + Dagre |
+| v0.4.0 | Projetos salvos no navegador com Dexie.js (IndexedDB) e arquivos `.veritas` |
+| v0.4.9 | Polimento: tabela virtualizada e circuito carregado sob demanda |
+| v0.5.0 | PWA: instalável e 100% funcional sem internet |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
@@ -41,6 +44,36 @@ Barra de input grande com feedback verde/vermelho a cada tecla, teclado virtual
 dividido por categoria (os símbolos que ninguém sabe digitar), alternância entre
 `V/F` e `1/0`, tema claro e escuro, e exportação em **CSV**, **PNG** (desenhado
 em canvas, sem biblioteca externa) e link compartilhável (`?expr=`).
+
+### Projetos salvos (v0.4.0)
+
+Os projetos ficam no **IndexedDB do próprio navegador**, via Dexie.js. Nada sai
+da máquina do usuário e nada custa servidor. Dá para nomear, renomear, reabrir e
+excluir projetos, além de exportar tudo num arquivo **`.veritas`** e importar de
+volta — o mesmo formato que a CLI e o servidor MCP vão ler mais adiante.
+
+O leitor do `.veritas` recusa arquivo de outro programa, JSON quebrado e versão
+de formato mais nova do que a que ele entende, em vez de importar lixo em
+silêncio.
+
+### Performance (v0.4.9)
+
+* **Tabela virtualizada.** Uma expressão com 10 variáveis dá 1024 linhas; com as
+  colunas de passos intermediários isso passa de 20 mil células. Acima de 200
+  linhas a tabela renderiza só a janela visível, então a rolagem continua fluida.
+* **Circuito sob demanda.** React Flow e Dagre pesam mais que todo o resto
+  somado, então viraram um pedaço separado, baixado só quando existe uma
+  expressão válida na tela. O pacote inicial caiu de 560 kB para 337 kB.
+
+### Offline de verdade (v0.5.0)
+
+Service worker com Workbox precarregando **970 kB** — o aplicativo inteiro,
+incluindo o catálogo de chips. Depois da primeira visita o Veritas abre no modo
+avião, e pode ser instalado como aplicativo no computador ou no celular.
+
+Quando a conexão cai, um aviso discreto explica que está tudo funcionando mesmo
+assim. Quando sai uma versão nova, o Veritas pergunta antes de recarregar — em
+vez de puxar o tapete no meio de uma expressão.
 
 ### Biblioteca de chips
 
@@ -79,7 +112,9 @@ src/
   engine/      lexer, parser, AST, avaliador, tabela verdade  (sem React)
   circuit/     AST -> grafo de portas, layout com Dagre, nó visual
   chips/       catálogo importado do Digital Logic Sim
+  storage/     banco local (Dexie) e o formato de arquivo .veritas
   components/  interface
+  hooks/       tema, projetos, conexão, virtualização da tabela
   lib/         exportação, URL compartilhável, formatação de valores
 scripts/
   import-dls-chips.mjs   importador da biblioteca de chips
@@ -90,12 +125,10 @@ rodar num servidor MCP ou numa CLI, como previsto no plano do projeto.
 
 ## Stack
 
-React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Vitest
+React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexie.js · Workbox · Vitest · oxlint
 
 ## Próximos passos
 
-* v0.4.0 — salvamento local dos projetos com Dexie.js (IndexedDB)
-* v0.5.0 — PWA: instalar e usar sem internet
 * v0.6.0 — contas de usuário e sincronização opcional
 * v0.7.0 — sincronização em tempo real (CRDT) e fios sem fio (túneis Tx/Rx)
 * Depois — barramentos multi-bit, lógica sequencial (clock, flip-flops, RAM),

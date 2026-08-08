@@ -1,5 +1,7 @@
+import { useRef } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { CLASSIFICATION_LABELS, type TruthTable } from '../engine'
+import { ROW_HEIGHT, useVirtualRows } from '../hooks/useVirtualRows'
 import { renderValue, type ValueStyle } from '../lib/values'
 
 interface TruthTableViewProps {
@@ -25,6 +27,8 @@ export function TruthTableView({
   onSelectRow,
 }: TruthTableViewProps) {
   const resultIndex = table.columns.length - 1
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const range = useVirtualRows(scrollRef, table.rows.length)
 
   return (
     <div>
@@ -51,7 +55,10 @@ export function TruthTableView({
         </p>
       )}
 
-      <div className="max-h-[32rem] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
+      <div
+        ref={scrollRef}
+        className="max-h-[32rem] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800"
+      >
         <table className="w-full border-collapse text-center text-sm">
           <thead className="sticky top-0 z-10">
             <tr>
@@ -73,9 +80,15 @@ export function TruthTableView({
             </tr>
           </thead>
           <tbody>
-            {table.rows.map((row, rowIndex) => (
+            {range.start > 0 && (
+              <tr aria-hidden style={{ height: range.start * ROW_HEIGHT }} />
+            )}
+            {table.rows.slice(range.start, range.end).map((row, offset) => {
+              const rowIndex = range.start + offset
+              return (
               <tr
                 key={rowIndex}
+                style={{ height: ROW_HEIGHT }}
                 onClick={() => onSelectRow(selectedRow === rowIndex ? null : rowIndex)}
                 className={`cursor-pointer transition-colors ${
                   selectedRow === rowIndex
@@ -98,7 +111,14 @@ export function TruthTableView({
                   </td>
                 ))}
               </tr>
-            ))}
+              )
+            })}
+            {range.end < table.rows.length && (
+              <tr
+                aria-hidden
+                style={{ height: (table.rows.length - range.end) * ROW_HEIGHT }}
+              />
+            )}
           </tbody>
         </table>
       </div>
