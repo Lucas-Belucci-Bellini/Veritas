@@ -15,6 +15,7 @@ import {
   type Notation,
 } from '../../src/engine/index'
 import type { ChipCatalog, ChipEntry } from '../../src/chips/types'
+import { Simulator, type ComponentSpec } from '../../src/simulation/index'
 
 /**
  * Implementação das ferramentas, separada do transporte MCP para poder ser
@@ -278,4 +279,89 @@ function describeChip(chip: ChipEntry): string {
   }
 
   return lines.join('\n')
+}
+
+export interface SimulationStep {
+  /** Valores a aplicar nos pinos de entrada antes de rodar os tiques. */
+  set?: Record<string, boolean>
+  ticks?: number
+}
+
+/** Teto de tiques por chamada, para não deixar o servidor rodando à toa. */
+export const MAX_SIMULATION_TICKS = 1000
+
+/**
+ * Roda um circuito por alguns tiques e devolve o diagrama de tempo.
+ *
+ * É o que dá acesso à parte sequencial do Veritas: clock, flip-flops e atrasos,
+ * que a tabela verdade não consegue descrever porque a saída deles depende do
+ * que aconteceu antes.
+ */
+export function simulateCircuit(
+  components: ComponentSpec[],
+  steps: SimulationStep[],
+  watch: string[],
+): ToolResult {
+  const total = steps.reduce((sum, step) => sum + (step.ticks ?? 1), 0)
+  if (total > MAX_SIMULATION_TICKS) {
+    return {
+      isError: true,
+      text: `São ${total} tiques no total; o limite por chamada é ${MAX_SIMULATION_TICKS}.`,
+    }
+  }
+
+  let simulator: Simulator
+  try {
+    simulator = new Simulator({ components })
+  } catch (error) {
+    return {
+      isError: true,
+      text: error instanceof Error ? error.message : 'Circuito inválido.',
+    }
+  }
+
+  const known = new Set(components.map((component) => component.id))
+  const unknown = watch.filter((id) => !known.has(id))
+  if (unknown.length > 0) {
+    return { isError: true, text: `Não existem no circuito: ${unknown.join(', ')}.` }
+  }
+
+  const observed = watch.length > 0 ? watch : components.map((component) => component.id)
+  const rows: string[] = []
+  const record = (tick: number, note: string) => {
+    const values = observed.map((id) => (simulator.read(id) ? '1' : '0'))
+    rows.push(`| ${tick} | ${values.join(' | ')} | ${note} |`)
+  }
+
+  record(0, 'início')
+
+  try {
+    for (const step of steps) {
+      const changes = Object.entries(step.set ?? {})
+      for (const [id, value] of changes) simulator.setInput(id, value)
+
+      const note = changes.length
+        ? changes.map(([id, value]) => `${id}=${value ? 1 : 0}`).join(', ')
+        : ''
+
+      const ticks = step.ticks ?? 1
+      for (let index = 0; index < ticks; index += 1) {
+        simulator.tick()
+        record(simulator.tickCount, index === 0 ? note : '')
+      }
+    }
+  } catch (error) {
+    return {
+      isError: true,
+      text: error instanceof Error ? error.message : 'Falha ao simular.',
+    }
+  }
+
+  return {
+    text: [
+      `| tique | ${observed.join(' | ')} | evento |`,
+      `| --- | ${observed.map(() => '---').join(' | ')} | --- |`,
+      ...rows,
+    ].join('\n'),
+  }
 }

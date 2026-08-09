@@ -22,6 +22,7 @@ resumido em [`plano.md`](./plano.md).
 | v0.4.9 | Polimento: tabela virtualizada e circuito carregado sob demanda |
 | v0.5.0 | PWA: instalável e 100% funcional sem internet |
 | v0.6.0 | Simplificação de expressões, mapas de Karnaugh e servidor MCP |
+| v0.6.1 | Motor de simulação sequencial: clock, flip-flops e atrasos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
@@ -95,11 +96,32 @@ que dão a volta pelas bordas do mapa.
 O mesmo minimizador serve o site, o importador de chips e o servidor MCP: uma
 implementação só, com testes.
 
+### Lógica sequencial (v0.6.1)
+
+Até aqui tudo era **combinacional**: a saída respondia na hora à entrada. O
+simulador em `src/simulation/` dá o salto para a **lógica sequencial**, onde a
+saída depende também do que aconteceu antes.
+
+Cada tique acontece em duas fases, como o plano previa: primeiro todo mundo
+calcula o próprio próximo valor olhando para os valores *atuais* dos vizinhos, e
+só depois todos publicam ao mesmo tempo. É o que a eletricidade faz de verdade —
+cada porta tem seu atraso de propagação — e é o que permite simular
+realimentação sem o navegador entrar em laço infinito.
+
+Componentes: portas lógicas, `input`, `output`, `constant`, `clock` (com período
+ajustável), flip-flops `dff` e `tff` (disparados na borda de subida, com saídas
+Q e Q̄) e `delay` de N tiques.
+
+Com isso já dá para montar latch SR, contador, divisor de frequência e linhas de
+atraso — os testes cobrem todos eles. E um teste cruzado confere que, para
+expressões combinacionais, o circuito simulado concorda com o avaliador em
+**todas** as linhas da tabela: os dois motores não podem discordar.
+
 ### Servidor MCP (v0.6.0)
 
 `mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
-para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh e
-consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
+para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh,
+simulação de circuitos sequenciais e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
 expressão, ele pergunta e recebe a conta feita.
 
 ```bash
@@ -148,6 +170,7 @@ src/
   engine/      lexer, parser, AST, avaliador, tabela verdade  (sem React)
   circuit/     AST -> grafo de portas, layout com Dagre, nó visual
   chips/       catálogo importado do Digital Logic Sim
+  simulation/  simulador por tiques: clock, flip-flops, atrasos
   storage/     banco local (Dexie) e o formato de arquivo .veritas
   components/  interface
   hooks/       tema, projetos, conexão, virtualização da tabela
@@ -169,7 +192,10 @@ React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexi
 
 ## Próximos passos
 
-* v0.6.0 — contas de usuário e sincronização opcional
+* Editor visual de circuitos, para desenhar na tela o que hoje só é simulável
+  por código ou pelo servidor MCP
+* Barramentos multi-bit e chips customizados (subcircuitos)
+* Contas de usuário e sincronização opcional
 * v0.7.0 — sincronização em tempo real (CRDT) e fios sem fio (túneis Tx/Rx)
 * Depois — barramentos multi-bit, lógica sequencial (clock, flip-flops, RAM),
   chips customizados e servidor MCP para IAs consultarem o motor

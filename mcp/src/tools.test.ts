@@ -5,7 +5,9 @@ import {
   getChip,
   karnaugh,
   listChips,
+  MAX_SIMULATION_TICKS,
   simplifyExpression,
+  simulateCircuit,
   truthTable,
 } from './tools'
 
@@ -111,5 +113,69 @@ describe.skipIf(!hasCatalog)('biblioteca de chips', () => {
     const result = getChip('Full Add')
     expect(result.isError).toBe(true)
     expect(result.text).toContain('Parecidos:')
+  })
+})
+
+describe('simulate_circuit', () => {
+  it('devolve o diagrama de tempo de um contador', () => {
+    const { text } = simulateCircuit(
+      [
+        { id: 'clk', type: 'input' },
+        { id: 'ff', type: 'dff', inputs: [{ node: 'ff', port: 1 }, { node: 'clk' }] },
+      ],
+      [
+        { set: { clk: true }, ticks: 1 },
+        { set: { clk: false }, ticks: 1 },
+        { set: { clk: true }, ticks: 1 },
+      ],
+      ['clk', 'ff'],
+    )
+
+    const lines = text.trim().split('\n')
+    expect(lines[0]).toBe('| tique | clk | ff | evento |')
+    // Começa em zero, sobe na primeira borda e continua ligado depois dela.
+    expect(lines[2]).toContain('| 0 | 0 | 0 |')
+    expect(lines[3]).toContain('| 1 | 1 | 1 |')
+    expect(lines[5]).toContain('| 3 | 1 | 0 |')
+  })
+
+  it('deixa o clock oscilar sozinho', () => {
+    const { text } = simulateCircuit(
+      [{ id: 'clk', type: 'clock', options: { period: 2 } }],
+      [{ ticks: 4 }],
+      ['clk'],
+    )
+    const levels = text
+      .trim()
+      .split('\n')
+      .slice(2)
+      .map((line) => line.split('|')[2].trim())
+    expect(levels).toEqual(['0', '0', '1', '1', '0'])
+  })
+
+  it('recusa circuito com ligação inexistente', () => {
+    const result = simulateCircuit(
+      [{ id: 'g', type: 'and', inputs: [{ node: 'fantasma' }] }],
+      [{ ticks: 1 }],
+      [],
+    )
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('não existe')
+  })
+
+  it('recusa acompanhar um componente que não existe', () => {
+    const result = simulateCircuit([{ id: 'a', type: 'input' }], [{ ticks: 1 }], ['b'])
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('Não existem no circuito: b')
+  })
+
+  it('recusa simulação longa demais', () => {
+    const result = simulateCircuit(
+      [{ id: 'a', type: 'input' }],
+      [{ ticks: MAX_SIMULATION_TICKS + 1 }],
+      [],
+    )
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('limite por chamada')
   })
 })

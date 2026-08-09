@@ -8,6 +8,7 @@ import {
   karnaugh,
   listChips,
   simplifyExpression,
+  simulateCircuit,
   truthTable,
   type ToolResult,
 } from './tools'
@@ -135,6 +136,72 @@ server.registerTool(
     inputSchema: { expression: EXPRESSION, notation: NOTATION },
   },
   async ({ expression, notation }) => guard(() => karnaugh(expression, notation)),
+)
+
+const COMPONENT = z.object({
+  id: z.string().min(1),
+  type: z.enum([
+    'input',
+    'output',
+    'constant',
+    'and',
+    'or',
+    'not',
+    'nand',
+    'nor',
+    'xor',
+    'xnor',
+    'clock',
+    'dff',
+    'tff',
+    'delay',
+  ]),
+  inputs: z
+    .array(z.object({ node: z.string(), port: z.number().int().min(0).optional() }))
+    .optional()
+    .describe('Ligações das entradas, na ordem dos pinos. dff/tff usam [D, CLK]'),
+  options: z
+    .object({
+      period: z.number().int().min(1).optional().describe('clock: tiques em cada nível'),
+      ticks: z.number().int().min(1).optional().describe('delay: tamanho do atraso'),
+      value: z.boolean().optional().describe('constant: o valor fixo'),
+      initial: z.boolean().optional().describe('valor no instante zero'),
+    })
+    .optional(),
+  label: z.string().optional(),
+})
+
+server.registerTool(
+  'simulate_circuit',
+  {
+    title: 'Simular circuito',
+    description:
+      'Roda um circuito por alguns tiques e devolve o diagrama de tempo. Diferente da ' +
+      'tabela verdade, aceita clock, flip-flops (dff/tff) e atrasos, cujo resultado ' +
+      'depende do que aconteceu antes. Cada componente leva um tique para propagar. ' +
+      'As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1).',
+    inputSchema: {
+      components: z.array(COMPONENT).min(1).describe('Os componentes do circuito'),
+      steps: z
+        .array(
+          z.object({
+            set: z
+              .record(z.string(), z.boolean())
+              .optional()
+              .describe('Valores a aplicar nos pinos de entrada antes de rodar'),
+            ticks: z.number().int().min(1).default(1),
+          }),
+        )
+        .min(1)
+        .describe('Roteiro da simulação, em ordem'),
+      watch: z
+        .array(z.string())
+        .default([])
+        .describe('Quais componentes acompanhar. Vazio acompanha todos'),
+    },
+  },
+  async ({ components, steps, watch }) =>
+    guard(() => simulateCircuit(components, steps, watch)),
 )
 
 server.registerTool(

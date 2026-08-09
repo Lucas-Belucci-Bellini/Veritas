@@ -16,6 +16,7 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `evaluate_expression` | Resolve a expressão para valores específicos, mostrando cada passo |
 | `simplify_expression` | Forma mínima em soma de produtos (Quine-McCluskey) e a economia de portas |
 | `karnaugh_map` | Mapa de Karnaugh de 1 a 4 variáveis com os agrupamentos |
+| `simulate_circuit` | Roda um circuito com clock e flip-flops e devolve o diagrama de tempo |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
 
@@ -57,6 +58,16 @@ Em `claude_desktop_config.json`:
   simplify_expression → Original: A ∧ B ∨ A ∧ ¬B
                         Mínima:   A
                         Operadores: 4 → 0
+
+> Monta um divisor de frequência por 2 e me mostra as formas de onda.
+
+  simulate_circuit → | tique | clk | ff | evento |
+                     | --- | --- | --- | --- |
+                     | 0 | 0 | 0 | início |
+                     | 2 | 1 | 0 |  |
+                     | 3 | 1 | 1 |  |
+                     | 6 | 1 | 1 |  |
+                     | 7 | 1 | 0 |  |
 
 > Como é o Full Adder da biblioteca?
 
