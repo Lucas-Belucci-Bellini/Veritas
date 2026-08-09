@@ -2,8 +2,10 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Code2, Moon, Sun } from 'lucide-react'
 import {
   assignmentForRow,
+  buildKarnaughMap,
   buildTruthTable,
   formatAst,
+  simplify,
   tryParse,
   type Notation,
   type TruthTable,
@@ -12,8 +14,10 @@ import { ChipLibrary } from './components/ChipLibrary'
 import { SegmentedControl, Toggle } from './components/Controls'
 import { ExportBar } from './components/ExportBar'
 import { ExpressionInput } from './components/ExpressionInput'
+import { KarnaughMapView } from './components/KarnaughMapView'
 import { ProjectsPanel } from './components/ProjectsPanel'
 import { PwaStatus } from './components/PwaStatus'
+import { SimplifyPanel } from './components/SimplifyPanel'
 import { TruthTableView } from './components/TruthTableView'
 import { VirtualKeyboard } from './components/VirtualKeyboard'
 import { useTheme } from './hooks/useTheme'
@@ -61,6 +65,18 @@ export default function App() {
       return null
     }
   }, [parsed, showSteps, notation])
+
+  const analysis = useMemo(() => {
+    if (!parsed.ok) return { simplification: null, karnaugh: null }
+    try {
+      return {
+        simplification: simplify(parsed.ast, notation),
+        karnaugh: buildKarnaughMap(parsed.ast, notation),
+      }
+    } catch {
+      return { simplification: null, karnaugh: null }
+    }
+  }, [parsed, notation])
 
   useEffect(() => {
     syncUrl(expression)
@@ -264,6 +280,34 @@ export default function App() {
           <section className="card p-10 text-center text-slate-400 dark:text-slate-500">
             Corrija a expressão para ver a tabela e o circuito.
           </section>
+        )}
+
+        {table && parsed.ok && (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className="card p-4 sm:p-6">
+              <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
+                Forma mínima
+              </h2>
+              <SimplifyPanel
+                current={table.formula}
+                simplification={analysis.simplification}
+                onUse={setExpression}
+              />
+            </section>
+
+            <section className="card p-4 sm:p-6">
+              <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
+                Mapa de Karnaugh
+              </h2>
+              {analysis.karnaugh ? (
+                <KarnaughMapView map={analysis.karnaugh} style={valueStyle} />
+              ) : (
+                <p className="text-sm text-slate-400 dark:text-slate-500">
+                  O mapa cabe até 4 variáveis; acima disso a tabela é mais legível.
+                </p>
+              )}
+            </section>
+          </div>
         )}
 
         <ProjectsPanel

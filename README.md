@@ -21,6 +21,7 @@ resumido em [`plano.md`](./plano.md).
 | v0.4.0 | Projetos salvos no navegador com Dexie.js (IndexedDB) e arquivos `.veritas` |
 | v0.4.9 | Polimento: tabela virtualizada e circuito carregado sob demanda |
 | v0.5.0 | PWA: instalável e 100% funcional sem internet |
+| v0.6.0 | Simplificação de expressões, mapas de Karnaugh e servidor MCP |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
@@ -75,6 +76,39 @@ Quando a conexão cai, um aviso discreto explica que está tudo funcionando mesm
 assim. Quando sai uma versão nova, o Veritas pergunta antes de recarregar — em
 vez de puxar o tapete no meio de uma expressão.
 
+### Simplificação e mapas de Karnaugh (v0.6.0)
+
+**Forma mínima.** Qualquer expressão é reduzida à soma de produtos mínima por
+Quine-McCluskey. Como a conta parte da tabela verdade, funciona também para as
+que as regras algébricas de bolso não pegam — implicação, XOR, bicondicional:
+
+```
+(A AND B) OR (A AND NOT B)   →   A          4 operadores a menos
+NOT (A OR B)                 →   ¬A ∧ ¬B
+```
+
+**Mapa de Karnaugh** de 1 a 4 variáveis, em código Gray, com os agrupamentos
+coloridos. Os grupos destacados são exatamente os implicantes primos que a
+simplificação escolheu, então dá para ver de onde veio cada termo — inclusive os
+que dão a volta pelas bordas do mapa.
+
+O mesmo minimizador serve o site, o importador de chips e o servidor MCP: uma
+implementação só, com testes.
+
+### Servidor MCP (v0.6.0)
+
+`mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
+para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh e
+consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
+expressão, ele pergunta e recebe a conta feita.
+
+```bash
+npm run build:mcp
+claude mcp add veritas -- node $PWD/mcp/dist/server.js
+```
+
+Detalhes em [`mcp/README.md`](./mcp/README.md).
+
 ### Biblioteca de chips
 
 O projeto [UMBRA LIMA ALFA](https://github.com/Lucas-Belucci-Bellini/UMBRA-LIMA-ALFA)
@@ -100,9 +134,11 @@ npm run chips:import -- /caminho/dos/chips # ou aponte para outro projeto DLS
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # testes do motor lógico
+npm test           # testes (motor, armazenamento e ferramentas MCP)
 npm run lint       # oxlint
+npm run typecheck  # TypeScript do site e do servidor MCP
 npm run build      # build de produção em dist/
+npm run build:mcp  # servidor MCP em mcp/dist/
 ```
 
 ## Como o código está organizado
@@ -116,12 +152,16 @@ src/
   components/  interface
   hooks/       tema, projetos, conexão, virtualização da tabela
   lib/         exportação, URL compartilhável, formatação de valores
+mcp/
+  src/tools.ts   as ferramentas em si, testáveis sem MCP
+  src/server.ts  transporte stdio e esquemas
 scripts/
   import-dls-chips.mjs   importador da biblioteca de chips
 ```
 
-O `engine/` não depende de React nem do DOM: é o mesmo código que um dia pode
-rodar num servidor MCP ou numa CLI, como previsto no plano do projeto.
+O `engine/` não depende de React nem do DOM — e é justamente por isso que o
+servidor MCP e o importador de chips conseguem usar o mesmo código do site, sem
+nenhuma cópia paralela.
 
 ## Stack
 
