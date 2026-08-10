@@ -13,6 +13,8 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
+// O mesmo minimizador que o site usa, empacotado por `npm run build:lib`.
+import { minimizeColumn } from '../dist-lib/veritas-engine.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const chipsDir = resolvePath(
@@ -312,121 +314,10 @@ function uniqueVariable(index) {
   return VARIABLE_NAMES[index] ?? `X${index}`
 }
 
-/**
- * Quine-McCluskey: agrupa os mintermos, encontra os implicantes primos e cobre
- * a função com os essenciais mais uma escolha gulosa do resto.
- */
+/** Expressao minima da coluna, ou null quando ela tem termos demais para caber. */
 function minimise(column, variables) {
-  const size = variables.length
-  const minterms = []
-  column.forEach((value, index) => {
-    if (value) minterms.push(index)
-  })
-
-  if (minterms.length === 0) return '0'
-  if (minterms.length === column.length) return '1'
-
-  const primes = primeImplicants(minterms, size)
-  const chosen = coverMinterms(primes, minterms)
-  if (chosen.length > MAX_EXPRESSION_TERMS) return null
-
-  const terms = chosen.map((implicant) => implicantToTerm(implicant, variables))
-  return terms.length === 1 ? terms[0] : terms.map(wrap).join(' OR ')
-}
-
-function wrap(term) {
-  return term.includes(' AND ') ? `(${term})` : term
-}
-
-function primeImplicants(minterms, size) {
-  let groups = minterms.map((value) => ({ value, mask: 0, covers: new Set([value]) }))
-  const primes = []
-  const seen = new Set()
-
-  while (groups.length > 0) {
-    const merged = new Map()
-    const used = new Set()
-
-    for (let i = 0; i < groups.length; i += 1) {
-      for (let j = i + 1; j < groups.length; j += 1) {
-        const a = groups[i]
-        const b = groups[j]
-        if (a.mask !== b.mask) continue
-        const diff = a.value ^ b.value
-        if (diff === 0 || (diff & (diff - 1)) !== 0) continue // deve diferir em 1 bit
-
-        used.add(i)
-        used.add(j)
-        const mask = a.mask | diff
-        const value = a.value & ~mask
-        const key = `${value}/${mask}`
-        const existing = merged.get(key)
-        if (existing) {
-          for (const covered of a.covers) existing.covers.add(covered)
-          for (const covered of b.covers) existing.covers.add(covered)
-        } else {
-          merged.set(key, { value, mask, covers: new Set([...a.covers, ...b.covers]) })
-        }
-      }
-    }
-
-    groups.forEach((group, index) => {
-      if (used.has(index)) return
-      const key = `${group.value}/${group.mask}`
-      if (seen.has(key)) return
-      seen.add(key)
-      primes.push({ ...group, size })
-    })
-
-    groups = [...merged.values()]
-  }
-
-  return primes
-}
-
-function coverMinterms(primes, minterms) {
-  const remaining = new Set(minterms)
-  const chosen = []
-
-  // Essenciais: os únicos que cobrem algum mintermo.
-  for (const minterm of minterms) {
-    const covering = primes.filter((prime) => prime.covers.has(minterm))
-    if (covering.length === 1 && !chosen.includes(covering[0])) chosen.push(covering[0])
-  }
-  for (const prime of chosen) {
-    for (const covered of prime.covers) remaining.delete(covered)
-  }
-
-  // O resto por escolha gulosa: sempre o que cobre mais mintermos pendentes.
-  while (remaining.size > 0) {
-    let best = null
-    let bestScore = 0
-    for (const prime of primes) {
-      if (chosen.includes(prime)) continue
-      let score = 0
-      for (const covered of prime.covers) if (remaining.has(covered)) score += 1
-      if (score > bestScore) {
-        best = prime
-        bestScore = score
-      }
-    }
-    if (!best) break
-    chosen.push(best)
-    for (const covered of best.covers) remaining.delete(covered)
-  }
-
-  return chosen
-}
-
-function implicantToTerm(implicant, variables) {
-  const size = variables.length
-  const literals = []
-  for (let bit = 0; bit < size; bit += 1) {
-    const weight = 1 << (size - 1 - bit)
-    if (implicant.mask & weight) continue
-    literals.push(implicant.value & weight ? variables[bit] : `NOT ${variables[bit]}`)
-  }
-  return literals.length === 0 ? '1' : literals.join(' AND ')
+  const { text, implicants } = minimizeColumn(column, variables)
+  return implicants.length > MAX_EXPRESSION_TERMS ? null : text
 }
 
 main()

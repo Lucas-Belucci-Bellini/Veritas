@@ -1,0 +1,14 @@
+{
+  "name": "veritas-logic",
+  "displayName": "Veritas — lógica booleana",
+  "version": "0.6.2",
+  "description": "Motor de lógica booleana do Veritas: tabelas verdade exatas, simplificação mínima, mapas de Karnaugh, formas normais SOP/POS, simulação de circuitos com clock e flip-flops, e consulta a uma biblioteca de 1121 chips do Digital Logic Sim.",
+  "author": {
+    "name": "Lucas Belucci Bellini",
+    "url": "https://github.com/Lucas-Belucci-Bellini"
+  },
+  "homepage": "https://github.com/Lucas-Belucci-Bellini/Veritas",
+  "repository": "https://github.com/Lucas-Belucci-Bellini/Veritas",
+  "keywords": ["logica", "booleana", "tabela-verdade", "karnaugh", "circuitos"],
+  "mcpServers": "./.mcp.json"
+}

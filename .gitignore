@@ -9,3 +9,6 @@ coverage
 .env
 .env.*
 !.env.example
+dev-dist
+dist-lib
+mcp/dist

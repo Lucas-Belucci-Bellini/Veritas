@@ -92,12 +92,16 @@ class Parser {
   parseExpression(minPrecedence: number): AstNode {
     let left = this.parseUnary()
 
-    while (isBinaryOp(this.current.type)) {
-      const op = this.current.type as BinaryOp
+    while (true) {
+      // Justaposição vale AND, como nos livros: `A B`, `(A + B)(A + C)`, `A B'`.
+      const explicit = isBinaryOp(this.current.type)
+      if (!explicit && !startsOperand(this.current.type)) break
+
+      const op = explicit ? (this.current.type as BinaryOp) : 'and'
       const precedence = PRECEDENCE[op]
       if (precedence < minPrecedence) break
 
-      this.advance()
+      if (explicit) this.advance()
       const nextMin = RIGHT_ASSOCIATIVE.has(op) ? precedence : precedence + 1
       const right = this.parseExpression(nextMin)
 
@@ -127,6 +131,24 @@ class Parser {
   }
 
   private parsePrimary(): AstNode {
+    return this.applyPrimes(this.parseOperand())
+  }
+
+  /** `A''` nega duas vezes; o apóstrofo gruda no operando à esquerda. */
+  private applyPrimes(node: AstNode): AstNode {
+    let result = node
+    while (this.current.type === 'prime') {
+      const prime = this.advance()
+      result = {
+        kind: 'not',
+        operand: result,
+        span: { start: result.span.start, end: prime.end },
+      }
+    }
+    return result
+  }
+
+  private parseOperand(): AstNode {
     const token = this.current
 
     if (token.type === 'var') {
@@ -219,6 +241,16 @@ class Parser {
       )
     }
 
+    if (token.type === 'prime') {
+      return new VeritasError(
+        'syntax',
+        'O apóstrofo nega o que vem antes dele, e aqui não há nada antes.',
+        token.start,
+        token.end,
+        'Escreva A\u2019 para negar A.',
+      )
+    }
+
     return new VeritasError(
       'syntax',
       `Não esperava ${describeToken(token)} aqui.`,
@@ -254,4 +286,9 @@ class Parser {
 
 function isBinaryOp(type: Token['type']): boolean {
   return type in PRECEDENCE
+}
+
+/** Tokens que podem abrir um operando — e portanto disparar o AND implícito. */
+function startsOperand(type: Token['type']): boolean {
+  return type === 'var' || type === 'const' || type === 'lparen' || type === 'not'
 }

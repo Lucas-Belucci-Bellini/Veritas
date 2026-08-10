@@ -5,6 +5,7 @@ import { evaluate } from './evaluator'
 import { formatAst } from './format'
 import { tokenize } from './lexer'
 import { parse, tryParse } from './parser'
+import { simplify } from './minimize'
 import { assignmentForRow, buildTruthTable } from './truthTable'
 
 const evalWith = (source: string, assignment: Record<string, boolean>) =>
@@ -52,11 +53,12 @@ describe('lexer', () => {
     expect(error.error.message).toContain('@')
   })
 
-  it('sugere operadores quando o usuário cola letras', () => {
+  it('sugere como separar quando o usuário cola letras', () => {
     const result = tryParse('AB')
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.error.hint).toContain('A AND B')
+    expect(result.error.hint).toContain('A B')
   })
 })
 
@@ -125,8 +127,14 @@ describe('mensagens de erro', () => {
     expect(expectError('A AND').message).toContain('termina em "AND"')
   })
 
-  it('detecta duas variáveis sem operador', () => {
-    expect(expectError('A B').message).toContain('Falta um operador')
+  it('recusa letras coladas e ensina como separar', () => {
+    const error = expectError('AB')
+    expect(error.message).toContain('não é um operador conhecido')
+    expect(error.hint).toContain('A B')
+  })
+
+  it('recusa apóstrofo sem nada para negar', () => {
+    expect(expectError("' A").message).toContain('não há nada antes')
   })
 
   it('recusa parênteses vazios', () => {
@@ -255,5 +263,49 @@ describe('colunas repetidas', () => {
       type: 'result',
       label: '¬A ∧ B ∨ ¬A ∧ C',
     })
+  })
+})
+
+describe('notação de engenharia', () => {
+  it('lê o apóstrofo como negação do que vem antes', () => {
+    expect(formatAst(parse("A'"))).toBe('¬A')
+    expect(formatAst(parse("(A + B)'"))).toBe('¬(A ∨ B)')
+    expect(formatAst(parse("A''"))).toBe('¬¬A')
+  })
+
+  it('trata justaposição como AND', () => {
+    expect(formatAst(parse('A B'))).toBe('A ∧ B')
+    expect(formatAst(parse('A B C'))).toBe('A ∧ B ∧ C')
+    expect(formatAst(parse('(A + B)(A + C)'))).toBe('(A ∨ B) ∧ (A ∨ C)')
+  })
+
+  it('dá ao AND implícito a mesma precedência do explícito', () => {
+    expect(formatAst(parse('A B + C'))).toBe('A ∧ B ∨ C')
+    expect(formatAst(parse('A + B C'))).toBe('A ∨ B ∧ C')
+  })
+
+  it('gruda o apóstrofo só no operando mais próximo', () => {
+    expect(formatAst(parse("A B'"))).toBe('A ∧ ¬B')
+    expect(formatAst(parse("A' B C"))).toBe('¬A ∧ B ∧ C')
+  })
+
+  it('aceita a aspa curva que os editores de texto inserem', () => {
+    expect(formatAst(parse('A\u2019 B'))).toBe('¬A ∧ B')
+  })
+
+  it('lê as expressões da atividade exatamente como estão escritas', () => {
+    const cases: Array<[string, string]> = [
+      ["A + A B'", 'A'],
+      ["A' B C + B C", 'B ∧ C'],
+      ["(A + B)(A + B')", 'A'],
+      ["(A' + B)' (A + C)'", '0'],
+      ['A B + B C (B + C)', 'B ∧ C ∨ A ∧ B'],
+    ]
+    for (const [source, minimal] of cases) {
+      const result = tryParse(source)
+      expect(result.ok, source).toBe(true)
+      if (!result.ok) continue
+      expect(simplify(result.ast)!.expression, source).toBe(minimal)
+    }
   })
 })

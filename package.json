@@ -1,7 +1,7 @@
 {
   "name": "veritas",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.6.2",
   "type": "module",
   "description": "Calculadora de tabelas verdade e simulador de circuitos logicos, 100% no navegador.",
   "scripts": {
@@ -10,26 +10,36 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
-    "chips:import": "node scripts/import-dls-chips.mjs",
-    "lint": "oxlint"
+    "typecheck": "tsc -b && tsc -p tsconfig.mcp.json",
+    "chips:import": "npm run build:lib && node scripts/import-dls-chips.mjs",
+    "lint": "oxlint",
+    "build:lib": "vite build --config vite.lib.config.ts",
+    "build:mcp": "vite build --config vite.mcp.config.ts",
+    "build:plugin": "vite build --config vite.plugin.config.ts",
+    "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
     "@xyflow/react": "^12.11.2",
+    "dexie": "^4.4.4",
     "lucide-react": "^1.30.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
+    "fake-indexeddb": "^6.2.5",
     "oxlint": "^1.75.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10",
+    "zod": "^4.4.3"
   }
 }

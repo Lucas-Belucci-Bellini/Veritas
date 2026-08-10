@@ -1,0 +1,15 @@
+{
+  "name": "veritas-mcp-server",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor MCP que expõe o motor lógico do Veritas para assistentes de IA.",
+  "bin": {
+    "veritas-mcp-server": "dist/server.js"
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  }
+}

@@ -18,6 +18,12 @@ resumido em [`plano.md`](./plano.md).
 | v0.1.0 | Motor lógico: lexer, parser, AST, avaliador e geração das combinações |
 | v0.2.0 | Interface: barra de input com validação em tempo real, teclado virtual, tema claro/escuro, exportação |
 | v0.3.0 | Simulador visual: circuito gerado da AST com React Flow + Dagre |
+| v0.4.0 | Projetos salvos no navegador com Dexie.js (IndexedDB) e arquivos `.veritas` |
+| v0.4.9 | Polimento: tabela virtualizada e circuito carregado sob demanda |
+| v0.5.0 | PWA: instalável e 100% funcional sem internet |
+| v0.6.0 | Simplificação de expressões, mapas de Karnaugh e servidor MCP |
+| v0.6.1 | Motor de simulação sequencial: clock, flip-flops e atrasos |
+| v0.6.2 | Notação de engenharia (`A'`, `A B`) e formas normais SOP/POS |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
@@ -41,6 +47,134 @@ Barra de input grande com feedback verde/vermelho a cada tecla, teclado virtual
 dividido por categoria (os símbolos que ninguém sabe digitar), alternância entre
 `V/F` e `1/0`, tema claro e escuro, e exportação em **CSV**, **PNG** (desenhado
 em canvas, sem biblioteca externa) e link compartilhável (`?expr=`).
+
+### Projetos salvos (v0.4.0)
+
+Os projetos ficam no **IndexedDB do próprio navegador**, via Dexie.js. Nada sai
+da máquina do usuário e nada custa servidor. Dá para nomear, renomear, reabrir e
+excluir projetos, além de exportar tudo num arquivo **`.veritas`** e importar de
+volta — o mesmo formato que a CLI e o servidor MCP vão ler mais adiante.
+
+O leitor do `.veritas` recusa arquivo de outro programa, JSON quebrado e versão
+de formato mais nova do que a que ele entende, em vez de importar lixo em
+silêncio.
+
+### Performance (v0.4.9)
+
+* **Tabela virtualizada.** Uma expressão com 10 variáveis dá 1024 linhas; com as
+  colunas de passos intermediários isso passa de 20 mil células. Acima de 200
+  linhas a tabela renderiza só a janela visível, então a rolagem continua fluida.
+* **Circuito sob demanda.** React Flow e Dagre pesam mais que todo o resto
+  somado, então viraram um pedaço separado, baixado só quando existe uma
+  expressão válida na tela. O pacote inicial caiu de 560 kB para 337 kB.
+
+### Offline de verdade (v0.5.0)
+
+Service worker com Workbox precarregando **970 kB** — o aplicativo inteiro,
+incluindo o catálogo de chips. Depois da primeira visita o Veritas abre no modo
+avião, e pode ser instalado como aplicativo no computador ou no celular.
+
+Quando a conexão cai, um aviso discreto explica que está tudo funcionando mesmo
+assim. Quando sai uma versão nova, o Veritas pergunta antes de recarregar — em
+vez de puxar o tapete no meio de uma expressão.
+
+### Notação de engenharia e formas normais (v0.6.2)
+
+Livros e listas de álgebra booleana não escrevem `A AND NOT B` — escrevem
+`A B'`. O Veritas agora lê essa notação direto:
+
+* **Apóstrofo posfixo** para negação: `A'`, `(A + B)'`, `A B' C`.
+* **Justaposição vale AND**: `A B`, `(A + B)(A + C)`, `A B + B C`.
+
+Letras coladas (`AB`) continuam dando erro de propósito, com a dica de separar
+com espaço — assim um `ANDD` digitado errado não vira silenciosamente
+`A ∧ N ∧ D ∧ D`.
+
+Junto vieram as **formas normais**:
+
+* SOP e POS **canônicas** (todos os mintermos, todos os maxtermos), com os
+  índices Σm e ΠM.
+* SOP e POS **mínimas**, com a contagem de operadores de cada uma — a POS sai da
+  minimização do complemento, aplicando De Morgan no resultado.
+* Um **classificador** que diz se a expressão que você escreveu já está em soma
+  de produtos, produto de somas, ou nenhuma das duas.
+
+### Simplificação e mapas de Karnaugh (v0.6.0)
+
+**Forma mínima.** Qualquer expressão é reduzida à soma de produtos mínima por
+Quine-McCluskey. Como a conta parte da tabela verdade, funciona também para as
+que as regras algébricas de bolso não pegam — implicação, XOR, bicondicional:
+
+```
+(A AND B) OR (A AND NOT B)   →   A          4 operadores a menos
+NOT (A OR B)                 →   ¬A ∧ ¬B
+```
+
+**Mapa de Karnaugh** de 1 a 4 variáveis, em código Gray, com os agrupamentos
+coloridos. Os grupos destacados são exatamente os implicantes primos que a
+simplificação escolheu, então dá para ver de onde veio cada termo — inclusive os
+que dão a volta pelas bordas do mapa.
+
+O mesmo minimizador serve o site, o importador de chips e o servidor MCP: uma
+implementação só, com testes.
+
+### Lógica sequencial (v0.6.1)
+
+Até aqui tudo era **combinacional**: a saída respondia na hora à entrada. O
+simulador em `src/simulation/` dá o salto para a **lógica sequencial**, onde a
+saída depende também do que aconteceu antes.
+
+Cada tique acontece em duas fases, como o plano previa: primeiro todo mundo
+calcula o próprio próximo valor olhando para os valores *atuais* dos vizinhos, e
+só depois todos publicam ao mesmo tempo. É o que a eletricidade faz de verdade —
+cada porta tem seu atraso de propagação — e é o que permite simular
+realimentação sem o navegador entrar em laço infinito.
+
+Componentes: portas lógicas, `input`, `output`, `constant`, `clock` (com período
+ajustável), flip-flops `dff` e `tff` (disparados na borda de subida, com saídas
+Q e Q̄) e `delay` de N tiques.
+
+Com isso já dá para montar latch SR, contador, divisor de frequência e linhas de
+atraso — os testes cobrem todos eles. E um teste cruzado confere que, para
+expressões combinacionais, o circuito simulado concorda com o avaliador em
+**todas** as linhas da tabela: os dois motores não podem discordar.
+
+### Plugin do Claude Code
+
+Este repositório também é um **marketplace de plugin do Claude Code**. Dá para
+instalar o motor do Veritas direto no seu Claude Code:
+
+```
+/plugin marketplace add Lucas-Belucci-Bellini/Veritas
+/plugin install veritas-logic@veritas
+```
+
+O plugin traz o servidor MCP já empacotado — nenhum `npm install`, nenhum build
+do lado de quem instala — mais uma skill que ensina o Claude a notação aceita e
+qual ferramenta usar em cada pergunta.
+
+Por isso `plugins/veritas-logic/server.mjs` e `catalog.json` são artefatos de
+build **versionados**: quem instala um plugin recebe uma cópia da pasta, e ela
+precisa funcionar sozinha. Para regerá-los:
+
+```bash
+npm run build:plugin
+npm run validate:plugin
+```
+
+### Servidor MCP (v0.6.0)
+
+`mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
+para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh,
+simulação de circuitos sequenciais e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
+expressão, ele pergunta e recebe a conta feita.
+
+```bash
+npm run build:mcp
+claude mcp add veritas -- node $PWD/mcp/dist/server.js
+```
+
+Detalhes em [`mcp/README.md`](./mcp/README.md).
 
 ### Biblioteca de chips
 
@@ -67,9 +201,11 @@ npm run chips:import -- /caminho/dos/chips # ou aponte para outro projeto DLS
 ```bash
 npm install
 npm run dev        # servidor de desenvolvimento
-npm test           # testes do motor lógico
+npm test           # testes (motor, armazenamento e ferramentas MCP)
 npm run lint       # oxlint
+npm run typecheck  # TypeScript do site e do servidor MCP
 npm run build      # build de produção em dist/
+npm run build:mcp  # servidor MCP em mcp/dist/
 ```
 
 ## Como o código está organizado
@@ -79,24 +215,39 @@ src/
   engine/      lexer, parser, AST, avaliador, tabela verdade  (sem React)
   circuit/     AST -> grafo de portas, layout com Dagre, nó visual
   chips/       catálogo importado do Digital Logic Sim
+  simulation/  simulador por tiques: clock, flip-flops, atrasos
+  storage/     banco local (Dexie) e o formato de arquivo .veritas
   components/  interface
+  hooks/       tema, projetos, conexão, virtualização da tabela
   lib/         exportação, URL compartilhável, formatação de valores
+mcp/
+  src/tools.ts   as ferramentas em si, testáveis sem MCP
+  src/server.ts  transporte stdio e esquemas
+.claude-plugin/
+  marketplace.json       catálogo do marketplace
+plugins/veritas-logic/
+  .claude-plugin/        manifesto do plugin
+  .mcp.json              como o Claude Code sobe o servidor
+  skills/veritas/        skill com a notação e o guia de ferramentas
+  server.mjs             servidor empacotado (gerado, versionado)
 scripts/
   import-dls-chips.mjs   importador da biblioteca de chips
 ```
 
-O `engine/` não depende de React nem do DOM: é o mesmo código que um dia pode
-rodar num servidor MCP ou numa CLI, como previsto no plano do projeto.
+O `engine/` não depende de React nem do DOM — e é justamente por isso que o
+servidor MCP e o importador de chips conseguem usar o mesmo código do site, sem
+nenhuma cópia paralela.
 
 ## Stack
 
-React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Vitest
+React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexie.js · Workbox · Vitest · oxlint
 
 ## Próximos passos
 
-* v0.4.0 — salvamento local dos projetos com Dexie.js (IndexedDB)
-* v0.5.0 — PWA: instalar e usar sem internet
-* v0.6.0 — contas de usuário e sincronização opcional
+* Editor visual de circuitos, para desenhar na tela o que hoje só é simulável
+  por código ou pelo servidor MCP
+* Barramentos multi-bit e chips customizados (subcircuitos)
+* Contas de usuário e sincronização opcional
 * v0.7.0 — sincronização em tempo real (CRDT) e fios sem fio (túneis Tx/Rx)
 * Depois — barramentos multi-bit, lógica sequencial (clock, flip-flops, RAM),
   chips customizados e servidor MCP para IAs consultarem o motor

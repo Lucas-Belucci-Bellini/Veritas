@@ -1,21 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Code2, Moon, Sun } from 'lucide-react'
 import {
   assignmentForRow,
+  buildKarnaughMap,
+  buildNormalForms,
   buildTruthTable,
+  classifyForm,
   formatAst,
+  simplify,
   tryParse,
   type Notation,
   type TruthTable,
 } from './engine'
 import { ChipLibrary } from './components/ChipLibrary'
-import { CircuitView } from './components/CircuitView'
 import { SegmentedControl, Toggle } from './components/Controls'
 import { ExportBar } from './components/ExportBar'
 import { ExpressionInput } from './components/ExpressionInput'
+import { KarnaughMapView } from './components/KarnaughMapView'
+import { ProjectsPanel } from './components/ProjectsPanel'
+import { NormalFormsPanel } from './components/NormalFormsPanel'
+import { PwaStatus } from './components/PwaStatus'
 import { TruthTableView } from './components/TruthTableView'
 import { VirtualKeyboard } from './components/VirtualKeyboard'
 import { useTheme } from './hooks/useTheme'
+
+// O React Flow e o Dagre pesam mais que todo o resto do aplicativo somado, e
+// só fazem falta quando já existe uma expressão válida na tela.
+const CircuitView = lazy(() =>
+  import('./components/CircuitView').then((module) => ({ default: module.CircuitView })),
+)
 import { expressionFromUrl, syncUrl } from './lib/url'
 import type { ValueStyle } from './lib/values'
 
@@ -54,6 +67,22 @@ export default function App() {
       return null
     }
   }, [parsed, showSteps, notation])
+
+  const analysis = useMemo(() => {
+    if (!parsed.ok) {
+      return { simplification: null, karnaugh: null, forms: null, form: 'nenhuma' as const }
+    }
+    try {
+      return {
+        simplification: simplify(parsed.ast, notation),
+        karnaugh: buildKarnaughMap(parsed.ast, notation),
+        forms: buildNormalForms(parsed.ast, notation),
+        form: classifyForm(parsed.ast),
+      }
+    } catch {
+      return { simplification: null, karnaugh: null, forms: null, form: 'nenhuma' as const }
+    }
+  }, [parsed, notation])
 
   useEffect(() => {
     syncUrl(expression)
@@ -233,11 +262,19 @@ export default function App() {
               <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
                 Circuito equivalente
               </h2>
-              <CircuitView
-                ast={parsed.ast}
-                notation={notation}
-                assignment={assignment}
-              />
+              <Suspense
+                fallback={
+                  <div className="grid h-96 w-full place-items-center rounded-xl border border-slate-200 text-sm text-slate-400 dark:border-slate-800">
+                    Montando o circuito…
+                  </div>
+                }
+              >
+                <CircuitView
+                  ast={parsed.ast}
+                  notation={notation}
+                  assignment={assignment}
+                />
+              </Suspense>
               <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
                 {selectedRow === null
                   ? 'Nenhuma linha selecionada — o circuito está desligado.'
@@ -251,8 +288,49 @@ export default function App() {
           </section>
         )}
 
+        {table && parsed.ok && (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className="card p-4 sm:p-6">
+              <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
+                Formas normais
+              </h2>
+              <NormalFormsPanel
+                current={table.formula}
+                form={analysis.form}
+                forms={analysis.forms}
+                simplification={analysis.simplification}
+                onUse={setExpression}
+              />
+            </section>
+
+            <section className="card p-4 sm:p-6">
+              <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
+                Mapa de Karnaugh
+              </h2>
+              {analysis.karnaugh ? (
+                <KarnaughMapView map={analysis.karnaugh} style={valueStyle} />
+              ) : (
+                <p className="text-sm text-slate-400 dark:text-slate-500">
+                  O mapa cabe até 4 variáveis; acima disso a tabela é mais legível.
+                </p>
+              )}
+            </section>
+          </div>
+        )}
+
+        <ProjectsPanel
+          expression={expression}
+          notation={notation}
+          onOpen={(saved, savedNotation) => {
+            setNotation(savedNotation)
+            setExpression(saved)
+          }}
+        />
+
         <ChipLibrary onUseExpression={setExpression} />
       </main>
+
+      <PwaStatus />
 
       <footer className="mx-auto max-w-6xl px-4 pb-10 text-center text-xs text-slate-400 dark:text-slate-600">
         Veritas — tudo roda no seu navegador, nenhuma expressão sai do seu

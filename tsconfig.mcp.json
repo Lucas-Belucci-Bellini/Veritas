@@ -3,15 +3,16 @@
     "target": "ES2023",
     "lib": ["ES2023"],
     "module": "ESNext",
-    "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
+    "resolveJsonModule": true,
     "noEmit": true,
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "types": ["node"]
   },
-  "include": ["vite.config.ts", "vite.lib.config.ts", "vite.mcp.config.ts", "vitest.config.ts", "scripts/**/*.mjs"]
+  "include": ["mcp/src"]
 }
