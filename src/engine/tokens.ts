@@ -21,6 +21,7 @@ export type TokenType =
   | 'iff'
   | 'lparen'
   | 'rparen'
+  | 'prime'
   | 'eof'
 
 export interface Token {
@@ -65,6 +66,9 @@ export const SYMBOL_OPERATORS: ReadonlyArray<readonly [string, TokenType]> = [
   ['¬', 'not'],
   ['!', 'not'],
   ['~', 'not'],
+  // Apóstrofo depois do operando: A' é o "A negado" dos livros de eletrônica.
+  ["'", 'prime'],
+  ['\u2019', 'prime'],
   ['(', 'lparen'],
   [')', 'rparen'],
 ]
@@ -111,7 +115,12 @@ export const CONSTANTS: Readonly<Record<string, boolean>> = {
 /** Notações de exibição oferecidas ao usuário. */
 export type Notation = 'math' | 'programming' | 'text'
 
-type OperatorTokenType = Exclude<TokenType, 'var' | 'const' | 'lparen' | 'rparen' | 'eof'>
+// O apóstrofo fica de fora: ele é só outra forma de escrever o NOT, não um
+// operador com glifo próprio nas tabelas de notação.
+type OperatorTokenType = Exclude<
+  TokenType,
+  'var' | 'const' | 'lparen' | 'rparen' | 'prime' | 'eof'
+>
 
 /** Como cada operador é escrito em cada notação. */
 export const OPERATOR_GLYPHS: Record<OperatorTokenType, Record<Notation, string>> = {
@@ -153,6 +162,8 @@ export function describeToken(token: Token): string {
       return 'um parêntese "("'
     case 'rparen':
       return 'um parêntese ")"'
+    case 'prime':
+      return 'um apóstrofo de negação'
     case 'eof':
       return 'o fim da expressão'
     default:

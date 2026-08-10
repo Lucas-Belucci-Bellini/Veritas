@@ -3,7 +3,9 @@ import { Code2, Moon, Sun } from 'lucide-react'
 import {
   assignmentForRow,
   buildKarnaughMap,
+  buildNormalForms,
   buildTruthTable,
+  classifyForm,
   formatAst,
   simplify,
   tryParse,
@@ -16,8 +18,8 @@ import { ExportBar } from './components/ExportBar'
 import { ExpressionInput } from './components/ExpressionInput'
 import { KarnaughMapView } from './components/KarnaughMapView'
 import { ProjectsPanel } from './components/ProjectsPanel'
+import { NormalFormsPanel } from './components/NormalFormsPanel'
 import { PwaStatus } from './components/PwaStatus'
-import { SimplifyPanel } from './components/SimplifyPanel'
 import { TruthTableView } from './components/TruthTableView'
 import { VirtualKeyboard } from './components/VirtualKeyboard'
 import { useTheme } from './hooks/useTheme'
@@ -67,14 +69,18 @@ export default function App() {
   }, [parsed, showSteps, notation])
 
   const analysis = useMemo(() => {
-    if (!parsed.ok) return { simplification: null, karnaugh: null }
+    if (!parsed.ok) {
+      return { simplification: null, karnaugh: null, forms: null, form: 'nenhuma' as const }
+    }
     try {
       return {
         simplification: simplify(parsed.ast, notation),
         karnaugh: buildKarnaughMap(parsed.ast, notation),
+        forms: buildNormalForms(parsed.ast, notation),
+        form: classifyForm(parsed.ast),
       }
     } catch {
-      return { simplification: null, karnaugh: null }
+      return { simplification: null, karnaugh: null, forms: null, form: 'nenhuma' as const }
     }
   }, [parsed, notation])
 
@@ -286,10 +292,12 @@ export default function App() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <section className="card p-4 sm:p-6">
               <h2 className="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
-                Forma mínima
+                Formas normais
               </h2>
-              <SimplifyPanel
+              <NormalFormsPanel
                 current={table.formula}
+                form={analysis.form}
+                forms={analysis.forms}
                 simplification={analysis.simplification}
                 onUse={setExpression}
               />

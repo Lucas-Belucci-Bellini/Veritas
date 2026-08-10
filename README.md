@@ -23,6 +23,7 @@ resumido em [`plano.md`](./plano.md).
 | v0.5.0 | PWA: instalável e 100% funcional sem internet |
 | v0.6.0 | Simplificação de expressões, mapas de Karnaugh e servidor MCP |
 | v0.6.1 | Motor de simulação sequencial: clock, flip-flops e atrasos |
+| v0.6.2 | Notação de engenharia (`A'`, `A B`) e formas normais SOP/POS |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
@@ -76,6 +77,27 @@ avião, e pode ser instalado como aplicativo no computador ou no celular.
 Quando a conexão cai, um aviso discreto explica que está tudo funcionando mesmo
 assim. Quando sai uma versão nova, o Veritas pergunta antes de recarregar — em
 vez de puxar o tapete no meio de uma expressão.
+
+### Notação de engenharia e formas normais (v0.6.2)
+
+Livros e listas de álgebra booleana não escrevem `A AND NOT B` — escrevem
+`A B'`. O Veritas agora lê essa notação direto:
+
+* **Apóstrofo posfixo** para negação: `A'`, `(A + B)'`, `A B' C`.
+* **Justaposição vale AND**: `A B`, `(A + B)(A + C)`, `A B + B C`.
+
+Letras coladas (`AB`) continuam dando erro de propósito, com a dica de separar
+com espaço — assim um `ANDD` digitado errado não vira silenciosamente
+`A ∧ N ∧ D ∧ D`.
+
+Junto vieram as **formas normais**:
+
+* SOP e POS **canônicas** (todos os mintermos, todos os maxtermos), com os
+  índices Σm e ΠM.
+* SOP e POS **mínimas**, com a contagem de operadores de cada uma — a POS sai da
+  minimização do complemento, aplicando De Morgan no resultado.
+* Um **classificador** que diz se a expressão que você escreveu já está em soma
+  de produtos, produto de somas, ou nenhuma das duas.
 
 ### Simplificação e mapas de Karnaugh (v0.6.0)
 

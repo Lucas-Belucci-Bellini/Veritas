@@ -16,11 +16,13 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `evaluate_expression` | Resolve a expressão para valores específicos, mostrando cada passo |
 | `simplify_expression` | Forma mínima em soma de produtos (Quine-McCluskey) e a economia de portas |
 | `karnaugh_map` | Mapa de Karnaugh de 1 a 4 variáveis com os agrupamentos |
+| `normal_forms` | SOP e POS, canônicas e mínimas, e a classificação da expressão dada |
 | `simulate_circuit` | Roda um circuito com clock e flip-flops e devolve o diagrama de tempo |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
 
-Todas aceitam as três notações (`AND`/`&&`/`∧`) e devolvem na notação pedida.
+Todas aceitam as três notações (`AND`/`&&`/`∧`), mais a de engenharia (`A B'`
+com apóstrofo e justaposição), e devolvem na notação pedida.
 
 ## Instalação
 

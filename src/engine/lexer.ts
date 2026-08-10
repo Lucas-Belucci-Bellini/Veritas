@@ -108,9 +108,8 @@ export function tokenize(source: string): Token[] {
         `"${word}" não é um operador conhecido.`,
         start,
         i,
-        `Variáveis têm uma letra só. Se você quis dizer ${word
-          .split('')
-          .join(' AND ')}, coloque o operador entre as letras.`,
+        `Variáveis têm uma letra só. Separe com espaço (${word.split('').join(' ')}) ` +
+          `ou use um operador (${word.split('').join(' AND ')}).`,
       )
     }
 

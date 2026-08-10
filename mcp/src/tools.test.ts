@@ -6,6 +6,7 @@ import {
   karnaugh,
   listChips,
   MAX_SIMULATION_TICKS,
+  normalForms,
   simplifyExpression,
   simulateCircuit,
   truthTable,
@@ -177,5 +178,26 @@ describe('simulate_circuit', () => {
     )
     expect(result.isError).toBe(true)
     expect(result.text).toContain('limite por chamada')
+  })
+})
+
+describe('normal_forms', () => {
+  it('lista as quatro formas e a classificação', () => {
+    const { text } = normalForms('A XOR B')
+    expect(text).toContain('Como está escrita: Nem SOP nem POS')
+    expect(text).toContain('SOP canônica — Σm(1, 2)')
+    expect(text).toContain('POS canônica — ΠM(0, 3)')
+    expect(text).toContain('¬A ∧ B ∨ A ∧ ¬B')
+    expect(text).toContain('(A ∨ B) ∧ (¬A ∨ ¬B)')
+  })
+
+  it('reconhece uma POS escrita à mão', () => {
+    expect(normalForms("(B + C' + D)(A' + B)").text).toContain(
+      'Como está escrita: Produto de somas (POS)',
+    )
+  })
+
+  it('diz qual das duas formas sai mais barata', () => {
+    expect(normalForms('A OR B').text).toMatch(/mais barat|mesmo/)
   })
 })

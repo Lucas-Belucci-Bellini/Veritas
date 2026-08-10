@@ -3,7 +3,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   buildKarnaughMap,
+  buildNormalForms,
   buildTruthTable,
+  classifyForm,
+  FORM_LABELS,
   collectVariables,
   evaluateWithSteps,
   formatAst,
@@ -279,6 +282,44 @@ function describeChip(chip: ChipEntry): string {
   }
 
   return lines.join('\n')
+}
+
+export function normalForms(expression: string, notation: Notation = 'math'): ToolResult {
+  const ast = parseOrExplain(expression)
+  const forms = buildNormalForms(ast, notation)
+  if (!forms) {
+    return {
+      isError: true,
+      text: 'A expressão tem variáveis demais para montar as formas normais.',
+    }
+  }
+
+  const cheaper =
+    forms.sopOperators === forms.posOperators
+      ? 'As duas custam o mesmo.'
+      : forms.sopOperators < forms.posOperators
+        ? 'A soma de produtos sai mais barata.'
+        : 'O produto de somas sai mais barato.'
+
+  return {
+    text: [
+      `Expressão: ${formatAst(ast, notation)}`,
+      `Como está escrita: ${FORM_LABELS[classifyForm(ast)]}`,
+      `Variáveis: ${forms.variables.join(', ')}`,
+      '',
+      `SOP canônica — Σm(${forms.minterms.join(', ') || '—'})`,
+      `  ${forms.canonicalSop}`,
+      `POS canônica — ΠM(${forms.maxterms.join(', ') || '—'})`,
+      `  ${forms.canonicalPos}`,
+      '',
+      `SOP mínima (${forms.sopOperators} operadores)`,
+      `  ${forms.minimalSop}`,
+      `POS mínima (${forms.posOperators} operadores)`,
+      `  ${forms.minimalPos}`,
+      '',
+      cheaper,
+    ].join('\n'),
+  }
 }
 
 export interface SimulationStep {

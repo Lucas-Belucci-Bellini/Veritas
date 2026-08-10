@@ -7,6 +7,7 @@ import {
   getChip,
   karnaugh,
   listChips,
+  normalForms,
   simplifyExpression,
   simulateCircuit,
   truthTable,
@@ -124,6 +125,19 @@ server.registerTool(
     inputSchema: { expression: EXPRESSION, notation: NOTATION },
   },
   async ({ expression, notation }) => guard(() => simplifyExpression(expression, notation)),
+)
+
+server.registerTool(
+  'normal_forms',
+  {
+    title: 'Formas normais',
+    description:
+      'Devolve a soma de produtos e o produto de somas da expressão, nas versões ' +
+      'canônica (todos os mintermos e maxtermos) e mínima, com a contagem de ' +
+      'operadores de cada uma, e diz se a expressão dada já está escrita em SOP ou POS.',
+    inputSchema: { expression: EXPRESSION, notation: NOTATION },
+  },
+  async ({ expression, notation }) => guard(() => normalForms(expression, notation)),
 )
 
 server.registerTool(
