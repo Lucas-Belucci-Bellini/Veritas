@@ -139,6 +139,29 @@ atraso — os testes cobrem todos eles. E um teste cruzado confere que, para
 expressões combinacionais, o circuito simulado concorda com o avaliador em
 **todas** as linhas da tabela: os dois motores não podem discordar.
 
+### Plugin do Claude Code
+
+Este repositório também é um **marketplace de plugin do Claude Code**. Dá para
+instalar o motor do Veritas direto no seu Claude Code:
+
+```
+/plugin marketplace add Lucas-Belucci-Bellini/Veritas
+/plugin install veritas-logic@veritas
+```
+
+O plugin traz o servidor MCP já empacotado — nenhum `npm install`, nenhum build
+do lado de quem instala — mais uma skill que ensina o Claude a notação aceita e
+qual ferramenta usar em cada pergunta.
+
+Por isso `plugins/veritas-logic/server.mjs` e `catalog.json` são artefatos de
+build **versionados**: quem instala um plugin recebe uma cópia da pasta, e ela
+precisa funcionar sozinha. Para regerá-los:
+
+```bash
+npm run build:plugin
+npm run validate:plugin
+```
+
 ### Servidor MCP (v0.6.0)
 
 `mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
@@ -200,6 +223,13 @@ src/
 mcp/
   src/tools.ts   as ferramentas em si, testáveis sem MCP
   src/server.ts  transporte stdio e esquemas
+.claude-plugin/
+  marketplace.json       catálogo do marketplace
+plugins/veritas-logic/
+  .claude-plugin/        manifesto do plugin
+  .mcp.json              como o Claude Code sobe o servidor
+  skills/veritas/        skill com a notação e o guia de ferramentas
+  server.mjs             servidor empacotado (gerado, versionado)
 scripts/
   import-dls-chips.mjs   importador da biblioteca de chips
 ```
