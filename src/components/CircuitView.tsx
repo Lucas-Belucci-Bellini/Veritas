@@ -25,6 +25,17 @@ interface CircuitViewProps {
 export function CircuitView({ ast, notation, assignment }: CircuitViewProps) {
   const graph = useMemo(() => astToGraph(ast, notation), [ast, notation])
 
+  /**
+   * O `fitView` do React Flow só roda na montagem. Sem remontar, trocar de
+   * expressão mantinha o enquadramento antigo e circuitos maiores apareciam
+   * cortados na direita. A chave muda quando o desenho muda — e só então,
+   * para acender uma linha da tabela não jogar fora o zoom do usuário.
+   */
+  const graphKey = useMemo(
+    () => graph.nodes.map((node) => `${node.id}:${node.data.label}`).join('|'),
+    [graph],
+  )
+
   const { nodes, edges } = useMemo(() => {
     const signals = assignment ? computeSignals(graph, assignment) : null
 
@@ -51,6 +62,7 @@ export function CircuitView({ ast, notation, assignment }: CircuitViewProps) {
   return (
     <div className="h-96 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
       <ReactFlow
+        key={graphKey}
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
