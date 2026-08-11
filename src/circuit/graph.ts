@@ -35,6 +35,8 @@ export function astToGraph(ast: AstNode, notation: Notation = 'math'): CircuitGr
   const edges: Edge[] = []
   const sources = new Map<string, AstNode>()
   const inputIds = new Map<string, string>()
+  /** Subexpressão já construída → nó que a produz. */
+  const built = new Map<string, string>()
   let counter = 0
 
   const nextId = (prefix: string) => `${prefix}-${(counter += 1)}`
@@ -50,6 +52,18 @@ export function astToGraph(ast: AstNode, notation: Notation = 'math'): CircuitGr
   }
 
   const visit = (node: AstNode): string => {
+    // Um circuito real não constrói o mesmo ¬A três vezes: um inversor só
+    // alimenta todas as portas que precisam dele. Reaproveitar subexpressões
+    // idênticas corta portas e desembaraça os fios.
+    const form = formatAst(node, 'math')
+    const existing = built.get(form)
+    if (existing) return existing
+    const id = build(node)
+    built.set(form, id)
+    return id
+  }
+
+  const build = (node: AstNode): string => {
     switch (node.kind) {
       case 'var': {
         const existing = inputIds.get(node.name)
