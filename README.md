@@ -257,10 +257,12 @@ A v0.7.0 começou com um editor visual combinacional em prévia. Ele já possui 
 modelo canônico de circuito, validação de entradas, detecção de ciclos, avaliação
 determinística, tabela verdade automática, destaque de sinais por linha selecionada
 e um canvas com paleta de componentes. Circuitos podem ser salvos, reabertos,
-exportados e importados usando IndexedDB e o formato versionado de circuitos. A
-autenticação Supabase, a sincronização explícita na nuvem e a Edge Function autenticada
-para análise/otimização de portas já estão disponíveis quando o ambiente é configurado.
-Consulte [`docs/AUTH-SYNC-AI.md`](./docs/AUTH-SYNC-AI.md) para o fluxo completo.
+exportados e importados usando IndexedDB e o formato versionado de circuitos. A autenticação Supabase, a sincronização explícita na nuvem, o histórico imutável com
+comparação de versões e a Edge Function autenticada para análise/otimização de portas já
+estão disponíveis quando o ambiente é configurado. Consulte [`docs/AUTH-SYNC-AI.md`](./docs/AUTH-SYNC-AI.md),
+[`docs/CLOUD-HISTORY.md`](./docs/CLOUD-HISTORY.md) e [`docs/EDGE-FUNCTION-API.md`](./docs/EDGE-FUNCTION-API.md)
+para os fluxos completos.
+
 
 O próximo trabalho é adicionar desfazer/refazer e melhorar a colaboração declarativa.
 Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados e

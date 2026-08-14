@@ -35,6 +35,7 @@ import type { CircuitProject } from '../storage/db'
 import { useAuth } from '../auth/useAuth'
 import { useCloudCircuitProjects } from '../hooks/useCloudCircuitProjects'
 import { requestCircuitAi, type CircuitAiResult } from '../ai/circuitAi'
+import { CircuitVersionHistory } from './CircuitVersionHistory'
 
 interface EditorNodeData extends Record<string, unknown> {
   kind: 'input' | 'constant' | 'gate' | 'output'
@@ -289,10 +290,10 @@ export function CircuitEditor() {
     }
     try {
       const name = projectName.trim() || document.name
-      const project = await cloud.sync(name, { ...document, name }, cloudProjectId ?? undefined)
-      setCloudProjectId(project.id)
-      setProjectName(project.name)
-      setNotice(`Circuito "${project.name}" sincronizado na nuvem.`)
+      const result = await cloud.sync(name, { ...document, name }, cloudProjectId ?? undefined)
+      setCloudProjectId(result.project.id)
+      setProjectName(result.project.name)
+      setNotice(`Circuito "${result.project.name}" sincronizado na nuvem na versão ${result.version.versionNumber}.`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível sincronizar o circuito.')
     }
@@ -306,7 +307,17 @@ export function CircuitEditor() {
     setCloudProjectId(project.id)
     setActiveProjectId(null)
     setSelectedRow(null)
+    void cloud.loadVersions(project.id)
     setNotice(`Circuito da nuvem "${project.name}" aberto.`)
+  }
+
+  const openCloudVersion = (version: (typeof cloud.versions)[number]) => {
+    const flow = fromDocument(version.document)
+    setNodes(flow.nodes)
+    setEdges(flow.edges)
+    setProjectName(version.name)
+    setSelectedRow(null)
+    setNotice(`Versão ${version.versionNumber} aberta como prévia. Sincronize para criar uma nova versão.`)
   }
 
   const removeCloud = async (project: (typeof cloud.projects)[number]) => {
@@ -483,6 +494,15 @@ export function CircuitEditor() {
       )}
 
       {cloud.error && user && <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{cloud.error}</p>}
+
+      {user && cloudProjectId && (cloud.versions.length > 0 || cloud.versionsLoading) && (
+        <CircuitVersionHistory
+          versions={cloud.versions}
+          loading={cloud.versionsLoading}
+          onRefresh={() => void cloud.loadVersions(cloudProjectId)}
+          onOpenVersion={openCloudVersion}
+        />
+      )}
 
       {user && issues.length === 0 && (
         <section className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900/70 dark:bg-violet-950/20">

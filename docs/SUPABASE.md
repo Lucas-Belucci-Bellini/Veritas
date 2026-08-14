@@ -60,3 +60,10 @@ O consultor de segurança do projeto ainda reporta avisos anteriores à migraç�
 [1]: https://supabase.com/docs/guides/database/postgres/row-level-security "Supabase — Row Level Security"
 [2]: https://supabase.com/docs/guides/database/postgres/column-level-security "Supabase — Column Level Security"
 [3]: https://supabase.com/docs/guides/auth/auth-mfa "Supabase — Authentication and database authorization"
+
+
+## Histórico remoto e Edge Function
+
+A sincronização autenticada agora usa `veritas_circuit_versions` para armazenar snapshots imutáveis. O frontend chama a RPC `veritas_sync_circuit_project`, que atualiza o projeto atual e insere uma versão com resumo de mudanças. A tabela permite `SELECT` e `INSERT` apenas para o proprietário autenticado; não há `UPDATE` ou `DELETE` para versões.
+
+A comparação estrutural e o fluxo de prévia estão descritos em [`CLOUD-HISTORY.md`](./CLOUD-HISTORY.md). O contrato completo da função `veritas-circuit-ai`, incluindo payload, resposta, erros, configuração de secrets e prompts, está em [`EDGE-FUNCTION-API.md`](./EDGE-FUNCTION-API.md).

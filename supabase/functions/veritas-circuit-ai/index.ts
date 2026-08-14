@@ -50,16 +50,17 @@ Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Use POST." }, 405);
 
   try {
-    const body = await request.json() as { action?: Action; context?: CircuitContext };
+    const body = await request.json() as { action?: Action; context?: CircuitContext; instruction?: string };
     if (body.action !== "analyze" && body.action !== "optimize") {
       return json({ error: "Ação inválida." }, 400);
     }
     if (!isContext(body.context)) return json({ error: "Contexto de circuito inválido." }, 400);
+    const instruction = typeof body.instruction === "string" ? body.instruction.trim().slice(0, 1200) : "";
     if (JSON.stringify(body.context).length > 200_000) {
       return json({ error: "O contexto do circuito excede o limite permitido." }, 413);
     }
 
-    const llmResult = await tryLlm(body.action, body.context);
+    const llmResult = await tryLlm(body.action, body.context, instruction);
     return json(llmResult ?? heuristic(body.action, body.context));
   } catch (error) {
     console.error(error);
@@ -67,7 +68,7 @@ Deno.serve(async (request: Request) => {
   }
 });
 
-async function tryLlm(action: Action, context: CircuitContext): Promise<AiResult | null> {
+async function tryLlm(action: Action, context: CircuitContext, instruction: string): Promise<AiResult | null> {
   const providerUrl = Deno.env.get("AI_PROVIDER_URL");
   const providerKey = Deno.env.get("AI_PROVIDER_KEY");
   if (!providerUrl || !providerKey) return null;
@@ -77,6 +78,7 @@ async function tryLlm(action: Action, context: CircuitContext): Promise<AiResult
     ? "Analise o circuito e proponha uma versão otimizada. Só remova componentes inalcançáveis ou faça transformações que preservem rigorosamente a função das saídas. Se não puder garantir equivalência, retorne optimizedDocument como null."
     : "Analise o circuito visual, explique sua função e indique oportunidades seguras de simplificação. Não invente componentes nem conexões.";
 
+  const userPrompt = instruction ? `${prompt}\n\nInstrução adicional do usuário:\n${instruction}` : prompt;
   const response = await fetch(providerUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${providerKey}` },
@@ -84,7 +86,7 @@ async function tryLlm(action: Action, context: CircuitContext): Promise<AiResult
       model,
       messages: [
         { role: "system", content: "Você é um especialista em lógica digital. Responda apenas JSON válido conforme o schema." },
-        { role: "user", content: `${prompt}\n\nContexto:\n${JSON.stringify(context)}` },
+        { role: "user", content: `${userPrompt}\n\nContexto:\n${JSON.stringify(context)}` },
       ],
       response_format: { type: "json_schema", json_schema: { name: "circuit_analysis", strict: true, schema } },
       max_completion_tokens: 1200,

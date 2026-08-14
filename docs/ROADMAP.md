@@ -124,3 +124,9 @@ O frontend agora possui autenticação Supabase por e-mail e senha, restauraçã
 O contexto produzido por `buildCircuitContext()` é enviado à Edge Function autenticada `veritas-circuit-ai`. A função usa saída JSON estruturada quando um provedor LLM é configurado por secrets e mantém uma heurística conservadora como fallback. A otimização nunca é aplicada silenciosamente: o usuário revisa sugestões e confirma a aplicação no canvas.
 
 Nesta etapa também foram ampliados os testes de tabela verdade e IndexedDB para cobrir múltiplas saídas, seleção de saída, truncamento, limites de segurança, reabertura do banco, atualização de documentos e normalização de importação.
+
+## Atualização da implementação — histórico remoto e API de IA
+
+O Veritas agora mantém histórico imutável dos salvamentos autenticados em `veritas_circuit_versions`. A função RPC `veritas_sync_circuit_project` atualiza o estado atual e registra a versão em uma operação transacional. O editor permite selecionar duas versões, visualizar nós e conexões adicionados, removidos ou alterados e abrir uma versão anterior como prévia antes de sincronizá-la como novo salvamento.
+
+Também foram adicionados testes específicos para o diff estrutural, listagem/RPC de versões Supabase e chamadas do cliente para a Edge Function, incluindo instruções opcionais, otimizações válidas, respostas inválidas e erros de transporte. A API da Edge Function e exemplos de prompts estão documentados em `docs/EDGE-FUNCTION-API.md`.

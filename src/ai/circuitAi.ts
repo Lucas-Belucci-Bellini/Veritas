@@ -16,11 +16,13 @@ export interface CircuitAiResult {
 export async function requestCircuitAi(
   document: CircuitDocument,
   action: CircuitAiAction,
+  instruction?: string,
 ): Promise<CircuitAiResult> {
   if (!supabase) throw new Error('Supabase não está configurado neste ambiente.')
   const context = buildCircuitContext(document)
+  const normalizedInstruction = instruction?.trim().slice(0, 1200)
   const { data, error } = await supabase.functions.invoke('veritas-circuit-ai', {
-    body: { action, context },
+    body: { action, context, ...(normalizedInstruction ? { instruction: normalizedInstruction } : {}) },
   })
 
   if (error) throw new Error(error.message || 'A análise de IA não pôde ser concluída.')
