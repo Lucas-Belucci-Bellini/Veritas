@@ -29,6 +29,8 @@ com um resumo executivo em [`plano.md`](./plano.md).
 | v0.7.0 | Editor visual combinacional, tabela verdade automática e persistência local IndexedDB |
 | v0.7.1 | Autenticação Supabase, sincronização em nuvem, histórico remoto e análise/otimização por IA |
 | v0.7.2 | Colaboração Realtime, exportação Verilog/VHDL e painel de métricas da IA |
+| v0.8.0 | ALGO-001 executor determinístico local-first e ALGO-002 Watch/BranchTrace |
+| v0.9.0 | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
@@ -171,19 +173,20 @@ npm run build:plugin
 npm run validate:plugin
 ```
 
-### Servidor MCP (v0.6.0)
+### Servidor MCP (v0.9.0)
 
 `mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
 para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh,
-simulação de circuitos sequenciais e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
-expressão, ele pergunta e recebe a conta feita.
+simulação de circuitos sequenciais, casos didáticos, debug de `AlgorithmDocument`
+e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
+expressão ou estado, ele pergunta e recebe a conta/execução feita.
 
 ```bash
 npm run build:mcp
 claude mcp add veritas -- node $PWD/mcp/dist/server.js
 ```
 
-Detalhes em [`mcp/README.md`](./mcp/README.md).
+Detalhes em [`mcp/README.md`](./mcp/README.md) e no desenho de compatibilidade [`docs/MCP-INTEROPERABILITY.md`](./docs/MCP-INTEROPERABILITY.md). O perfil atual é stdio; Streamable HTTP autenticado é a próxima camada para clientes remotos.
 
 ### Biblioteca de chips
 
@@ -279,6 +282,6 @@ Usuários autenticados podem compartilhar um circuito pelo UUID de outro usuári
 O editor exporta circuitos combinacionais válidos para **Verilog-2001** (`.v`) e **VHDL-2008** (`.vhd`). Identificadores são sanitizados de forma determinística e circuitos inválidos são rejeitados antes do download. O painel de métricas acompanha latência, sucesso, confiança, provedor e fallback da IA em tempo real, sempre com RLS por usuário e telemetria best-effort.
 
 O próximo trabalho é adicionar desfazer/refazer e evoluir a colaboração para múltiplas salas com isolamento por tópico, versão otimista e rejeição explícita de conflitos. O desenho inicial está em [`docs/EDUCATIONAL-TESTS-MULTIROOM.md`](./docs/EDUCATIONAL-TESTS-MULTIROOM.md).
-Depois virão barramentos multi-bit, workspace sequencial visual e chips customizados. O núcleo `ALGO-001` já está disponível como módulo local-first: `AlgorithmDocument` versionado, validação estrutural, avaliador de expressões restrito, executor determinístico Step/Run, fila de entrada, trace e persistência IndexedDB. A documentação está em [`docs/FLOWGORITHM-INSIGHTS.md`](./docs/FLOWGORITHM-INSIGHTS.md). O incremento `ALGO-002` agora possui Watch de variáveis, `BranchTrace`, entrada tipada, Step/Run/Reset, laboratório de casos lógicos e integração demonstrativa no App principal. A arquitetura e os critérios estão em [`docs/ALGO-002-UI.md`](./docs/ALGO-002-UI.md) e o mapeamento didático em [`docs/ALGO-002-LOGIC-MAPPING.md`](./docs/ALGO-002-LOGIC-MAPPING.md). O executor não executa o Flowgorithm enviado nem importa assemblies externos. Uma API de contexto para integrações MCP, desktop nativo, agentes em larga escala e recursos 3D só entram após validação técnica e planejamento próprios. Consulte o
+Depois virão barramentos multi-bit, workspace sequencial visual e chips customizados. O núcleo `ALGO-001` já está disponível como módulo local-first: `AlgorithmDocument` versionado, validação estrutural, avaliador de expressões restrito, executor determinístico Step/Run, fila de entrada, trace e persistência IndexedDB. A documentação está em [`docs/FLOWGORITHM-INSIGHTS.md`](./docs/FLOWGORITHM-INSIGHTS.md). O `ALGO-002` possui Watch, `BranchTrace`, entrada tipada, Step/Run/Reset, laboratório lógico e integração demonstrativa no App. O `ALGO-003` agora adiciona While, razões de pausa, Continue e breakpoints por ID, documentado em [`docs/ALGO-003-DEBUG.md`](./docs/ALGO-003-DEBUG.md). A API proposicional completa reutiliza a engine para NAND, NOR, XNOR, implicação e bicondicional. O MCP expõe essas capacidades com schemas determinísticos; o desenho de stdio/HTTP está em [`docs/MCP-INTEROPERABILITY.md`](./docs/MCP-INTEROPERABILITY.md). O executor não executa o Flowgorithm enviado nem importa assemblies externos. Uma API de contexto para integrações MCP, desktop nativo, agentes em larga escala e recursos 3D só entra após validação técnica e planejamento próprios. Consulte o
 [`roadmap executável`](./docs/ROADMAP.md) e a documentação [`Supabase`](./docs/SUPABASE.md)
 para ver a ordem completa.

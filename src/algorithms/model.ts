@@ -38,6 +38,12 @@ export type AlgorithmNode =
       elseNext: string
     })
   | (AlgorithmNodeBase & {
+      type: 'while'
+      condition: string
+      bodyNext: string
+      exitNext: string
+    })
+  | (AlgorithmNodeBase & {
       type: 'input'
       variable: string
       prompt?: string
@@ -63,6 +69,19 @@ export type AlgorithmExecutionStatus =
   | 'awaiting-input'
   | 'finished'
   | 'error'
+
+export type DebugPauseReason =
+  | 'step'
+  | 'breakpoint'
+  | 'input'
+  | 'finished'
+  | 'error'
+  | 'max-steps'
+
+export interface ExecutionDebugState {
+  breakpoints: string[]
+  lastPauseReason: DebugPauseReason | null
+}
 
 export interface AlgorithmTraceEntry {
   step: number
@@ -101,6 +120,7 @@ export interface ExecutionState {
   trace: AlgorithmTraceEntry[]
   watch: VariableWatchEntry[]
   branches: BranchTraceEntry[]
+  debug: ExecutionDebugState
   stepIndex: number
   error: string | null
 }

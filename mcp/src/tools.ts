@@ -19,6 +19,18 @@ import {
 } from '../../src/engine/index'
 import type { ChipCatalog, ChipEntry } from '../../src/chips/types'
 import { Simulator, type ComponentSpec } from '../../src/simulation/index'
+import {
+  buildFullPropositionalTruthTable,
+  evaluateLogicTestCase,
+  logicCaseIsValid,
+  LOGIC_TEST_CASES,
+  createExecutionState,
+  runAlgorithm,
+  stepAlgorithm,
+  type AlgorithmDocument,
+  type ExecutionState,
+  type RuntimeValue,
+} from '../../src/algorithms/index'
 
 /**
  * Implementação das ferramentas, separada do transporte MCP para poder ser
@@ -28,6 +40,10 @@ import { Simulator, type ComponentSpec } from '../../src/simulation/index'
 export interface ToolResult {
   text: string
   isError?: boolean
+}
+
+function jsonResult(value: unknown): ToolResult {
+  return { text: JSON.stringify(value, null, 2) }
 }
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -194,6 +210,96 @@ export function karnaugh(expression: string, notation: Notation = 'math'): ToolR
       groups.length > 0 ? 'Agrupamentos:' : 'Sem agrupamentos: a função é constante.',
       ...groups,
     ].join('\n'),
+  }
+}
+
+export function evaluateLogicCase(caseId: string): ToolResult {
+  const testCase = LOGIC_TEST_CASES.find((item) => item.id === caseId)
+  if (!testCase) {
+    return {
+      isError: true,
+      text: `Caso "${caseId}" não encontrado. Disponíveis: ${LOGIC_TEST_CASES.map((item) => item.id).join(', ')}.`,
+    }
+  }
+
+  const rows = evaluateLogicTestCase(testCase)
+  const variables = testCase.variables
+  const header = `| ${variables.join(' | ')} | resultado | passa |`
+  const divider = `| ${variables.map(() => '---').join(' | ')} | --- | --- |`
+  const body = rows.map((row) => {
+    const result = row.expressionValue ?? row.conclusionValue ?? row.premiseValues?.every(Boolean) ?? false
+    return `| ${variables.map((variable) => (row.assignment[variable] ? 'V' : 'F')).join(' | ')} | ${result ? 'V' : 'F'} | ${row.passes ? 'sim' : 'não'} |`
+  })
+
+  return {
+    text: [
+      `# ${testCase.title}`,
+      `Origem: ${testCase.source}`,
+      `Tipo: ${testCase.kind}`,
+      '',
+      ...(body.length > 0 ? [header, divider, ...body] : []),
+      '',
+      `Caso válido: ${logicCaseIsValid(testCase) ? 'sim' : 'não'}`,
+    ].join('\n'),
+  }
+}
+
+export function fullPropositionalTable(
+  expression: string,
+  options: { includeSteps?: boolean; notation?: Notation; maxRows?: number } = {},
+): ToolResult {
+  const table = buildFullPropositionalTruthTable(expression, options)
+  const header = `| ${table.columns.map((column) => column.label).join(' | ')} |`
+  const divider = `| ${table.columns.map(() => '---').join(' | ')} |`
+  const body = table.rows.map((row) => `| ${row.map((value) => (value ? '1' : '0')).join(' | ')} |`)
+  return {
+    text: [header, divider, ...body, '', `Classificação: ${table.classification}`, `${table.trueCount} de ${table.rows.length} linhas verdadeiras`].join('\n'),
+  }
+}
+
+export interface AlgorithmDebugQuery {
+  document: AlgorithmDocument
+  state?: ExecutionState
+  mode?: 'step' | 'run'
+  maxSteps?: number
+  inputQueues?: Record<string, RuntimeValue[]>
+  breakpoints?: string[]
+}
+
+function normalizeDebugState(state: ExecutionState): ExecutionState {
+  return {
+    ...state,
+    debug: {
+      breakpoints: [...(state.debug?.breakpoints ?? [])],
+      lastPauseReason: state.debug?.lastPauseReason ?? null,
+    },
+  }
+}
+
+export function debugAlgorithm(query: AlgorithmDebugQuery): ToolResult {
+  try {
+    let state = query.state
+      ? normalizeDebugState(query.state)
+      : createExecutionState(query.document, {
+          inputQueues: query.inputQueues,
+          breakpoints: query.breakpoints,
+        })
+    if (query.breakpoints && query.state) {
+      state = {
+        ...state,
+        debug: { ...state.debug, breakpoints: [...query.breakpoints].sort() },
+      }
+    }
+
+    const next = query.mode === 'step'
+      ? stepAlgorithm(query.document, state, { maxSteps: query.maxSteps })
+      : runAlgorithm(query.document, state, { maxSteps: query.maxSteps })
+    return jsonResult(next)
+  } catch (error) {
+    return {
+      isError: true,
+      text: error instanceof Error ? error.message : 'Falha ao depurar algoritmo.',
+    }
   }
 }
 

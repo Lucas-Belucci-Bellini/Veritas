@@ -4,6 +4,8 @@ import {
   enumerateBooleanAssignments,
   evaluateLogicTestCase,
   logicCaseIsValid,
+  buildFullPropositionalTruthTable,
+  evaluatePropositionalExpression,
 } from './logicCases'
 
 describe('casos interativos de lógica dos materiais', () => {
@@ -41,5 +43,27 @@ describe('casos interativos de lógica dos materiais', () => {
   it('valida Modus Ponens e Modus Tollens como argumentos', () => {
     expect(logicCaseIsValid(LOGIC_TEST_CASES.find((item) => item.id === 'modus-ponens')!)).toBe(true)
     expect(logicCaseIsValid(LOGIC_TEST_CASES.find((item) => item.id === 'modus-tollens')!)).toBe(true)
+  })
+
+  it('gera tabela completa com os conectivos proposicionais da engine', () => {
+    const table = buildFullPropositionalTruthTable(
+      '(A NAND B) XOR (C NOR D) <-> (A -> B)',
+      { notation: 'text', includeSteps: true },
+    )
+    expect(table.variables).toEqual(['A', 'B', 'C', 'D'])
+    expect(table.totalRows).toBe(16)
+    expect(table.rows).toHaveLength(16)
+    expect(table.columns.some((column) => column.label.includes('NAND'))).toBe(true)
+    expect(table.columns.some((column) => column.label.includes('NOR'))).toBe(true)
+    expect(table.columns.some((column) => column.label.includes('XOR'))).toBe(true)
+  })
+
+  it('retorna passos de subexpressões para uma atribuição proposicional', () => {
+    const result = evaluatePropositionalExpression('NOT (P AND Q) OR (P XOR Q)', {
+      P: true,
+      Q: false,
+    })
+    expect(result.value).toBe(true)
+    expect(result.steps.size).toBeGreaterThan(0)
   })
 })

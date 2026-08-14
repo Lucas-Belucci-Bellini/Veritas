@@ -5,6 +5,7 @@ import {
   provideInput,
   runAlgorithm,
   stepAlgorithm,
+  toggleBreakpoint,
   type AlgorithmDocument,
   type AlgorithmNode,
   type ExecutionState,
@@ -30,6 +31,25 @@ function statusLabel(status: ExecutionState['status']): string {
       return 'finalizado'
     case 'error':
       return 'erro'
+  }
+}
+
+function pauseReasonLabel(reason: ExecutionState['debug']['lastPauseReason']): string {
+  switch (reason) {
+    case 'breakpoint':
+      return 'breakpoint'
+    case 'input':
+      return 'entrada'
+    case 'finished':
+      return 'fim'
+    case 'max-steps':
+      return 'limite de passos'
+    case 'error':
+      return 'erro'
+    case 'step':
+      return 'step manual'
+    default:
+      return '—'
   }
 }
 
@@ -77,8 +97,12 @@ export function AlgorithmWorkspace({
     commit(runAlgorithm(document, state, { maxSteps }))
   }
 
+  function handleToggleBreakpoint(nodeId: string) {
+    commit(toggleBreakpoint(state, nodeId))
+  }
+
   function handleReset() {
-    commit(createExecutionState(document))
+    commit(createExecutionState(document, { breakpoints: state.debug.breakpoints }))
     setRawInput('')
     setSelectedNodeId(null)
   }
@@ -95,6 +119,8 @@ export function AlgorithmWorkspace({
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Nó ativo: <span className="font-mono">{activeNode?.id ?? '—'}</span>
+            <span className="mx-2">·</span>
+            pausa: <span className="font-mono">{pauseReasonLabel(state.debug.lastPauseReason)}</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -115,7 +141,7 @@ export function AlgorithmWorkspace({
             disabled={state.status === 'finished' || state.status === 'error' || state.status === 'awaiting-input'}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-brand-400 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
           >
-            Run
+            {state.debug.lastPauseReason === 'breakpoint' ? 'Continue' : 'Run'}
           </button>
           <button
             type="button"
@@ -126,6 +152,25 @@ export function AlgorithmWorkspace({
           </button>
         </div>
       </header>
+
+      <details className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <summary className="cursor-pointer text-sm font-bold text-slate-900 dark:text-slate-100">
+          Breakpoints ({state.debug.breakpoints.length})
+        </summary>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {document.nodes.map((node) => (
+            <label key={node.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800">
+              <input
+                type="checkbox"
+                checked={state.debug.breakpoints.includes(node.id)}
+                onChange={() => handleToggleBreakpoint(node.id)}
+              />
+              <span className="font-mono">{node.id}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{node.type}</span>
+            </label>
+          ))}
+        </div>
+      </details>
 
       {state.status === 'awaiting-input' && inputNode && (
         <form

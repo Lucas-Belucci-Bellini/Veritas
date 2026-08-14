@@ -17,6 +17,8 @@ function targetsForNode(node: AlgorithmNode): string[] {
       return [node.next]
     case 'if':
       return [node.thenNext, node.elseNext]
+    case 'while':
+      return [node.bodyNext, node.exitNext]
     case 'end':
       return []
   }

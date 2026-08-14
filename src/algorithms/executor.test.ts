@@ -5,6 +5,7 @@ import {
   provideInput,
   runAlgorithm,
   stepAlgorithm,
+  setBreakpoint,
 } from './index'
 
 function branchingDocument() {
@@ -122,6 +123,70 @@ describe('executor ALGO-001', () => {
     expect(() => createExecutionState(document)).toThrow('não existe')
   })
 
+  it('pausa antes de um breakpoint e Continue executa o nó marcado', () => {
+    const document = branchingDocument()
+    let state = createExecutionState(document, { inputQueues: { x: [3] } })
+    state = setBreakpoint(state, 'if-positive')
+
+    state = runAlgorithm(document, state)
+    expect(state.status).toBe('paused')
+    expect(state.activeNodeId).toBe('if-positive')
+    expect(state.debug.lastPauseReason).toBe('breakpoint')
+    expect(state.trace.map((entry) => entry.nodeId)).toEqual(['start', 'declare-x', 'input-x'])
+
+    state = runAlgorithm(document, state)
+    expect(state.status).toBe('finished')
+    expect(state.output).toEqual(['positivo'])
+  })
+
+  it('executa While, registra cada decisão e termina no ramo de saída', () => {
+    const document = {
+      ...createAlgorithmDocument('Contador'),
+      nodes: [
+        { id: 'start', type: 'start' as const, position: { x: 0, y: 0 }, next: 'declare-i' },
+        {
+          id: 'declare-i',
+          type: 'declare' as const,
+          position: { x: 120, y: 0 },
+          variable: 'i',
+          valueType: 'number' as const,
+          initialValue: 0,
+          next: 'while-i',
+        },
+        {
+          id: 'while-i',
+          type: 'while' as const,
+          position: { x: 240, y: 0 },
+          condition: 'i < 3',
+          bodyNext: 'increment-i',
+          exitNext: 'output-i',
+        },
+        {
+          id: 'increment-i',
+          type: 'assign' as const,
+          position: { x: 360, y: 80 },
+          variable: 'i',
+          expression: 'i + 1',
+          next: 'while-i',
+        },
+        {
+          id: 'output-i',
+          type: 'output' as const,
+          position: { x: 360, y: -80 },
+          expression: 'i',
+          next: 'end',
+        },
+        { id: 'end', type: 'end' as const, position: { x: 480, y: 0 } },
+      ],
+    }
+
+    const result = runAlgorithm(document)
+    expect(result.status).toBe('finished')
+    expect(result.output).toEqual([3])
+    expect(result.branches.map((entry) => entry.result)).toEqual([true, true, true, false])
+    expect(result.watch.find((entry) => entry.name === 'i')?.value).toBe(3)
+  })
+
   it('interrompe loops acidentais pelo limite de passos', () => {
     const document = {
       ...createAlgorithmDocument('Loop controlado'),
@@ -141,5 +206,6 @@ describe('executor ALGO-001', () => {
     const result = runAlgorithm(document, undefined, { maxSteps: 4 })
     expect(result.status).toBe('error')
     expect(result.error).toContain('limite de 4 passos')
+    expect(result.debug.lastPauseReason).toBe('max-steps')
   })
 })

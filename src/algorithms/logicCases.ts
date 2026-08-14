@@ -1,3 +1,7 @@
+import { parse } from '../engine/parser'
+import { evaluateWithSteps } from '../engine/evaluator'
+import { buildTruthTable, type TruthTable } from '../engine/truthTable'
+import type { Notation } from '../engine/tokens'
 import { evaluateExpression } from './expressions'
 import type { RuntimeValue } from './model'
 
@@ -145,4 +149,33 @@ export function evaluateLogicTestCase(testCase: LogicTestCase): LogicEvaluationR
 
 export function logicCaseIsValid(testCase: LogicTestCase): boolean {
   return evaluateLogicTestCase(testCase).every((row) => row.passes)
+}
+
+export interface FullPropositionalTableOptions {
+  notation?: Notation
+  includeSteps?: boolean
+  maxRows?: number
+}
+
+/**
+ * Usa a mesma parser/avaliador da aplicação principal para cobrir todos os
+ * conectivos proposicionais: AND, NAND, OR, NOR, XOR, XNOR, -> e <->.
+ */
+export function buildFullPropositionalTruthTable(
+  expression: string,
+  options: FullPropositionalTableOptions = {},
+): TruthTable {
+  const ast = parse(expression)
+  return buildTruthTable(ast, {
+    notation: options.notation ?? 'math',
+    includeSteps: options.includeSteps ?? true,
+    maxRows: options.maxRows ?? 4096,
+  })
+}
+
+export function evaluatePropositionalExpression(
+  expression: string,
+  assignment: Record<string, boolean>,
+): { value: boolean; steps: Map<string, boolean> } {
+  return evaluateWithSteps(parse(expression), assignment)
 }

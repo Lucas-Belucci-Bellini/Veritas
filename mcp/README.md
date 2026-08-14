@@ -13,6 +13,9 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | Ferramenta | O que faz |
 | --- | --- |
 | `truth_table` | Tabela verdade completa, com colunas intermediárias e classificação |
+| `propositional_truth_table` | Tabela completa para todos os conectivos proposicionais da engine |
+| `logic_case` | Casos didáticos de Álgebra de Boole e Argumentos com contraexemplos |
+| `debug_algorithm` | Step/Run de AlgorithmDocument com Watch, BranchTrace, While e breakpoints |
 | `evaluate_expression` | Resolve a expressão para valores específicos, mostrando cada passo |
 | `simplify_expression` | Forma mínima em soma de produtos (Quine-McCluskey) e a economia de portas |
 | `karnaugh_map` | Mapa de Karnaugh de 1 a 4 variáveis com os agrupamentos |
@@ -37,6 +40,23 @@ npm run build:mcp     # gera mcp/dist/server.js
 claude mcp add veritas -- node /caminho/para/Veritas/mcp/dist/server.js
 ```
 
+### Codex CLI
+
+```bash
+codex mcp add veritas -- node /caminho/para/Veritas/mcp/dist/server.js
+codex mcp list
+```
+
+Para limitar ferramentas e pedir aprovação por padrão em `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.veritas]
+command = "node"
+args = ["/caminho/para/Veritas/mcp/dist/server.js"]
+enabled_tools = ["truth_table", "propositional_truth_table", "logic_case", "debug_algorithm"]
+default_tools_approval_mode = "prompt"
+```
+
 ### Claude Desktop
 
 Em `claude_desktop_config.json`:
@@ -51,6 +71,10 @@ Em `claude_desktop_config.json`:
   }
 }
 ```
+
+### Clientes remotos
+
+A instalação stdio atende clientes que iniciam processos locais. Para Claude API e ChatGPT web, o servidor precisa ser exposto por um endpoint Streamable HTTP HTTPS autenticado; consulte [`docs/MCP-INTEROPERABILITY.md`](../docs/MCP-INTEROPERABILITY.md). Não exponha `mcp/dist/server.js` diretamente à internet e não coloque tokens no frontend.
 
 ## Exemplo
 

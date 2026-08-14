@@ -3,7 +3,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import {
+  debugAlgorithm,
   evaluateExpression,
+  evaluateLogicCase,
+  fullPropositionalTable,
   getChip,
   karnaugh,
   listChips,
@@ -13,6 +16,7 @@ import {
   truthTable,
   type ToolResult,
 } from './tools'
+import type { AlgorithmDocument, ExecutionState } from '../../src/algorithms/index'
 
 /**
  * Servidor MCP do Veritas.
@@ -138,6 +142,68 @@ server.registerTool(
     inputSchema: { expression: EXPRESSION, notation: NOTATION },
   },
   async ({ expression, notation }) => guard(() => normalForms(expression, notation)),
+)
+
+server.registerTool(
+  'logic_case',
+  {
+    title: 'Caso lógico didático',
+    description:
+      'Avalia um exercício de Álgebra de Boole ou Argumentos do catálogo do Veritas e devolve todas as linhas, contraexemplos e validade do caso.',
+    inputSchema: {
+      case_id: z.string().min(1).describe('ID do caso, por exemplo tautology-excluded-middle ou modus-ponens'),
+    },
+  },
+  async ({ case_id }) => guard(() => evaluateLogicCase(case_id)),
+)
+
+server.registerTool(
+  'propositional_truth_table',
+  {
+    title: 'Tabela proposicional completa',
+    description:
+      'Gera uma tabela verdade completa usando a engine do Veritas. Aceita AND, NAND, OR, NOR, XOR, XNOR, NOT, implicação -> e bicondicional <->.',
+    inputSchema: {
+      expression: EXPRESSION,
+      include_steps: z.boolean().default(true),
+      notation: NOTATION,
+      max_rows: z.number().int().min(2).max(4096).default(4096),
+    },
+  },
+  async ({ expression, include_steps, notation, max_rows }) =>
+    guard(() => fullPropositionalTable(expression, {
+      includeSteps: include_steps,
+      notation,
+      maxRows: max_rows,
+    })),
+)
+
+const RUNTIME_VALUE = z.union([z.boolean(), z.number(), z.string(), z.null()])
+
+server.registerTool(
+  'debug_algorithm',
+  {
+    title: 'Depurar algoritmo',
+    description:
+      'Executa um AlgorithmDocument do Veritas em modo step ou run, preservando estado, Watch, BranchTrace, breakpoints e razão de pausa. Não grava no banco nem executa código arbitrário.',
+    inputSchema: {
+      document: z.unknown().describe('AlgorithmDocument serializável do formato veritas-algorithm'),
+      state: z.unknown().optional().describe('ExecutionState retornado por uma chamada anterior'),
+      mode: z.enum(['step', 'run']).default('run'),
+      max_steps: z.number().int().min(1).max(100_000).default(10_000),
+      input_queues: z.record(z.string(), z.array(RUNTIME_VALUE)).optional(),
+      breakpoints: z.array(z.string()).default([]),
+    },
+  },
+  async ({ document, state, mode, max_steps, input_queues, breakpoints }) =>
+    guard(() => debugAlgorithm({
+      document: document as AlgorithmDocument,
+      state: state as ExecutionState | undefined,
+      mode,
+      maxSteps: max_steps,
+      inputQueues: input_queues,
+      breakpoints,
+    })),
 )
 
 server.registerTool(

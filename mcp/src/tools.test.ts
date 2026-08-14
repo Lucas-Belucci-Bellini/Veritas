@@ -1,7 +1,10 @@
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  debugAlgorithm,
   evaluateExpression,
+  evaluateLogicCase,
+  fullPropositionalTable,
   getChip,
   karnaugh,
   listChips,
@@ -11,6 +14,50 @@ import {
   simulateCircuit,
   truthTable,
 } from './tools'
+import { createAlgorithmDocument } from '../../src/algorithms'
+
+describe('logic_case', () => {
+  it('avalia um caso didático e expõe o contraexemplo', () => {
+    const result = evaluateLogicCase('implication-counterexample')
+    expect(result.text).toContain('| V | F | F | não |')
+    expect(result.text).toContain('Caso válido: não')
+  })
+
+  it('rejeita um identificador de caso desconhecido', () => {
+    const result = evaluateLogicCase('nao-existe')
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('Disponíveis:')
+  })
+})
+
+describe('propositional_truth_table', () => {
+  it('usa a tabela completa para conectivos avançados', () => {
+    const result = fullPropositionalTable('A NAND B <-> (A -> B)', { notation: 'text' })
+    expect(result.text).toContain('| A | B |')
+    expect(result.text).toContain('Classificação:')
+    expect(result.text).toContain('NAND')
+  })
+})
+
+describe('debug_algorithm', () => {
+  it('faz uma transição step sem efeitos externos', () => {
+    const document = createAlgorithmDocument('MCP debug')
+    const result = debugAlgorithm({ document, mode: 'step' })
+    const state = JSON.parse(result.text) as { status: string; activeNodeId: string; stepIndex: number }
+    expect(state.status).toBe('paused')
+    expect(state.activeNodeId).toBe('end')
+    expect(state.stepIndex).toBe(1)
+  })
+
+  it('preserva breakpoint no estado retornado', () => {
+    const document = createAlgorithmDocument('MCP breakpoint')
+    const result = debugAlgorithm({ document, mode: 'run', breakpoints: ['end'] })
+    const state = JSON.parse(result.text) as { status: string; activeNodeId: string; debug: { lastPauseReason: string } }
+    expect(state.status).toBe('paused')
+    expect(state.activeNodeId).toBe('end')
+    expect(state.debug.lastPauseReason).toBe('breakpoint')
+  })
+})
 
 describe('truth_table', () => {
   it('devolve a tabela em markdown com a classificação', () => {
