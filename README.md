@@ -1,7 +1,8 @@
 # Veritas
 
 Calculadora de tabelas verdade e ferramenta local-first para projetar circuitos lógicos que roda
-inteiramente no navegador — sem servidor, sem banco de dados, sem conta.
+no navegador. O modo local funciona sem conta; quando configurado, o usuário pode autenticar
+com Supabase, sincronizar circuitos na nuvem e pedir análise assistida por IA.
 
 Você digita `(A AND B) OR NOT C` e recebe, no mesmo instante, a tabela verdade
 completa com os passos intermediários e o circuito de portas lógicas
@@ -49,12 +50,16 @@ dividido por categoria (os símbolos que ninguém sabe digitar), alternância en
 `V/F` e `1/0`, tema claro e escuro, e exportação em **CSV**, **PNG** (desenhado
 em canvas, sem biblioteca externa) e link compartilhável (`?expr=`).
 
-### Projetos salvos (v0.4.0)
+### Projetos salvos localmente e na nuvem
 
-Os projetos ficam no **IndexedDB do próprio navegador**, via Dexie.js. Nada sai
-da máquina do usuário e nada custa servidor. Dá para nomear, renomear, reabrir e
-excluir projetos, além de exportar tudo num arquivo **`.veritas`** e importar de
-volta — o mesmo formato que a CLI e o servidor MCP vão ler mais adiante.
+Os projetos locais ficam no **IndexedDB do próprio navegador**, via Dexie.js. O modo
+local-first continua funcionando offline e sem conta. Dá para nomear, renomear, reabrir e
+excluir projetos, além de exportar tudo num arquivo **`.veritas`** e importar de volta.
+
+Com `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` configurados, o usuário pode
+criar conta, entrar e usar **Sincronizar nuvem** no editor visual. A tabela remota é
+protegida por RLS e só aceita registros do usuário autenticado. A sincronização não é
+automática: circuitos locais só são enviados após uma ação explícita.
 
 O leitor do `.veritas` recusa arquivo de outro programa, JSON quebrado e versão
 de formato mais nova do que a que ele entende, em vez de importar lixo em
@@ -218,9 +223,12 @@ src/
   chips/       catálogo importado do Digital Logic Sim
   simulation/  simulador por tiques: clock, flip-flops, atrasos
   storage/     banco local (Dexie) e o formato de arquivo .veritas
+  auth/        sessão e autenticação Supabase
+  cloud/       CRUD autenticado dos circuitos sincronizados
+  ai/          cliente da análise/otimização por IA
   components/  interface
-  hooks/       tema, projetos, conexão, virtualização da tabela
-  lib/         exportação, URL compartilhável, formatação de valores
+  hooks/       tema, projetos, sessão, sincronização e virtualização da tabela
+  lib/         Supabase, exportação, URL compartilhável, formatação de valores
 mcp/
   src/tools.ts   as ferramentas em si, testáveis sem MCP
   src/server.ts  transporte stdio e esquemas
@@ -241,7 +249,7 @@ nenhuma cópia paralela.
 
 ## Stack
 
-React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexie.js · Workbox · Vitest · oxlint
+React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexie.js · Supabase Auth · Supabase Edge Functions · Workbox · Vitest · oxlint
 
 ## Próximos passos
 
@@ -249,13 +257,14 @@ A v0.7.0 começou com um editor visual combinacional em prévia. Ele já possui 
 modelo canônico de circuito, validação de entradas, detecção de ciclos, avaliação
 determinística, tabela verdade automática, destaque de sinais por linha selecionada
 e um canvas com paleta de componentes. Circuitos podem ser salvos, reabertos,
-exportados e importados usando IndexedDB e o formato versionado de circuitos.
-O próximo trabalho é adicionar desfazer/refazer e sincronização autenticada opcional.
+exportados e importados usando IndexedDB e o formato versionado de circuitos. A
+autenticação Supabase, a sincronização explícita na nuvem e a Edge Function autenticada
+para análise/otimização de portas já estão disponíveis quando o ambiente é configurado.
+Consulte [`docs/AUTH-SYNC-AI.md`](./docs/AUTH-SYNC-AI.md) para o fluxo completo.
 
-O módulo de contexto do circuito já produz snapshots determinísticos para uma
-futura integração autenticada com o Supabase. Depois virão barramentos multi-bit,
-workspace sequencial visual, chips customizados e uma API declarativa de contexto
-para integrações MCP. Contas, sincronização, desktop nativo, agentes em larga escala
+O próximo trabalho é adicionar desfazer/refazer e melhorar a colaboração declarativa.
+Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados e
+uma API de contexto para integrações MCP. Desktop nativo, agentes em larga escala
 e recursos 3D só entram após validação técnica e planejamento próprios. Consulte o
 [`roadmap executável`](./docs/ROADMAP.md) e a documentação [`Supabase`](./docs/SUPABASE.md)
 para ver a ordem completa.

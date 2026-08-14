@@ -45,6 +45,27 @@ describe('circuitProjects', () => {
     expect(await getCircuitProject(id)).toBeUndefined()
   })
 
+  it('atualiza o documento e move o circuito para o topo da lista', async () => {
+    const firstId = await createCircuitProject({ name: 'Primeiro', document })
+    await createCircuitProject({ name: 'Segundo', document })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    const changed = { ...document, name: 'AND modificado', connections: document.connections.slice(0, 2) }
+    await updateCircuitProject(firstId, { document: changed })
+
+    const saved = await getCircuitProject(firstId)
+    expect(saved?.document.name).toBe('AND modificado')
+    expect((await listCircuitProjects())[0].id).toBe(firstId)
+  })
+
+  it('mantém os circuitos depois de fechar e reabrir o IndexedDB', async () => {
+    await createCircuitProject({ name: 'Persistente', document })
+    db.close()
+    await db.open()
+
+    expect((await listCircuitProjects()).map((project) => project.name)).toEqual(['Persistente'])
+  })
+
   it('lista os circuitos do mais recente para o mais antigo', async () => {
     await createCircuitProject({ name: 'Antigo', document })
     await new Promise((resolve) => setTimeout(resolve, 5))
@@ -70,6 +91,16 @@ describe('arquivo de circuitos', () => {
     expect(() =>
       parseCircuitFile('{"format":"veritas-circuits","version":99,"projects":[]}'),
     ).toThrow('versão mais nova')
+  })
+
+  it('normaliza nome vazio ao importar um circuito válido', () => {
+    const file = JSON.stringify({
+      format: 'veritas-circuits',
+      version: 1,
+      projects: [{ name: '   ', document }],
+    })
+
+    expect(parseCircuitFile(file)[0].name).toBe('AND local')
   })
 
   it('recusa circuito com ligação inválida', () => {

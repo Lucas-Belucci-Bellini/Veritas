@@ -74,7 +74,7 @@ export function parseCircuitFile(text: string): NewCircuitProject[] {
   }
 
   const projects = data.projects.filter(isCircuitProjectLike).map((project) => ({
-    name: project.name.trim() || 'Circuito sem nome',
+    name: project.name.trim() || project.document.name.trim() || 'Circuito sem nome',
     document: project.document,
   }))
 

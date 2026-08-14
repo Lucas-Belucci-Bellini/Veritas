@@ -23,6 +23,8 @@ import { PwaStatus } from './components/PwaStatus'
 import { TruthTableView } from './components/TruthTableView'
 import { VirtualKeyboard } from './components/VirtualKeyboard'
 import { useTheme } from './hooks/useTheme'
+import { AuthProvider } from './auth/AuthProvider'
+import { AuthPanel } from './components/AuthPanel'
 
 // O React Flow e o Dagre pesam mais que todo o resto do aplicativo somado, e
 // só fazem falta quando já existe uma expressão válida na tela.
@@ -49,7 +51,7 @@ const NOTATIONS: ReadonlyArray<{ value: Notation; label: string; title: string }
   { value: 'text', label: 'AND OR', title: 'Notação textual' },
 ]
 
-export default function App() {
+function AppContent() {
   const [expression, setExpression] = useState(
     () => expressionFromUrl() ?? '(A AND B) OR NOT C',
   )
@@ -155,6 +157,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <AuthPanel />
             <a
               href="https://github.com/Lucas-Belucci-Bellini/Veritas"
               target="_blank"
@@ -350,5 +353,13 @@ export default function App() {
         computador.
       </footer>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }

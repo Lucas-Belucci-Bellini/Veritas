@@ -116,3 +116,11 @@ A primeira parte da v0.7.0 foi implementada no repositório. O editor agora gera
 Os circuitos visuais também podem ser salvos, reabertos, excluídos, exportados e importados no IndexedDB. O banco local recebeu a tabela `circuitProjects` na versão 2, sem alterar a tabela de projetos de expressões.
 
 No Supabase existente foi aplicada a migração `veritas_circuit_context_foundation`. Ela cria uma tabela própria com RLS por `auth.uid()`, índices para usuário, tags e deduplicação, mas ainda não conecta o frontend diretamente porque a aplicação não possui autenticação. O módulo `src/circuit/context.ts` já produz o pacote determinístico que a futura camada autenticada poderá persistir.
+
+## Atualização da implementação — autenticação, nuvem e IA
+
+O frontend agora possui autenticação Supabase por e-mail e senha, restauração de sessão e logout. O IndexedDB permanece local-first, enquanto usuários autenticados podem sincronizar explicitamente circuitos na tabela `veritas_circuit_projects`, protegida por RLS e deduplicada por usuário e hash de conteúdo.
+
+O contexto produzido por `buildCircuitContext()` é enviado à Edge Function autenticada `veritas-circuit-ai`. A função usa saída JSON estruturada quando um provedor LLM é configurado por secrets e mantém uma heurística conservadora como fallback. A otimização nunca é aplicada silenciosamente: o usuário revisa sugestões e confirma a aplicação no canvas.
+
+Nesta etapa também foram ampliados os testes de tabela verdade e IndexedDB para cobrir múltiplas saídas, seleção de saída, truncamento, limites de segurança, reabertura do banco, atualização de documentos e normalização de importação.

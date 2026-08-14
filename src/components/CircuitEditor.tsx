@@ -32,6 +32,9 @@ import { TruthTableView } from './TruthTableView'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
 import type { ValueStyle } from '../lib/values'
 import type { CircuitProject } from '../storage/db'
+import { useAuth } from '../auth/useAuth'
+import { useCloudCircuitProjects } from '../hooks/useCloudCircuitProjects'
+import { requestCircuitAi, type CircuitAiResult } from '../ai/circuitAi'
 
 interface EditorNodeData extends Record<string, unknown> {
   kind: 'input' | 'constant' | 'gate' | 'output'
@@ -79,6 +82,11 @@ export function CircuitEditor() {
   const [hydrated, setHydrated] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const storage = useCircuitProjects()
+  const { user } = useAuth()
+  const cloud = useCloudCircuitProjects()
+  const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
 
   const document = useMemo(() => toDocument(nodes, edges), [nodes, edges])
   const issues = useMemo(() => validateCircuit(document), [document])
@@ -241,6 +249,76 @@ export function CircuitEditor() {
     setNotice('Arquivo de circuito exportado.')
   }
 
+  const runAi = async (action: 'analyze' | 'optimize') => {
+    if (!user) {
+      setNotice('Entre na sua conta para usar a análise de IA.')
+      return
+    }
+    if (issues.length > 0) {
+      setNotice('Corrija o circuito antes de pedir uma análise de IA.')
+      return
+    }
+    setAiLoading(true)
+    setAiResult(null)
+    try {
+      setAiResult(await requestCircuitAi(document, action))
+      setNotice(action === 'analyze' ? 'Análise de IA concluída.' : 'Otimização de IA concluída; revise antes de aplicar.')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível concluir a análise de IA.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const applyAiOptimization = () => {
+    const optimized = aiResult?.optimizedDocument
+    if (!optimized) return
+    const flow = fromDocument(optimized)
+    setNodes(flow.nodes)
+    setEdges(flow.edges)
+    setProjectName(optimized.name)
+    setCloudProjectId(null)
+    setSelectedRow(null)
+    setNotice('Otimização aplicada localmente. Sincronize novamente se quiser enviá-la para a nuvem.')
+  }
+
+  const syncCloud = async () => {
+    if (!user) {
+      setNotice('Entre na sua conta para sincronizar circuitos na nuvem.')
+      return
+    }
+    try {
+      const name = projectName.trim() || document.name
+      const project = await cloud.sync(name, { ...document, name }, cloudProjectId ?? undefined)
+      setCloudProjectId(project.id)
+      setProjectName(project.name)
+      setNotice(`Circuito "${project.name}" sincronizado na nuvem.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível sincronizar o circuito.')
+    }
+  }
+
+  const openCloud = (project: (typeof cloud.projects)[number]) => {
+    const flow = fromDocument(project.document)
+    setNodes(flow.nodes)
+    setEdges(flow.edges)
+    setProjectName(project.name)
+    setCloudProjectId(project.id)
+    setActiveProjectId(null)
+    setSelectedRow(null)
+    setNotice(`Circuito da nuvem "${project.name}" aberto.`)
+  }
+
+  const removeCloud = async (project: (typeof cloud.projects)[number]) => {
+    try {
+      await cloud.remove(project.id)
+      if (cloudProjectId === project.id) setCloudProjectId(null)
+      setNotice('Circuito removido da nuvem.')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível remover o circuito da nuvem.')
+    }
+  }
+
   const importLocal = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -279,6 +357,9 @@ export function CircuitEditor() {
           </button>
           <button type="button" className="key text-xs" onClick={saveLocal}>
             Salvar local
+          </button>
+          <button type="button" className="key text-xs" onClick={() => void syncCloud()} disabled={cloud.loading} title={user ? 'Sincronizar este circuito com sua conta Supabase' : 'Entre para sincronizar na nuvem'}>
+            {cloud.loading ? 'Sincronizando…' : 'Sincronizar nuvem'}
           </button>
           <button type="button" className="key text-xs" onClick={exportLocal}>
             Exportar
@@ -383,6 +464,48 @@ export function CircuitEditor() {
         {storage.unavailable && <span className="text-xs text-amber-700 dark:text-amber-300">{storage.unavailable}</span>}
         {storage.error && <span className="text-xs text-rose-700 dark:text-rose-300">{storage.error}</span>}
       </div>
+
+      {user && cloud.projects.length > 0 && (
+        <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-900/70 dark:bg-brand-950/20">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold tracking-wide text-brand-700 uppercase dark:text-brand-300">Circuitos na nuvem</span>
+            <button type="button" className="text-xs text-brand-700 hover:underline dark:text-brand-300" onClick={() => void cloud.refresh()}>Atualizar</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {cloud.projects.map((project) => (
+              <div key={project.id} className="flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2 py-1 dark:border-brand-800 dark:bg-slate-900">
+                <button type="button" className="px-2 text-xs font-semibold hover:text-brand-600" onClick={() => openCloud(project)}>{project.name}</button>
+                <button type="button" className="px-1 text-xs text-slate-400 hover:text-rose-600" onClick={() => void removeCloud(project)} aria-label={`Excluir ${project.name} da nuvem`}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {cloud.error && user && <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{cloud.error}</p>}
+
+      {user && issues.length === 0 && (
+        <section className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900/70 dark:bg-violet-950/20">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xs font-semibold tracking-wide text-violet-700 uppercase dark:text-violet-300">Assistente de lógica</h3>
+              <p className="mt-1 text-xs text-violet-800/80 dark:text-violet-200/80">Analisa o contexto do circuito e propõe uma limpeza conservadora das portas.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="key text-xs" disabled={aiLoading} onClick={() => void runAi('analyze')}>{aiLoading ? 'Analisando…' : 'Analisar com IA'}</button>
+              <button type="button" className="key text-xs" disabled={aiLoading} onClick={() => void runAi('optimize')}>{aiLoading ? 'Otimizando…' : 'Otimizar portas'}</button>
+            </div>
+          </div>
+          {aiResult && (
+            <div className="mt-3 rounded-lg border border-violet-200 bg-white/70 p-3 text-sm dark:border-violet-900/70 dark:bg-slate-900/60">
+              <p className="font-semibold text-slate-800 dark:text-slate-100">{aiResult.summary}</p>
+              <p className="mt-1 text-xs text-slate-400">Provedor: {aiResult.provider === 'llm' ? 'modelo de linguagem' : 'heurística segura'} · confiança {Math.round(aiResult.confidence * 100)}%</p>
+              <ul className="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300">{aiResult.suggestions.map((suggestion) => <li key={suggestion}>• {suggestion}</li>)}</ul>
+              {aiResult.optimizedDocument && <button type="button" className="mt-3 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700" onClick={applyAiOptimization}>Aplicar otimização</button>}
+            </div>
+          )}
+        </section>
+      )}
 
       {storage.projects.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
