@@ -69,6 +69,26 @@ describe('executor ALGO-001', () => {
     expect(result.activeNodeId).toBeNull()
     expect(result.variables.x).toBe(3)
     expect(result.output).toEqual(['positivo'])
+    expect(result.watch).toEqual([
+      {
+        name: 'x',
+        type: 'number',
+        value: 3,
+        previousValue: 0,
+        changedAtStep: 3,
+        scope: 'global',
+      },
+    ])
+    expect(result.branches).toEqual([
+      {
+        nodeId: 'if-positive',
+        expression: 'x > 0',
+        operands: { x: 3 },
+        result: true,
+        selectedBranch: 'then',
+        step: 4,
+      },
+    ])
     expect(result.trace.map((entry) => entry.nodeId)).toEqual([
       'start',
       'declare-x',

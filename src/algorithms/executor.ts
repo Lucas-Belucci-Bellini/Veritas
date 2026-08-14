@@ -33,6 +33,11 @@ function cloneState(state: ExecutionState): ExecutionState {
     inputCursors: { ...state.inputCursors },
     output: [...state.output],
     trace: [...state.trace],
+    watch: state.watch.map((entry) => ({ ...entry })),
+    branches: state.branches.map((entry) => ({
+      ...entry,
+      operands: { ...entry.operands },
+    })),
   }
 }
 
@@ -55,7 +60,27 @@ function ensureDeclared(state: ExecutionState, variable: string): void {
   }
 }
 
-function executeNode(state: ExecutionState, node: AlgorithmNode): void {
+function recordWatchChange(
+  state: ExecutionState,
+  variable: string,
+  value: RuntimeValue,
+  step: number,
+): void {
+  const existing = state.watch.find((entry) => entry.name === variable)
+  state.watch = [
+    ...state.watch.filter((entry) => entry.name !== variable),
+    {
+      name: variable,
+      type: state.variableTypes[variable],
+      value,
+      previousValue: existing?.value,
+      changedAtStep: step,
+      scope: 'global' as const,
+    },
+  ].sort((left, right) => left.name.localeCompare(right.name))
+}
+
+function executeNode(state: ExecutionState, node: AlgorithmNode, step: number): void {
   switch (node.type) {
     case 'start':
       state.activeNodeId = requireNext(node)
@@ -74,6 +99,7 @@ function executeNode(state: ExecutionState, node: AlgorithmNode): void {
       }
       state.variableTypes[node.variable] = node.valueType
       state.variables[node.variable] = value
+      recordWatchChange(state, node.variable, value, step)
       state.activeNodeId = node.next
       return
     }
@@ -85,6 +111,7 @@ function executeNode(state: ExecutionState, node: AlgorithmNode): void {
         throw new AlgorithmExecutionError(`A atribuição para "${node.variable}" exige ${valueType}.`)
       }
       state.variables[node.variable] = value
+      recordWatchChange(state, node.variable, value, step)
       state.activeNodeId = node.next
       return
     }
@@ -93,6 +120,14 @@ function executeNode(state: ExecutionState, node: AlgorithmNode): void {
       if (typeof condition !== 'boolean') {
         throw new AlgorithmExecutionError('A condição do IF precisa produzir verdadeiro ou falso.')
       }
+      state.branches.push({
+        nodeId: node.id,
+        expression: node.condition,
+        operands: { ...state.variables },
+        result: condition,
+        selectedBranch: condition ? 'then' : 'else',
+        step,
+      })
       state.activeNodeId = condition ? node.thenNext : node.elseNext
       return
     }
@@ -111,6 +146,7 @@ function executeNode(state: ExecutionState, node: AlgorithmNode): void {
       }
       state.inputCursors[node.variable] = cursor + 1
       state.variables[node.variable] = value
+      recordWatchChange(state, node.variable, value, step)
       state.activeNodeId = node.next
       return
     }
@@ -140,9 +176,27 @@ export function createExecutionState(
     inputCursors: {},
     output: [],
     trace: [],
+    watch: [],
+    branches: [],
     stepIndex: 0,
     error: null,
   }
+}
+
+export function parseAlgorithmInput(
+  raw: string,
+  valueType: ExecutionState['variableTypes'][string],
+): RuntimeValue {
+  if (valueType === 'string') return raw
+  if (valueType === 'number') {
+    const value = Number(raw.trim())
+    if (!Number.isFinite(value)) throw new AlgorithmExecutionError('A entrada precisa ser um número finito.')
+    return value
+  }
+  const normalized = raw.trim().toLowerCase()
+  if (['true', 'verdadeiro', '1', 'sim'].includes(normalized)) return true
+  if (['false', 'falso', '0', 'não', 'nao'].includes(normalized)) return false
+  throw new AlgorithmExecutionError('A entrada booleana precisa ser verdadeiro/falso.')
 }
 
 export function provideInput(
@@ -175,7 +229,7 @@ export function stepAlgorithm(
 
   const next = cloneState(state)
   try {
-    executeNode(next, node)
+    executeNode(next, node, next.stepIndex + 1)
     if (next.status === 'awaiting-input') return next
     next.stepIndex += 1
     next.trace.push({

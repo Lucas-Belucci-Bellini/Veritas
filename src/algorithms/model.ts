@@ -72,6 +72,24 @@ export interface AlgorithmTraceEntry {
   outputLength: number
 }
 
+export interface VariableWatchEntry {
+  name: string
+  type: AlgorithmValueType
+  value: RuntimeValue
+  previousValue: RuntimeValue | undefined
+  changedAtStep: number | null
+  scope: 'global' | 'function'
+}
+
+export interface BranchTraceEntry {
+  nodeId: string
+  expression: string
+  operands: Record<string, RuntimeValue>
+  result: boolean
+  selectedBranch: 'then' | 'else'
+  step: number
+}
+
 export interface ExecutionState {
   status: AlgorithmExecutionStatus
   activeNodeId: string | null
@@ -81,6 +99,8 @@ export interface ExecutionState {
   inputCursors: Record<string, number>
   output: RuntimeValue[]
   trace: AlgorithmTraceEntry[]
+  watch: VariableWatchEntry[]
+  branches: BranchTraceEntry[]
   stepIndex: number
   error: string | null
 }

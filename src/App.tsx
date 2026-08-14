@@ -25,6 +25,9 @@ import { VirtualKeyboard } from './components/VirtualKeyboard'
 import { useTheme } from './hooks/useTheme'
 import { AuthProvider } from './auth/AuthProvider'
 import { AuthPanel } from './components/AuthPanel'
+import { AlgorithmWorkspace } from './components/AlgorithmWorkspace'
+import { LogicCaseLab } from './components/LogicCaseLab'
+import { createImplicationExample } from './algorithms'
 
 // O React Flow e o Dagre pesam mais que todo o resto do aplicativo somado, e
 // só fazem falta quando já existe uma expressão válida na tela.
@@ -61,6 +64,7 @@ function AppContent() {
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
   const [theme, toggleTheme] = useTheme()
   const inputRef = useRef<HTMLInputElement>(null)
+  const algorithmExample = useMemo(() => createImplicationExample(), [])
 
   const parsed = useMemo(() => tryParse(expression), [expression])
 
@@ -323,6 +327,20 @@ function AppContent() {
             </section>
           </div>
         )}
+
+        <section className="card space-y-5 p-4 sm:p-6">
+          <div>
+            <p className="text-xs font-semibold tracking-wide text-brand-600 uppercase dark:text-brand-300">
+              Workspace de algoritmos
+            </p>
+            <h2 className="mt-1 text-lg font-bold">ALGO-002 — lógica observável</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              O mesmo raciocínio dos exercícios didáticos aparece como entrada, branch, Watch e trace.
+            </p>
+          </div>
+          <AlgorithmWorkspace document={algorithmExample} />
+          <LogicCaseLab />
+        </section>
 
         <Suspense
           fallback={
