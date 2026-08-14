@@ -280,7 +280,11 @@ O editor exporta circuitos combinacionais válidos para **Verilog-2001** (`.v`) 
 
 O próximo trabalho é adicionar desfazer/refazer e evoluir a colaboração para múltiplas salas com isolamento por tópico, versão otimista e rejeição explícita de conflitos. O desenho inicial está em [`docs/EDUCATIONAL-TESTS-MULTIROOM.md`](./docs/EDUCATIONAL-TESTS-MULTIROOM.md).
 Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados e
-uma API de contexto para integrações MCP. Desktop nativo, agentes em larga escala
-e recursos 3D só entram após validação técnica e planejamento próprios. Consulte o
+um workspace de algoritmos inspirado em fluxogramas pedagógicos. A proposta `ALGO-001`,
+documentada em [`docs/FLOWGORITHM-INSIGHTS.md`](./docs/FLOWGORITHM-INSIGHTS.md), usa
+um executor puro, execução passo a passo, Watch de variáveis e limites de sandbox; ela
+não executa o Flowgorithm enviado nem importa assemblies externos. Uma API de contexto
+para integrações MCP, desktop nativo, agentes em larga escala e recursos 3D só entram após
+validação técnica e planejamento próprios. Consulte o
 [`roadmap executável`](./docs/ROADMAP.md) e a documentação [`Supabase`](./docs/SUPABASE.md)
 para ver a ordem completa.

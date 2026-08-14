@@ -154,3 +154,9 @@ A colaboração permanece em prévia: o snapshot é uma atualização transitór
 Os seis materiais fornecidos foram mapeados em `docs/EDUCATIONAL-TESTS-MULTIROOM.md`. A nova suíte `src/engine/courseMaterials.test.ts` cobre tautologias, contradições, equivalências de De Morgan, condicional equivalente a `¬P ∨ Q`, contrapositiva, recíproca com contraexemplo e regras de inferência. A validação passou com 18 arquivos e 179 testes, além de typecheck, lint e build.
 
 O conteúdo de arquitetura de computadores foi incorporado ao backlog conceitual de barramentos multi-bit, ALU didática, registradores e interconexões. A próxima etapa de colaboração é `ROOM-001`: extrair sessões por sala, isolar tópicos, incluir `baseVersion` nos snapshots, rejeitar conflitos otimistas no RPC e criar testes de isolamento entre duas salas. A resolução deverá começar com conflito explícito, antes de qualquer CRDT ou LWW silencioso.
+
+## Atualização da implementação — insights do Flowgorithm
+
+Os arquivos enviados do Flowgorithm foram inspecionados estaticamente, sem executar o `.exe` e sem importar assemblies externos. A análise foi registrada em `docs/FLOWGORITHM-INSIGHTS.md` e resultou na proposta `ALGO-001`: um workspace de algoritmos independente do editor combinacional, com `AlgorithmDocument` versionado, nós Start/End/Declare/Assign/If/Input/Output, executor puro, execução passo a passo, Watch de variáveis, breakpoints e limites de sandbox.
+
+A ordem recomendada é começar pelo executor determinístico e pelos testes de atribuição/ramificação/entrada/saída, depois adicionar loops, funções e arrays. Geração de código, I/O de arquivos, recursão e recursos gráficos só entram após o IR, a segurança e os limites de execução estarem validados.
