@@ -254,6 +254,12 @@ nenhuma cópia paralela.
 
 React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexie.js · Supabase Auth · Supabase Edge Functions · Workbox · Vitest · oxlint
 
+## Testes derivados dos materiais didáticos
+
+Os materiais enviados sobre proposições, conectivos, tabela verdade, implicação, equivalência, álgebra booleana, argumentos e organização de computadores foram usados para criar regressões em `src/engine/courseMaterials.test.ts`. A suíte verifica tautologias, contradições, contrapositiva, não equivalência da recíproca, De Morgan, bicondicional, Modus Ponens, Modus Tollens e silogismo hipotético. O mapeamento completo e a proposta de colaboração multi-room estão em [`docs/EDUCATIONAL-TESTS-MULTIROOM.md`](./docs/EDUCATIONAL-TESTS-MULTIROOM.md).
+
+A suíte passou com **18 arquivos e 179 testes**, mantendo typecheck, lint e build limpos. O conteúdo de arquitetura de computadores também foi convertido em backlog conceitual para barramentos multi-bit, ALU didática, registradores e interconexões; esses componentes ainda não foram adicionados ao editor combinacional atual.
+
 ## Próximos passos
 
 A v0.7.0 começou com um editor visual combinacional em prévia. Ele já possui um
@@ -272,7 +278,7 @@ Usuários autenticados podem compartilhar um circuito pelo UUID de outro usuári
 
 O editor exporta circuitos combinacionais válidos para **Verilog-2001** (`.v`) e **VHDL-2008** (`.vhd`). Identificadores são sanitizados de forma determinística e circuitos inválidos são rejeitados antes do download. O painel de métricas acompanha latência, sucesso, confiança, provedor e fallback da IA em tempo real, sempre com RLS por usuário e telemetria best-effort.
 
-O próximo trabalho é adicionar desfazer/refazer e melhorar a colaboração declarativa.
+O próximo trabalho é adicionar desfazer/refazer e evoluir a colaboração para múltiplas salas com isolamento por tópico, versão otimista e rejeição explícita de conflitos. O desenho inicial está em [`docs/EDUCATIONAL-TESTS-MULTIROOM.md`](./docs/EDUCATIONAL-TESTS-MULTIROOM.md).
 Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados e
 uma API de contexto para integrações MCP. Desktop nativo, agentes em larga escala
 e recursos 3D só entram após validação técnica e planejamento próprios. Consulte o

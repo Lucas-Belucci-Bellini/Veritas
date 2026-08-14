@@ -148,3 +148,9 @@ A release v0.7.2 foi implementada em fatias verticais e publicada com o commit `
 | Segurança e documentação | Migrações aplicadas no projeto existente, policies de Realtime e `docs/REALTIME-EXPORT-METRICS.md` |
 
 A colaboração permanece em prévia: o snapshot é uma atualização transitória e a persistência oficial continua sendo o salvamento versionado. A próxima etapa deve adicionar desfazer/refazer e, antes de uma colaboração declarativa de maior escala, definir estratégia de conflitos, presença de cursores e resolução de alterações concorrentes.
+
+## Atualização da implementação — testes didáticos e backlog multi-room
+
+Os seis materiais fornecidos foram mapeados em `docs/EDUCATIONAL-TESTS-MULTIROOM.md`. A nova suíte `src/engine/courseMaterials.test.ts` cobre tautologias, contradições, equivalências de De Morgan, condicional equivalente a `¬P ∨ Q`, contrapositiva, recíproca com contraexemplo e regras de inferência. A validação passou com 18 arquivos e 179 testes, além de typecheck, lint e build.
+
+O conteúdo de arquitetura de computadores foi incorporado ao backlog conceitual de barramentos multi-bit, ALU didática, registradores e interconexões. A próxima etapa de colaboração é `ROOM-001`: extrair sessões por sala, isolar tópicos, incluir `baseVersion` nos snapshots, rejeitar conflitos otimistas no RPC e criar testes de isolamento entre duas salas. A resolução deverá começar com conflito explícito, antes de qualquer CRDT ou LWW silencioso.
