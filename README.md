@@ -1,6 +1,6 @@
 # Veritas
 
-Calculadora de tabelas verdade e visualizador de circuitos lógicos que roda
+Calculadora de tabelas verdade e ferramenta local-first para projetar circuitos lógicos que roda
 inteiramente no navegador — sem servidor, sem banco de dados, sem conta.
 
 Você digita `(A AND B) OR NOT C` e recebe, no mesmo instante, a tabela verdade
@@ -8,8 +8,9 @@ completa com os passos intermediários e o circuito de portas lógicas
 equivalente. Clicar numa linha da tabela acende o caminho da eletricidade no
 circuito.
 
-O plano completo do projeto está em [`issue.md`](./issue.md) e o roadmap
-resumido em [`plano.md`](./plano.md).
+O registro completo de ideias está em [`issue.md`](./issue.md). O plano executável,
+o backlog priorizado e os critérios de aceite estão em [`docs/ROADMAP.md`](./docs/ROADMAP.md),
+com um resumo executivo em [`plano.md`](./plano.md).
 
 ## O que já está pronto
 
@@ -244,10 +245,14 @@ React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexi
 
 ## Próximos passos
 
-* Editor visual de circuitos, para desenhar na tela o que hoje só é simulável
-  por código ou pelo servidor MCP
-* Barramentos multi-bit e chips customizados (subcircuitos)
-* Contas de usuário e sincronização opcional
-* v0.7.0 — sincronização em tempo real (CRDT) e fios sem fio (túneis Tx/Rx)
-* Depois — barramentos multi-bit, lógica sequencial (clock, flip-flops, RAM),
-  chips customizados e servidor MCP para IAs consultarem o motor
+A v0.7.0 começou com um editor visual combinacional em prévia. Ele já possui um
+modelo canônico de circuito, validação de entradas, detecção de ciclos, avaliação
+determinística e um canvas inicial com paleta de componentes. O próximo trabalho
+é concluir a tabela verdade derivada do canvas, salvar/reabrir documentos visuais
+e adicionar desfazer/refazer.
+
+Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados
+e uma API declarativa de contexto para integrações MCP. Contas, sincronização,
+desktop nativo, agentes em larga escala e recursos 3D só entram após validação
+técnica e planejamento próprios. Consulte o [`roadmap executável`](./docs/ROADMAP.md)
+para ver a ordem completa.

@@ -29,6 +29,9 @@ import { useTheme } from './hooks/useTheme'
 const CircuitView = lazy(() =>
   import('./components/CircuitView').then((module) => ({ default: module.CircuitView })),
 )
+const CircuitEditor = lazy(() =>
+  import('./components/CircuitEditor').then((module) => ({ default: module.CircuitEditor })),
+)
 import { expressionFromUrl, syncUrl } from './lib/url'
 import type { ValueStyle } from './lib/values'
 
@@ -317,6 +320,16 @@ export default function App() {
             </section>
           </div>
         )}
+
+        <Suspense
+          fallback={
+            <section className="card p-8 text-center text-sm text-slate-400 dark:text-slate-500">
+              Carregando editor visual…
+            </section>
+          }
+        >
+          <CircuitEditor />
+        </Suspense>
 
         <ProjectsPanel
           expression={expression}

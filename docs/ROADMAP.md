@@ -1,0 +1,110 @@
+# Veritas — Plano executável do produto
+
+> Este documento é a fonte de verdade do roadmap do Veritas. O arquivo [`issue.md`](../issue.md) continua preservado como registro de descoberta e ideias, mas não deve ser interpretado como uma fila linear de implementação.
+
+## 1. Estado atual
+
+A versão de referência do repositório é a **v0.6.2**. O projeto já possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial básica e servidor MCP.
+
+| Área | Situação real | Evidência no repositório |
+| --- | --- | --- |
+| Motor lógico combinacional | Entregue | `src/engine/` |
+| Interface da calculadora | Entregue | `src/App.tsx` e `src/components/` |
+| Circuito derivado da expressão | Entregue | `src/circuit/` |
+| Persistência local e `.veritas` | Entregue | `src/storage/` |
+| PWA offline-first | Entregue | `vite.config.ts` e `vite-plugin-pwa` |
+| Karnaugh, simplificação e formas normais | Entregue | `src/engine/` |
+| Simulação sequencial de base | Entregue no motor; edição visual ainda não | `src/simulation/` |
+| MCP para uso headless por IAs | Entregue | `mcp/` e `plugins/veritas-logic/` |
+| Editor visual bidirecional | Próxima entrega | Ainda não existe como fluxo principal |
+| Barramentos multi-bit | Backlog priorizado | Ainda não existe no modelo de dados |
+| Chips customizados hierárquicos | Backlog posterior | Depende do editor e do modelo de subcircuitos |
+| Sync em nuvem e contas | Não iniciar agora | Exige backend, autenticação e política de conflitos |
+| Aplicativo desktop Tauri/Rust | Investigar depois | Depende de métricas de performance e escopo estabilizado |
+| 3D, PCB, impressão e 250 subagentes | Visão de longo prazo | Não fazem parte do próximo ciclo |
+
+## 2. Decisões de produto
+
+O Veritas será construído primeiro como uma ferramenta **local-first, client-side e offline-first** para estudar, projetar e validar circuitos digitais. A mesma engine TypeScript continuará sendo usada pela interface web, pelo importador de chips e pelo servidor MCP, evitando implementações paralelas que possam divergir.
+
+A calculadora de expressões continua sendo uma experiência de entrada rápida. O próximo salto do produto não é adicionar mais painéis à tela atual, mas permitir que o usuário **edite o circuito visualmente**, simule esse circuito e converta o resultado para uma expressão ou tabela verdade quando isso for matematicamente possível.
+
+Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, renderização 3D e fabricação física serão tratados como linhas de produto posteriores. Eles só entram após existir uma base estável de projeto, eventos, validação, versionamento e limites de execução.
+
+## 3. Roadmap por releases
+
+| Release | Objetivo | Entregas incluídas | Critério de saída |
+| --- | --- | --- | --- |
+| **v0.7.0** | Editor visual mínimo viável | Canvas editável; entradas, constantes, saídas e portas AND/OR/NOT/XOR; criação e remoção de conexões; avaliação combinacional; mensagens de erro; exportação/importação de circuito | Um usuário consegue criar um circuito simples sem digitar uma expressão e validar sua tabela verdade |
+| **v0.7.1** | Usabilidade e confiabilidade do editor | Seleção, exclusão, atalhos, desfazer/refazer, layout inicial, validação de ciclos combinacionais, testes de interação e persistência do novo formato | O editor é utilizável em projetos pequenos e não perde dados em operações comuns |
+| **v0.8.0** | Barramentos multi-bit | Largura explícita de sinal; operações bitwise; displays binário/hexadecimal; splitter/combiner; limites de largura e testes de compatibilidade | Um circuito de 8 bits consegue ser criado, simulado, salvo e reaberto com resultado determinístico |
+| **v0.9.0** | Workspace sequencial | Edição visual de clock, DFF/TFF, delay, contadores e observação de ticks; pausa, avanço manual e reset | Um contador e um circuito com feedback podem ser simulados sem congelar a interface |
+| **v0.10.0** | Abstração e chips customizados | Pinos de entrada/saída; criação de subcircuito; biblioteca local de chips; execução hierárquica com limites de profundidade | Um subcircuito salvo pode ser reutilizado como componente em outro projeto |
+| **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
+| **v1.x** | Integrações opcionais | Sync cloud, autenticação, colaboração, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
+
+## 4. Próximo ciclo: v0.7.0
+
+A primeira implementação organizada será o **editor visual combinacional**. O escopo é deliberadamente pequeno: somente componentes sem estado e um conjunto curto de portas. O usuário poderá começar no canvas, conectar componentes e gerar uma representação verificável do circuito. A calculadora de expressões continuará funcionando como está, sem ser substituída ou acoplada de forma frágil ao editor.
+
+O editor terá um modelo de dados próprio, independente dos objetos internos do React Flow. A interface converterá esse modelo para nós e arestas visuais; a engine receberá um netlist normalizado. Essa separação permite salvar arquivos estáveis, testar o cálculo sem DOM e futuramente trocar a biblioteca de canvas sem reescrever o domínio.
+
+| Item | Decisão para v0.7.0 |
+| --- | --- |
+| Componentes | `input`, `constant`, `and`, `or`, `not`, `xor`, `output` |
+| Sinais | Booleanos de um bit |
+| Conectividade | Uma saída pode alimentar múltiplas entradas; cada entrada aceita no máximo uma conexão |
+| Avaliação | Ordenação topológica e propagação determinística |
+| Ciclos | Rejeitados no modo combinacional, com erro acionável |
+| Conversão para expressão | Permitida quando o grafo possui uma saída selecionada e não tem ciclo |
+| Persistência | Novo formato versionado dentro de `.veritas`, mantendo compatibilidade de leitura |
+| Segurança | Sem execução de código importado; validar tipos, IDs, referências e limites |
+
+## 5. Backlog organizado
+
+Os itens abaixo serão implementados nessa ordem. Cada item deve gerar código, teste e documentação mínima antes de ser marcado como concluído.
+
+| ID | Prioridade | Trabalho | Dependências |
+| --- | --- | --- | --- |
+| VRT-001 | P0 | Definir tipos canônicos de circuito, portas, conexões e versão do formato | Nenhuma |
+| VRT-002 | P0 | Criar normalizador e validador de netlist | VRT-001 |
+| VRT-003 | P0 | Implementar avaliação combinacional do netlist | VRT-001, VRT-002 |
+| VRT-004 | P0 | Criar adaptador netlist ↔ React Flow | VRT-001 |
+| VRT-005 | P0 | Implementar canvas editável com componentes básicos | VRT-004 |
+| VRT-006 | P0 | Exibir erros de conexão, entradas faltantes e ciclos | VRT-002, VRT-003 |
+| VRT-007 | P1 | Gerar tabela verdade a partir do circuito | VRT-003 |
+| VRT-008 | P1 | Converter circuito acíclico para expressão quando possível | VRT-003 |
+| VRT-009 | P1 | Salvar e reabrir projetos visuais | VRT-001, camada de storage atual |
+| VRT-010 | P1 | Desfazer/refazer e atalhos essenciais | VRT-005 |
+| VRT-011 | P1 | Testes cruzados entre expressão, circuito e tabela | VRT-003, VRT-007, engine atual |
+| VRT-012 | P2 | Tutorial inicial de uso e exemplos de circuitos | VRT-005 |
+
+## 6. Fora do próximo ciclo
+
+Não serão iniciados no ciclo v0.7.0 o sync com Supabase, autenticação, CRDT, WebSockets, 250 subagentes, WebLLM, integração de GitHub com permissões de escrita, Tauri, Rust, Three.js, exportação para PCB, G-Code ou impressão 3D. Essas ideias continuam registradas no `issue.md`, mas iniciar qualquer uma delas agora aumentaria a superfície técnica antes de o editor possuir um modelo estável.
+
+Também não será implementada uma execução arbitrária de comandos recebidos de IA ou de arquivos importados. A futura integração agentic deverá trabalhar com operações declarativas, validação, permissões e confirmação explícita do usuário.
+
+## 7. Definição de pronto
+
+Uma funcionalidade só será considerada pronta quando estiver implementada na camada correta, coberta por testes automatizados, validada por `lint`, `typecheck`, `test` e `build`, documentada no README quando alterar o fluxo do usuário e compatível com o princípio offline-first. Mudanças no formato `.veritas` devem incluir versão, validação defensiva e teste de migração ou rejeição clara.
+
+Para cada release, será produzido um pequeno registro com as decisões tomadas, as limitações conhecidas e os próximos itens. O número de versão só avançará quando os critérios de saída da tabela forem atendidos.
+
+## 8. Riscos e controles
+
+| Risco | Controle |
+| --- | --- |
+| O editor virar uma cópia difícil de manter da engine | Netlist canônico e engine sem dependência de React/DOM |
+| Circuitos inválidos congelarem a aplicação | Limites de nós/arestas, detecção de ciclos e avaliação com falhas explícitas |
+| Arquivos importados corromperem projetos | Validação de esquema, versão de formato e rejeição defensiva |
+| O roadmap crescer mais rápido que a capacidade de entrega | Releases curtas, backlog priorizado e itens fora de escopo explícitos |
+| Integrações com IA alterarem dados sem controle | Propostas declarativas, dry-run, logs e confirmação do usuário |
+| Migração prematura para desktop atrasar o produto web | Medir performance primeiro e só então decidir a fronteira Rust/Tauri |
+
+## 9. Referências
+
+[1]: https://github.com/Lucas-Belucci-Bellini/Veritas/blob/main/issue.md "Registro de descoberta do Veritas"
+[2]: https://reactflow.dev/ "React Flow — documentação oficial"
+[3]: https://modelcontextprotocol.io/ "Model Context Protocol — documentação oficial"
+[4]: https://tauri.app/ "Tauri — documentação oficial"
