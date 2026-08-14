@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   addEdge,
   Background,
@@ -16,7 +16,9 @@ import {
   type NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { assignmentAt } from '../engine'
 import {
+  buildCircuitTruthTable,
   editorInputCount,
   evaluateCircuit,
   validateCircuit,
@@ -26,6 +28,10 @@ import {
 } from '../circuit'
 import { GateSymbol } from '../circuit/GateSymbol'
 import type { GateOp } from '../circuit/graph'
+import { TruthTableView } from './TruthTableView'
+import { useCircuitProjects } from '../hooks/useCircuitProjects'
+import type { ValueStyle } from '../lib/values'
+import type { CircuitProject } from '../storage/db'
 
 interface EditorNodeData extends Record<string, unknown> {
   kind: 'input' | 'constant' | 'gate' | 'output'
@@ -62,20 +68,85 @@ const NODE_LABELS: Record<EditorComponentType, string> = {
 
 export function CircuitEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState<EditorFlowNode>(createDemoNodes())
-  const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[])
+  const [edges, setEdges, onEdgesChange] = useEdgesState(createDemoEdges())
   const [notice, setNotice] = useState('')
   const [showGuide, setShowGuide] = useState(true)
+  const [projectName, setProjectName] = useState('Circuito AND')
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(null)
+  const [selectedOutputId, setSelectedOutputId] = useState<string | undefined>()
+  const [selectedRow, setSelectedRow] = useState<number | null>(null)
+  const [valueStyle, setValueStyle] = useState<ValueStyle>('vf')
+  const [hydrated, setHydrated] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const storage = useCircuitProjects()
 
   const document = useMemo(() => toDocument(nodes, edges), [nodes, edges])
   const issues = useMemo(() => validateCircuit(document), [document])
-  const evaluation = useMemo(() => {
+  const outputNodes = useMemo(
+    () => nodes.filter((node) => node.data.componentType === 'output'),
+    [nodes],
+  )
+
+  useEffect(() => {
+    if (selectedOutputId && outputNodes.some((node) => node.id === selectedOutputId)) return
+    setSelectedOutputId(outputNodes[0]?.id)
+  }, [outputNodes, selectedOutputId])
+
+  useEffect(() => {
+    if (!storage.ready || hydrated) return
+    const latest = storage.projects[0]
+    if (latest) {
+      loadProject(latest, setNodes, setEdges, setProjectName, setActiveProjectId)
+      setNotice(`Circuito local "${latest.name}" restaurado.`)
+    }
+    setHydrated(true)
+  }, [hydrated, setEdges, setNodes, storage.projects, storage.ready])
+
+  const truthTable = useMemo(() => {
     if (issues.length > 0) return null
     try {
-      return evaluateCircuit(document)
+      return buildCircuitTruthTable(document, { outputId: selectedOutputId })
     } catch {
       return null
     }
-  }, [document, issues])
+  }, [document, issues, selectedOutputId])
+
+  const selectedEvaluation = useMemo(() => {
+    if (!truthTable || selectedRow === null) return null
+    try {
+      return evaluateCircuit(document, assignmentAt(truthTable, selectedRow))
+    } catch {
+      return null
+    }
+  }, [document, selectedRow, truthTable])
+
+  const renderedNodes = useMemo(
+    () =>
+      nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          value: selectedEvaluation?.values[node.id]?.[0],
+        },
+      })),
+    [nodes, selectedEvaluation],
+  )
+
+  const renderedEdges = useMemo(
+    () =>
+      edges.map((edge) => {
+        const live = selectedEvaluation?.values[edge.source]?.[0] === true
+        return {
+          ...edge,
+          animated: live,
+          style: {
+            stroke: live ? '#f59e0b' : 'var(--color-slate-400)',
+            strokeWidth: live ? 2.4 : 1.6,
+          },
+        }
+      }),
+    [edges, selectedEvaluation],
+  )
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -88,6 +159,7 @@ export function CircuitEditor() {
         setNotice('Essa entrada já possui uma conexão. Remova o fio antigo antes de conectar outro.')
         return
       }
+      setSelectedRow(null)
       setNotice('')
       setEdges((current) =>
         addEdge(
@@ -106,19 +178,85 @@ export function CircuitEditor() {
 
   const addComponent = (type: EditorComponentType) => {
     setNotice('')
-    setNodes((current) => [...current, createNode(type, current.length)])
+    setSelectedRow(null)
+    setNodes((current) => [...current, createNode(type, current.length, nextNodeId(type, current))])
   }
 
   const reset = () => {
     setNodes(createDemoNodes())
     setEdges(createDemoEdges())
-    setNotice('Exemplo de AND carregado.')
+    setProjectName('Circuito AND')
+    setActiveProjectId(null)
+    setSelectedRow(null)
+    setNotice('Exemplo de AND carregado. Salve-o localmente quando quiser preservá-lo.')
+  }
+
+  const saveLocal = async () => {
+    if (storage.unavailable) {
+      setNotice(storage.unavailable)
+      return
+    }
+    try {
+      const name = projectName.trim() || document.name
+      const documentToSave = { ...document, name }
+      if (activeProjectId !== null) {
+        await storage.update(activeProjectId, { name, document: documentToSave })
+      } else {
+        const id = await storage.save({ name, document: documentToSave })
+        setActiveProjectId(id)
+      }
+      setProjectName(name)
+      setNotice(`Circuito "${name}" salvo no IndexedDB.`)
+    } catch {
+      setNotice('Não foi possível salvar o circuito localmente.')
+    }
+  }
+
+  const openLocal = (project: CircuitProject) => {
+    loadProject(project, setNodes, setEdges, setProjectName, setActiveProjectId)
+    setSelectedRow(null)
+    setNotice(`Circuito local "${project.name}" aberto.`)
+  }
+
+  const removeLocal = async (project: CircuitProject) => {
+    try {
+      await storage.remove(project.id)
+      if (activeProjectId === project.id) {
+        setActiveProjectId(null)
+        setNotice('Circuito removido do armazenamento local.')
+      }
+    } catch {
+      setNotice('Não foi possível remover o circuito local.')
+    }
+  }
+
+  const exportLocal = () => {
+    const blob = new Blob([JSON.stringify({ format: 'veritas-circuits', version: 1, exportedAt: new Date().toISOString(), projects: [{ name: projectName, document }] }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = window.document.createElement('a')
+    link.href = url
+    link.download = `${safeFileName(projectName || 'circuito')}.veritas-circuits.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    setNotice('Arquivo de circuito exportado.')
+  }
+
+  const importLocal = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const count = await storage.importFile(await file.text())
+      setNotice(`${count} circuito(s) importado(s) para o IndexedDB.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Arquivo de circuito inválido.')
+    }
   }
 
   const validationMessage =
     issues[0]?.message ??
-    (evaluation
-      ? `Circuito válido: ${Object.keys(evaluation.outputs).length} saída(s) avaliada(s).`
+    (truthTable
+      ? `Circuito válido: ${truthTable.variables.length} entrada(s), ${truthTable.totalRows} linha(s).`
       : 'Adicione componentes e conecte as entradas para começar.')
 
   return (
@@ -135,10 +273,26 @@ export function CircuitEditor() {
             Monte um circuito no canvas, conecte as portas e valide a lógica sem precisar começar por uma expressão.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" className="key text-xs" onClick={reset}>
-            Carregar exemplo
+            Novo exemplo
           </button>
+          <button type="button" className="key text-xs" onClick={saveLocal}>
+            Salvar local
+          </button>
+          <button type="button" className="key text-xs" onClick={exportLocal}>
+            Exportar
+          </button>
+          <button type="button" className="key text-xs" onClick={() => fileInputRef.current?.click()}>
+            Importar
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json,.veritas-circuits.json"
+            className="hidden"
+            onChange={importLocal}
+          />
           <button
             type="button"
             className="key text-xs"
@@ -152,7 +306,7 @@ export function CircuitEditor() {
 
       {showGuide && (
         <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 dark:border-brand-900/70 dark:bg-brand-950/40 dark:text-brand-100">
-          <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas e use a mensagem abaixo do canvas para corrigir conexões incompletas.
+          <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, clique em uma linha da tabela para acender o circuito e use “Salvar local” para guardar o desenho no navegador.
         </div>
       )}
 
@@ -182,8 +336,8 @@ export function CircuitEditor() {
         <div>
           <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
             <ReactFlow
-              nodes={nodes}
-              edges={edges}
+              nodes={renderedNodes}
+              edges={renderedEdges}
               nodeTypes={NODE_TYPES}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
@@ -215,17 +369,74 @@ export function CircuitEditor() {
         </div>
       </div>
 
-      {evaluation && Object.keys(evaluation.outputs).length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          {Object.entries(evaluation.outputs).map(([id, value]) => (
-            <span
-              key={id}
-              className="rounded-full border border-slate-200 px-3 py-1 font-mono dark:border-slate-700"
-            >
-              {labelForNode(nodes, id)} = {value ? '1' : '0'}
-            </span>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500" htmlFor="circuit-project-name">
+          Projeto local
+        </label>
+        <input
+          id="circuit-project-name"
+          value={projectName}
+          onChange={(event) => setProjectName(event.target.value)}
+          className="min-w-48 rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-400 dark:border-slate-700"
+          placeholder="Nome do circuito"
+        />
+        {storage.unavailable && <span className="text-xs text-amber-700 dark:text-amber-300">{storage.unavailable}</span>}
+        {storage.error && <span className="text-xs text-rose-700 dark:text-rose-300">{storage.error}</span>}
+      </div>
+
+      {storage.projects.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {storage.projects.map((project) => (
+            <div key={project.id} className="flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">
+              <button type="button" className="px-2 text-xs font-semibold hover:text-brand-600" onClick={() => openLocal(project)}>
+                {project.name}
+              </button>
+              <button type="button" className="px-1 text-xs text-slate-400 hover:text-rose-600" onClick={() => void removeLocal(project)} aria-label={`Excluir ${project.name}`}>
+                ×
+              </button>
+            </div>
           ))}
         </div>
+      )}
+
+      {truthTable && (
+        <section className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-800">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
+                Tabela verdade do circuito
+              </h3>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                A tabela é calculada automaticamente a partir das entradas e saídas conectadas no canvas.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {outputNodes.length > 1 && (
+                <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  Saída
+                  <select
+                    value={selectedOutputId ?? ''}
+                    onChange={(event) => {
+                      setSelectedOutputId(event.target.value)
+                      setSelectedRow(null)
+                    }}
+                    className="rounded-lg border border-slate-200 bg-transparent px-2 py-1.5 dark:border-slate-700"
+                  >
+                    {outputNodes.map((node) => (
+                      <option key={node.id} value={node.id}>
+                        {node.data.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button type="button" className="key text-xs" onClick={() => setValueStyle((style) => (style === 'vf' ? 'binary' : 'vf'))}>
+                {valueStyle === 'vf' ? 'V / F' : '1 / 0'}
+              </button>
+            </div>
+          </div>
+          <TruthTableView table={truthTable} style={valueStyle} selectedRow={selectedRow} onSelectRow={setSelectedRow} />
+        </section>
       )}
     </section>
   )
@@ -238,10 +449,10 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
   if (data.kind === 'input' || data.kind === 'constant') {
     return (
       <div className="flex items-center" style={{ height: 32 }}>
-        <span className="grid h-8 min-w-8 place-items-center rounded-full border-2 border-slate-400 bg-white px-2 font-mono text-sm font-bold text-slate-700 dark:border-slate-500 dark:bg-slate-800 dark:text-slate-100">
+        <span className={`grid h-8 min-w-8 place-items-center rounded-full border-2 px-2 font-mono text-sm font-bold transition-colors ${lit ? 'border-amber-500 bg-amber-400/25 text-amber-700 dark:text-amber-200' : 'border-slate-400 bg-white text-slate-700 dark:border-slate-500 dark:bg-slate-800 dark:text-slate-100'}`}>
           {data.label}
         </span>
-        <span className="h-0.5 w-4 bg-slate-400 dark:bg-slate-500" />
+        <span className={`h-0.5 w-4 ${lit ? 'bg-amber-500' : 'bg-slate-400 dark:bg-slate-500'}`} />
         <Handle type="source" position={Position.Right} className={dot} />
       </div>
     )
@@ -251,8 +462,8 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
     return (
       <div className="flex items-center gap-2" title={data.label} style={{ height: 40 }}>
         <Handle type="target" position={Position.Left} id="a" className={dot} />
-        <span className="h-0.5 w-4 bg-slate-400 dark:bg-slate-500" />
-        <span className="h-4 w-4 shrink-0 rounded-full border-2 border-slate-400 dark:border-slate-500" />
+        <span className={`h-0.5 w-4 ${lit ? 'bg-amber-500' : 'bg-slate-400 dark:bg-slate-500'}`} />
+        <span className={`h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${lit ? 'border-amber-500 bg-amber-400 shadow-[0_0_12px_2px_rgb(245_158_11/0.6)]' : 'border-slate-400 dark:border-slate-500'}`} />
         <span className="expr font-mono text-xs font-semibold whitespace-nowrap">{data.label}</span>
       </div>
     )
@@ -300,13 +511,13 @@ function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
   }
 }
 
-function createNode(type: EditorComponentType, index: number): EditorFlowNode {
+function createNode(type: EditorComponentType, index: number, id = `${type}-${index + 1}`): EditorFlowNode {
   const kind = type === 'input' || type === 'constant' ? type : type === 'output' ? 'output' : 'gate'
   const defaultValue = type === 'constant'
   const label = type === 'input' ? `I${index + 1}` : type === 'output' ? `O${index + 1}` : NODE_LABELS[type]
 
   return {
-    id: `${type}-${index + 1}`,
+    id,
     type: 'editorLogic',
     position: { x: 40 + (index % 3) * 150, y: 40 + Math.floor(index / 3) * 100 },
     data: {
@@ -337,7 +548,56 @@ function createDemoEdges(): Edge[] {
   ]
 }
 
-function labelForNode(nodes: EditorFlowNode[], id: string): string {
-  return nodes.find((node) => node.id === id)?.data.label ?? id
+function nextNodeId(type: EditorComponentType, nodes: EditorFlowNode[]): string {
+  let index = nodes.length + 1
+  let id = `${type}-${index}`
+  while (nodes.some((node) => node.id === id)) {
+    index += 1
+    id = `${type}-${index}`
+  }
+  return id
 }
 
+function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edges: Edge[] } {
+  return {
+    nodes: document.nodes.map((node, index) =>
+      createNode(node.type, index, node.id),
+    ).map((node, index) => {
+      const source = document.nodes[index]
+      return {
+        ...node,
+        position: source.position,
+        data: {
+          ...node.data,
+          label: source.label ?? node.data.label,
+          value: source.options?.value ?? source.options?.initial ?? node.data.value,
+        },
+      }
+    }),
+    edges: document.connections.map((connection) => ({
+      id: `${connection.source.node}->${connection.target.node}:${connection.target.port === 1 ? 'b' : 'a'}`,
+      source: connection.source.node,
+      target: connection.target.node,
+      targetHandle: connection.target.port === 1 ? 'b' : 'a',
+      type: 'smoothstep',
+    })),
+  }
+}
+
+function loadProject(
+  project: CircuitProject,
+  setNodes: (nodes: EditorFlowNode[]) => void,
+  setEdges: (edges: Edge[]) => void,
+  setProjectName: (name: string) => void,
+  setActiveProjectId: (id: number | null) => void,
+): void {
+  const flow = fromDocument(project.document)
+  setNodes(flow.nodes)
+  setEdges(flow.edges)
+  setProjectName(project.name)
+  setActiveProjectId(project.id)
+}
+
+function safeFileName(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9-_]+/gi, '-').replace(/^-|-$/g, '') || 'circuito'
+}

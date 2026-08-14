@@ -247,12 +247,15 @@ React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexi
 
 A v0.7.0 começou com um editor visual combinacional em prévia. Ele já possui um
 modelo canônico de circuito, validação de entradas, detecção de ciclos, avaliação
-determinística e um canvas inicial com paleta de componentes. O próximo trabalho
-é concluir a tabela verdade derivada do canvas, salvar/reabrir documentos visuais
-e adicionar desfazer/refazer.
+determinística, tabela verdade automática, destaque de sinais por linha selecionada
+e um canvas com paleta de componentes. Circuitos podem ser salvos, reabertos,
+exportados e importados usando IndexedDB e o formato versionado de circuitos.
+O próximo trabalho é adicionar desfazer/refazer e sincronização autenticada opcional.
 
-Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados
-e uma API declarativa de contexto para integrações MCP. Contas, sincronização,
-desktop nativo, agentes em larga escala e recursos 3D só entram após validação
-técnica e planejamento próprios. Consulte o [`roadmap executável`](./docs/ROADMAP.md)
+O módulo de contexto do circuito já produz snapshots determinísticos para uma
+futura integração autenticada com o Supabase. Depois virão barramentos multi-bit,
+workspace sequencial visual, chips customizados e uma API declarativa de contexto
+para integrações MCP. Contas, sincronização, desktop nativo, agentes em larga escala
+e recursos 3D só entram após validação técnica e planejamento próprios. Consulte o
+[`roadmap executável`](./docs/ROADMAP.md) e a documentação [`Supabase`](./docs/SUPABASE.md)
 para ver a ordem completa.

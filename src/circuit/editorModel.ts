@@ -1,5 +1,4 @@
 import {
-  inputNames,
   outputCount,
   type ComponentOptions,
   type ComponentSpec,
@@ -253,5 +252,5 @@ export function toNetlist(document: CircuitDocument): Netlist {
 
 /** Compatibilidade explícita para consumidores que validam tipos fixos. */
 export function isEditorComponentType(type: ComponentType): type is EditorComponentType {
-  return EDITOR_COMPONENT_TYPES.includes(type as EditorComponentType) && inputNames(type) !== null
+  return EDITOR_COMPONENT_TYPES.includes(type as EditorComponentType)
 }

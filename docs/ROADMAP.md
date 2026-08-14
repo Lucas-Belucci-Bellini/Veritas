@@ -108,3 +108,11 @@ Para cada release, será produzido um pequeno registro com as decisões tomadas,
 [2]: https://reactflow.dev/ "React Flow — documentação oficial"
 [3]: https://modelcontextprotocol.io/ "Model Context Protocol — documentação oficial"
 [4]: https://tauri.app/ "Tauri — documentação oficial"
+
+## Atualização da implementação — 2026-08-14
+
+A primeira parte da v0.7.0 foi implementada no repositório. O editor agora gera uma tabela verdade diretamente do netlist visual, permite selecionar uma linha para acender os sinais no canvas, suporta múltiplas saídas com seleção da saída principal e preserva o formato `V/F` ou `1/0` usando o componente de tabela já existente.
+
+Os circuitos visuais também podem ser salvos, reabertos, excluídos, exportados e importados no IndexedDB. O banco local recebeu a tabela `circuitProjects` na versão 2, sem alterar a tabela de projetos de expressões.
+
+No Supabase existente foi aplicada a migração `veritas_circuit_context_foundation`. Ela cria uma tabela própria com RLS por `auth.uid()`, índices para usuário, tags e deduplicação, mas ainda não conecta o frontend diretamente porque a aplicação não possui autenticação. O módulo `src/circuit/context.ts` já produz o pacote determinístico que a futura camada autenticada poderá persistir.

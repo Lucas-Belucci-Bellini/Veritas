@@ -19,3 +19,7 @@ export type {
 } from './editorModel'
 export { evaluateCircuit, evaluateNetlist } from './evaluate'
 export type { CircuitEvaluation, CircuitEvaluationOptions } from './evaluate'
+export { buildCircuitTruthTable } from './truthTable'
+export type { CircuitTruthTableOptions } from './truthTable'
+export { buildCircuitContext } from './context'
+export type { CircuitContextRecord } from './context'

@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Notation } from '../engine'
+import type { CircuitDocument } from '../circuit'
 
 /** Um projeto salvo no navegador do usuário. */
 export interface Project {
@@ -13,6 +14,17 @@ export interface Project {
 
 export type NewProject = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>
 
+/** Um circuito visual salvo no navegador do usuário. */
+export interface CircuitProject {
+  id: number
+  name: string
+  document: CircuitDocument
+  createdAt: number
+  updatedAt: number
+}
+
+export type NewCircuitProject = Omit<CircuitProject, 'id' | 'createdAt' | 'updatedAt'>
+
 /**
  * O banco vive no IndexedDB do próprio navegador.
  *
@@ -21,10 +33,15 @@ export type NewProject = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>
  */
 export class VeritasDatabase extends Dexie {
   projects!: EntityTable<Project, 'id'>
+  circuitProjects!: EntityTable<CircuitProject, 'id'>
 
   constructor(name = 'veritas') {
     super(name)
     this.version(1).stores({ projects: '++id, name, updatedAt' })
+    this.version(2).stores({
+      projects: '++id, name, updatedAt',
+      circuitProjects: '++id, name, updatedAt',
+    })
   }
 }
 

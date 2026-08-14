@@ -7,3 +7,17 @@ A seção **Editor visual combinacional** apareceu abaixo dos painéis existente
 O estado inicial mostrou corretamente o aviso de validação para entradas desconectadas quando o componente foi renderizado antes da carga do exemplo. A interface também exibiu os controles de zoom e o status do circuito. O build final separou `CircuitEditor` em um chunk próprio e não apresentou o aviso anterior de chunk inicial acima de 500 kB.
 
 Esta verificação confirma a renderização e a composição da interface. A interação de arrastar conexões deve continuar sendo coberta por testes de domínio e, em uma próxima iteração, por testes de navegador automatizados.
+
+## Verificação da tabela verdade e persistência — 2026-08-14
+
+A aplicação local foi aberta em `http://127.0.0.1:5173`. A tela principal continuou renderizando a calculadora e o circuito equivalente existentes. Na prévia do editor visual, os controles `Novo exemplo`, `Salvar local`, `Exportar` e `Importar` apareceram junto da paleta de componentes e do tutorial.
+
+O circuito AND de demonstração exibiu a mensagem de validação esperada para uma entrada desconectada quando o canvas foi carregado. Isso confirma que a validação visual impede que uma tabela enganosa seja mostrada antes de o usuário completar as conexões. A estrutura da interface também exibiu o espaço preparado para projeto local e a tabela verdade automática quando o circuito está válido.
+
+A verificação foi apenas local e não executou login nem escrita no Supabase pelo navegador. A camada Supabase foi aplicada separadamente via migração protegida por RLS.
+
+## Verificação após correção do estado inicial — 2026-08-14
+
+Após recarregar a aplicação, o exemplo inicial passou a exibir três conexões React Flow entre `I1`, `I2`, a porta AND e `O4`. O status mudou para **Circuito visual válido: 2 entrada(s), 4 linha(s)**.
+
+A tabela verdade do editor apareceu com as quatro linhas esperadas: `F F F`, `F V F`, `V F F` e `V V V`, além dos controles `V / F`, seleção de linha e a mensagem de que um clique acende o circuito. A correção foi a inicialização dos edges com `createDemoEdges()` em vez de iniciar o editor sem fios.
