@@ -16,10 +16,14 @@ A versão de referência do repositório é a **v0.6.2**. O projeto já possui u
 | Karnaugh, simplificação e formas normais | Entregue | `src/engine/` |
 | Simulação sequencial de base | Entregue no motor; edição visual ainda não | `src/simulation/` |
 | MCP para uso headless por IAs | Entregue | `mcp/` e `plugins/veritas-logic/` |
-| Editor visual bidirecional | Próxima entrega | Ainda não existe como fluxo principal |
+| Editor visual combinacional | Entregue em prévia | `src/components/CircuitEditor.tsx` e `src/circuit/` |
+| Tabela verdade e persistência local | Entregue | `src/circuit/truthTable.ts`, `src/storage/` e testes Vitest |
+| Autenticação, sync e histórico em nuvem | Entregue | `src/auth/`, `src/cloud/`, migrações Supabase e `docs/CLOUD-HISTORY.md` |
+| Colaboração Realtime | Entregue em prévia | Broadcast, Presence, convite por papel e canvas visualizador |
+| Exportação Verilog/VHDL | Entregue em prévia | `src/circuit/export.ts` e testes determinísticos |
+| Monitoramento de IA | Entregue em prévia | `veritas_ai_metrics`, Realtime, cliente e painel |
 | Barramentos multi-bit | Backlog priorizado | Ainda não existe no modelo de dados |
 | Chips customizados hierárquicos | Backlog posterior | Depende do editor e do modelo de subcircuitos |
-| Sync em nuvem e contas | Não iniciar agora | Exige backend, autenticação e política de conflitos |
 | Aplicativo desktop Tauri/Rust | Investigar depois | Depende de métricas de performance e escopo estabilizado |
 | 3D, PCB, impressão e 250 subagentes | Visão de longo prazo | Não fazem parte do próximo ciclo |
 
@@ -37,15 +41,16 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | --- | --- | --- | --- |
 | **v0.7.0** | Editor visual mínimo viável | Canvas editável; entradas, constantes, saídas e portas AND/OR/NOT/XOR; criação e remoção de conexões; avaliação combinacional; mensagens de erro; exportação/importação de circuito | Um usuário consegue criar um circuito simples sem digitar uma expressão e validar sua tabela verdade |
 | **v0.7.1** | Usabilidade e confiabilidade do editor | Seleção, exclusão, atalhos, desfazer/refazer, layout inicial, validação de ciclos combinacionais, testes de interação e persistência do novo formato | O editor é utilizável em projetos pequenos e não perde dados em operações comuns |
+| **v0.7.2** | Integrações colaborativas e industriais | Colaboração Realtime privada com Presence/Broadcast, convite editor/visualizador, histórico remoto, exportação Verilog/VHDL, Edge Function autenticada e painel de métricas de IA | Usuários autenticados compartilham um circuito com papéis explícitos, exportam um netlist válido e acompanham telemetria sem expor dados de terceiros |
 | **v0.8.0** | Barramentos multi-bit | Largura explícita de sinal; operações bitwise; displays binário/hexadecimal; splitter/combiner; limites de largura e testes de compatibilidade | Um circuito de 8 bits consegue ser criado, simulado, salvo e reaberto com resultado determinístico |
 | **v0.9.0** | Workspace sequencial | Edição visual de clock, DFF/TFF, delay, contadores e observação de ticks; pausa, avanço manual e reset | Um contador e um circuito com feedback podem ser simulados sem congelar a interface |
 | **v0.10.0** | Abstração e chips customizados | Pinos de entrada/saída; criação de subcircuito; biblioteca local de chips; execução hierárquica com limites de profundidade | Um subcircuito salvo pode ser reutilizado como componente em outro projeto |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
-| **v1.x** | Integrações opcionais | Sync cloud, autenticação, colaboração, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
+| **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
-## 4. Próximo ciclo: v0.7.0
+## 4. Próximo ciclo: v0.7.1
 
-A primeira implementação organizada será o **editor visual combinacional**. O escopo é deliberadamente pequeno: somente componentes sem estado e um conjunto curto de portas. O usuário poderá começar no canvas, conectar componentes e gerar uma representação verificável do circuito. A calculadora de expressões continuará funcionando como está, sem ser substituída ou acoplada de forma frágil ao editor.
+A primeira implementação organizada foi o **editor visual combinacional** e está disponível em prévia. O próximo ciclo concentra-se em usabilidade e confiabilidade: desfazer/refazer, atalhos, seleção consistente, layout inicial e testes de interação. A calculadora de expressões continua funcionando de forma independente do editor.
 
 O editor terá um modelo de dados próprio, independente dos objetos internos do React Flow. A interface converterá esse modelo para nós e arestas visuais; a engine receberá um netlist normalizado. Essa separação permite salvar arquivos estáveis, testar o cálculo sem DOM e futuramente trocar a biblioteca de canvas sem reescrever o domínio.
 
@@ -130,3 +135,16 @@ Nesta etapa também foram ampliados os testes de tabela verdade e IndexedDB para
 O Veritas agora mantém histórico imutável dos salvamentos autenticados em `veritas_circuit_versions`. A função RPC `veritas_sync_circuit_project` atualiza o estado atual e registra a versão em uma operação transacional. O editor permite selecionar duas versões, visualizar nós e conexões adicionados, removidos ou alterados e abrir uma versão anterior como prévia antes de sincronizá-la como novo salvamento.
 
 Também foram adicionados testes específicos para o diff estrutural, listagem/RPC de versões Supabase e chamadas do cliente para a Edge Function, incluindo instruções opcionais, otimizações válidas, respostas inválidas e erros de transporte. A API da Edge Function e exemplos de prompts estão documentados em `docs/EDGE-FUNCTION-API.md`.
+
+## Atualização da implementação — colaboração, exportação e métricas
+
+A release v0.7.2 foi implementada em fatias verticais e publicada com o commit `feat: add realtime collaboration verilog vhdl export and ai metrics`:
+
+| Entrega | Implementação e critério verificado |
+| --- | --- |
+| Colaboração Realtime | Canal Supabase privado por circuito, Broadcast de snapshots, Presence de participantes, convite/remoção de colaboradores e bloqueio visualizador |
+| Exportação HDL | Exportadores determinísticos para Verilog-2001 e VHDL-2008, com sanitização de identificadores e rejeição de circuitos inválidos |
+| Monitoramento da IA | Tabela `veritas_ai_metrics` com RLS, publicação Realtime, cliente, hook, painel e telemetria best-effort |
+| Segurança e documentação | Migrações aplicadas no projeto existente, policies de Realtime e `docs/REALTIME-EXPORT-METRICS.md` |
+
+A colaboração permanece em prévia: o snapshot é uma atualização transitória e a persistência oficial continua sendo o salvamento versionado. A próxima etapa deve adicionar desfazer/refazer e, antes de uma colaboração declarativa de maior escala, definir estratégia de conflitos, presença de cursores e resolução de alterações concorrentes.

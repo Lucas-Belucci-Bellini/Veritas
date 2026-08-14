@@ -26,6 +26,9 @@ com um resumo executivo em [`plano.md`](./plano.md).
 | v0.6.0 | Simplificação de expressões, mapas de Karnaugh e servidor MCP |
 | v0.6.1 | Motor de simulação sequencial: clock, flip-flops e atrasos |
 | v0.6.2 | Notação de engenharia (`A'`, `A B`) e formas normais SOP/POS |
+| v0.7.0 | Editor visual combinacional, tabela verdade automática e persistência local IndexedDB |
+| v0.7.1 | Autenticação Supabase, sincronização em nuvem, histórico remoto e análise/otimização por IA |
+| v0.7.2 | Colaboração Realtime, exportação Verilog/VHDL e painel de métricas da IA |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
@@ -260,9 +263,14 @@ e um canvas com paleta de componentes. Circuitos podem ser salvos, reabertos,
 exportados e importados usando IndexedDB e o formato versionado de circuitos. A autenticação Supabase, a sincronização explícita na nuvem, o histórico imutável com
 comparação de versões e a Edge Function autenticada para análise/otimização de portas já
 estão disponíveis quando o ambiente é configurado. Consulte [`docs/AUTH-SYNC-AI.md`](./docs/AUTH-SYNC-AI.md),
-[`docs/CLOUD-HISTORY.md`](./docs/CLOUD-HISTORY.md) e [`docs/EDGE-FUNCTION-API.md`](./docs/EDGE-FUNCTION-API.md)
-para os fluxos completos.
+[`docs/CLOUD-HISTORY.md`](./docs/CLOUD-HISTORY.md), [`docs/EDGE-FUNCTION-API.md`](./docs/EDGE-FUNCTION-API.md)
+e [`docs/REALTIME-EXPORT-METRICS.md`](./docs/REALTIME-EXPORT-METRICS.md) para os fluxos completos.
 
+### Colaboração, HDL e métricas (v0.7.2)
+
+Usuários autenticados podem compartilhar um circuito pelo UUID de outro usuário e escolher o papel **editor** ou **visualizador**. O canal privado do Supabase Realtime usa Broadcast para snapshots e Presence para participantes online; o visualizador recebe atualizações, mas tem o canvas bloqueado. A persistência oficial continua sendo o salvamento versionado na nuvem, enquanto o IndexedDB mantém o caminho local-first.
+
+O editor exporta circuitos combinacionais válidos para **Verilog-2001** (`.v`) e **VHDL-2008** (`.vhd`). Identificadores são sanitizados de forma determinística e circuitos inválidos são rejeitados antes do download. O painel de métricas acompanha latência, sucesso, confiança, provedor e fallback da IA em tempo real, sempre com RLS por usuário e telemetria best-effort.
 
 O próximo trabalho é adicionar desfazer/refazer e melhorar a colaboração declarativa.
 Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados e

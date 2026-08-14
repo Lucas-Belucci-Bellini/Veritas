@@ -21,6 +21,7 @@ import {
   buildCircuitTruthTable,
   editorInputCount,
   evaluateCircuit,
+  exportCircuit,
   validateCircuit,
   type CircuitDocument,
   type CircuitNode,
@@ -36,6 +37,9 @@ import { useAuth } from '../auth/useAuth'
 import { useCloudCircuitProjects } from '../hooks/useCloudCircuitProjects'
 import { requestCircuitAi, type CircuitAiResult } from '../ai/circuitAi'
 import { CircuitVersionHistory } from './CircuitVersionHistory'
+import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
+import { AiMetricsPanel } from './AiMetricsPanel'
+import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollaborator, type CircuitCollaborator, type CollaboratorRole } from '../realtime/circuitCollaborators'
 
 interface EditorNodeData extends Record<string, unknown> {
   kind: 'input' | 'constant' | 'gate' | 'output'
@@ -88,13 +92,44 @@ export function CircuitEditor() {
   const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
+  const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
+  const [collaboratorUserId, setCollaboratorUserId] = useState('')
+  const [collaboratorRole, setCollaboratorRole] = useState<CollaboratorRole>('editor')
 
   const document = useMemo(() => toDocument(nodes, edges), [nodes, edges])
+  const applyRemoteDocument = useCallback((remoteDocument: CircuitDocument) => {
+    if (validateCircuit(remoteDocument).length > 0) return
+    const flow = fromDocument(remoteDocument)
+    setNodes(flow.nodes)
+    setEdges(flow.edges)
+    setProjectName(remoteDocument.name)
+    setSelectedRow(null)
+    setNotice('Alteração remota recebida de outro colaborador.')
+  }, [setEdges, setNodes])
+  const collaboration = useCircuitCollaboration({
+    projectId: cloudProjectId,
+    enabled: Boolean(user && cloudProjectId),
+    onRemoteDocument: applyRemoteDocument,
+  })
   const issues = useMemo(() => validateCircuit(document), [document])
   const outputNodes = useMemo(
     () => nodes.filter((node) => node.data.componentType === 'output'),
     [nodes],
   )
+
+  useEffect(() => {
+    if (!user || !cloudProjectId) {
+      setCollaborators([])
+      return
+    }
+    let active = true
+    void listCircuitCollaborators(cloudProjectId).then((items) => {
+      if (active) setCollaborators(items)
+    }).catch(() => {
+      if (active) setCollaborators([])
+    })
+    return () => { active = false }
+  }, [cloudProjectId, user])
 
   useEffect(() => {
     if (selectedOutputId && outputNodes.some((node) => node.id === selectedOutputId)) return
@@ -141,6 +176,17 @@ export function CircuitEditor() {
     [nodes, selectedEvaluation],
   )
 
+  const { broadcast: broadcastRemote, status: collaborationStatus } = collaboration
+  const readOnlyCollaboration = Boolean(user && collaborators.some((collaborator) => collaborator.userId === user.id && collaborator.role === 'viewer'))
+
+  useEffect(() => {
+    if (collaborationStatus !== 'connected') return
+    const timer = setTimeout(() => {
+      void broadcastRemote(document)
+    }, 120)
+    return () => clearTimeout(timer)
+  }, [broadcastRemote, collaborationStatus, document])
+
   const renderedEdges = useMemo(
     () =>
       edges.map((edge) => {
@@ -186,6 +232,10 @@ export function CircuitEditor() {
   )
 
   const addComponent = (type: EditorComponentType) => {
+    if (readOnlyCollaboration) {
+      setNotice('Você está conectado como visualizador e não pode editar este circuito.')
+      return
+    }
     setNotice('')
     setSelectedRow(null)
     setNodes((current) => [...current, createNode(type, current.length, nextNodeId(type, current))])
@@ -239,6 +289,23 @@ export function CircuitEditor() {
     }
   }
 
+  const downloadIndustrialExport = (format: 'verilog' | 'vhdl') => {
+    try {
+      const content = exportCircuit(document, format)
+      const extension = format === 'verilog' ? 'v' : 'vhd'
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = `${safeFileName(projectName || document.name)}.${extension}`
+      link.click()
+      URL.revokeObjectURL(url)
+      setNotice(`Exportação ${format === 'verilog' ? 'Verilog' : 'VHDL'} concluída.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível exportar o circuito.')
+    }
+  }
+
   const exportLocal = () => {
     const blob = new Blob([JSON.stringify({ format: 'veritas-circuits', version: 1, exportedAt: new Date().toISOString(), projects: [{ name: projectName, document }] }, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -284,6 +351,10 @@ export function CircuitEditor() {
   }
 
   const syncCloud = async () => {
+    if (readOnlyCollaboration) {
+      setNotice('Visualizadores não podem sincronizar alterações na nuvem.')
+      return
+    }
     if (!user) {
       setNotice('Entre na sua conta para sincronizar circuitos na nuvem.')
       return
@@ -318,6 +389,29 @@ export function CircuitEditor() {
     setProjectName(version.name)
     setSelectedRow(null)
     setNotice(`Versão ${version.versionNumber} aberta como prévia. Sincronize para criar uma nova versão.`)
+  }
+
+  const inviteCollaborator = async () => {
+    if (!cloudProjectId || !collaboratorUserId.trim()) return
+    try {
+      const collaborator = await addCircuitCollaborator(cloudProjectId, collaboratorUserId, collaboratorRole)
+      setCollaborators((current) => [...current.filter((item) => item.userId !== collaborator.userId), collaborator])
+      setCollaboratorUserId('')
+      setNotice('Colaborador adicionado ao circuito.')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível adicionar o colaborador.')
+    }
+  }
+
+  const removeCollaborator = async (collaborator: CircuitCollaborator) => {
+    if (!cloudProjectId) return
+    try {
+      await removeCircuitCollaborator(cloudProjectId, collaborator.userId)
+      setCollaborators((current) => current.filter((item) => item.userId !== collaborator.userId))
+      setNotice('Colaborador removido do circuito.')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível remover o colaborador.')
+    }
   }
 
   const removeCloud = async (project: (typeof cloud.projects)[number]) => {
@@ -369,11 +463,17 @@ export function CircuitEditor() {
           <button type="button" className="key text-xs" onClick={saveLocal}>
             Salvar local
           </button>
-          <button type="button" className="key text-xs" onClick={() => void syncCloud()} disabled={cloud.loading} title={user ? 'Sincronizar este circuito com sua conta Supabase' : 'Entre para sincronizar na nuvem'}>
+          <button type="button" className="key text-xs" onClick={() => void syncCloud()} disabled={cloud.loading || readOnlyCollaboration} title={user ? 'Sincronizar este circuito com sua conta Supabase' : 'Entre para sincronizar na nuvem'}>
             {cloud.loading ? 'Sincronizando…' : 'Sincronizar nuvem'}
           </button>
           <button type="button" className="key text-xs" onClick={exportLocal}>
             Exportar
+          </button>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={issues.length > 0}>
+            Verilog
+          </button>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={issues.length > 0}>
+            VHDL
           </button>
           <button type="button" className="key text-xs" onClick={() => fileInputRef.current?.click()}>
             Importar
@@ -414,6 +514,7 @@ export function CircuitEditor() {
                 type="button"
                 className="rounded-lg border border-slate-200 px-3 py-2 text-left transition hover:border-brand-400 hover:bg-brand-50 dark:border-slate-700 dark:hover:border-brand-500 dark:hover:bg-brand-950/40"
                 onClick={() => addComponent(item.type)}
+                disabled={readOnlyCollaboration}
                 title={item.description}
               >
                 <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -431,14 +532,14 @@ export function CircuitEditor() {
               nodes={renderedNodes}
               edges={renderedEdges}
               nodeTypes={NODE_TYPES}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
+              onNodesChange={readOnlyCollaboration ? undefined : onNodesChange}
+              onEdgesChange={readOnlyCollaboration ? undefined : onEdgesChange}
+              onConnect={readOnlyCollaboration ? undefined : onConnect}
+              nodesDraggable={!readOnlyCollaboration}
+              nodesConnectable={!readOnlyCollaboration}
               fitView
               fitViewOptions={{ padding: 0.2 }}
               deleteKeyCode={['Backspace', 'Delete']}
-              nodesConnectable
-              nodesDraggable
               elementsSelectable
               minZoom={0.25}
               maxZoom={2}
@@ -494,6 +595,31 @@ export function CircuitEditor() {
       )}
 
       {cloud.error && user && <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{cloud.error}</p>}
+      {user && cloudProjectId && collaboration.status !== 'disabled' && (
+        <div className={`mt-3 rounded-xl border p-3 text-xs ${collaboration.status === 'connected' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/20 dark:text-emerald-200' : collaboration.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/70 dark:bg-rose-950/20 dark:text-rose-200' : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong>{collaboration.status === 'connected' ? 'Colaboração em tempo real ativa' : collaboration.status === 'connecting' ? 'Conectando colaboração…' : 'Colaboração indisponível'}</strong>
+            {collaboration.participants.length > 0 && <span>{collaboration.participants.length} participante(s) online</span>}
+          </div>
+          {collaboration.error && <p className="mt-1">{collaboration.error}</p>}
+          {collaboration.participants.length > 0 && <p className="mt-1 opacity-80">{collaboration.participants.map((participant) => participant.label).join(' · ')}</p>}
+        </div>
+      )}
+
+      {user && cloudProjectId && (
+        <div className="mt-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">Acesso ao circuito</span>
+            <span className="text-[11px] text-slate-400">Compartilhe usando o UUID do usuário</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <input value={collaboratorUserId} onChange={(event) => setCollaboratorUserId(event.target.value)} className="min-w-64 flex-1 rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-xs dark:border-slate-700" placeholder="UUID do usuário" />
+            <select value={collaboratorRole} onChange={(event) => setCollaboratorRole(event.target.value as CollaboratorRole)} className="rounded-lg border border-slate-200 bg-transparent px-2 py-2 text-xs dark:border-slate-700"><option value="editor">Editor</option><option value="viewer">Visualizador</option></select>
+            <button type="button" className="key text-xs" onClick={() => void inviteCollaborator()} disabled={!collaboratorUserId.trim()}>Adicionar</button>
+          </div>
+          {collaborators.length > 0 && <div className="mt-2 grid gap-1">{collaborators.map((collaborator) => <div key={collaborator.userId} className="flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300"><span className="truncate">{collaborator.userId} · {collaborator.role === 'editor' ? 'editor' : 'visualizador'}</span><button type="button" className="text-slate-400 hover:text-rose-600" onClick={() => void removeCollaborator(collaborator)} aria-label={`Remover ${collaborator.userId}`}>×</button></div>)}</div>}
+        </div>
+      )}
 
       {user && cloudProjectId && (cloud.versions.length > 0 || cloud.versionsLoading) && (
         <CircuitVersionHistory
@@ -526,6 +652,8 @@ export function CircuitEditor() {
           )}
         </section>
       )}
+
+      {user && <AiMetricsPanel />}
 
       {storage.projects.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">

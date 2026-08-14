@@ -1,6 +1,7 @@
 import type { CircuitDocument } from '../circuit'
 import { buildCircuitContext } from '../circuit'
 import { supabase } from '../lib/supabase'
+import { recordAiMetric } from '../metrics/aiMetrics'
 
 export type CircuitAiAction = 'analyze' | 'optimize'
 
@@ -21,13 +22,34 @@ export async function requestCircuitAi(
   if (!supabase) throw new Error('Supabase não está configurado neste ambiente.')
   const context = buildCircuitContext(document)
   const normalizedInstruction = instruction?.trim().slice(0, 1200)
-  const { data, error } = await supabase.functions.invoke('veritas-circuit-ai', {
-    body: { action, context, ...(normalizedInstruction ? { instruction: normalizedInstruction } : {}) },
-  })
+  const startedAt = Date.now()
+  try {
+    const { data, error } = await supabase.functions.invoke('veritas-circuit-ai', {
+      body: { action, context, ...(normalizedInstruction ? { instruction: normalizedInstruction } : {}) },
+    })
 
-  if (error) throw new Error(error.message || 'A análise de IA não pôde ser concluída.')
-  if (!isCircuitAiResult(data)) throw new Error('A Edge Function devolveu uma análise inválida.')
-  return data
+    if (error) throw new Error(error.message || 'A análise de IA não pôde ser concluída.')
+    if (!isCircuitAiResult(data)) throw new Error('A Edge Function devolveu uma análise inválida.')
+    void recordAiMetric({
+      action,
+      provider: data.provider,
+      latencyMs: Date.now() - startedAt,
+      success: true,
+      confidence: data.confidence,
+      contentHash: context.contentHash,
+    })
+    return data
+  } catch (error) {
+    void recordAiMetric({
+      action,
+      provider: 'unknown',
+      latencyMs: Date.now() - startedAt,
+      success: false,
+      contentHash: context.contentHash,
+      errorMessage: error instanceof Error ? error.message : 'Erro desconhecido',
+    })
+    throw error
+  }
 }
 
 function isCircuitAiResult(value: unknown): value is CircuitAiResult {
