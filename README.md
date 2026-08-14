@@ -279,12 +279,6 @@ Usuários autenticados podem compartilhar um circuito pelo UUID de outro usuári
 O editor exporta circuitos combinacionais válidos para **Verilog-2001** (`.v`) e **VHDL-2008** (`.vhd`). Identificadores são sanitizados de forma determinística e circuitos inválidos são rejeitados antes do download. O painel de métricas acompanha latência, sucesso, confiança, provedor e fallback da IA em tempo real, sempre com RLS por usuário e telemetria best-effort.
 
 O próximo trabalho é adicionar desfazer/refazer e evoluir a colaboração para múltiplas salas com isolamento por tópico, versão otimista e rejeição explícita de conflitos. O desenho inicial está em [`docs/EDUCATIONAL-TESTS-MULTIROOM.md`](./docs/EDUCATIONAL-TESTS-MULTIROOM.md).
-Depois virão barramentos multi-bit, workspace sequencial visual, chips customizados e
-um workspace de algoritmos inspirado em fluxogramas pedagógicos. A proposta `ALGO-001`,
-documentada em [`docs/FLOWGORITHM-INSIGHTS.md`](./docs/FLOWGORITHM-INSIGHTS.md), usa
-um executor puro, execução passo a passo, Watch de variáveis e limites de sandbox; ela
-não executa o Flowgorithm enviado nem importa assemblies externos. Uma API de contexto
-para integrações MCP, desktop nativo, agentes em larga escala e recursos 3D só entram após
-validação técnica e planejamento próprios. Consulte o
+Depois virão barramentos multi-bit, workspace sequencial visual e chips customizados. O núcleo `ALGO-001` já está disponível como módulo local-first: `AlgorithmDocument` versionado, validação estrutural, avaliador de expressões restrito, executor determinístico Step/Run, fila de entrada, trace e persistência IndexedDB. A documentação está em [`docs/FLOWGORITHM-INSIGHTS.md`](./docs/FLOWGORITHM-INSIGHTS.md). O próximo incremento é `ALGO-002`, com Watch de variáveis, `BranchTrace`, destaque do nó ativo e atividades baseadas em lógica booleana, detalhado em [`docs/ALGO-002-LOGIC-MAPPING.md`](./docs/ALGO-002-LOGIC-MAPPING.md). O executor não executa o Flowgorithm enviado nem importa assemblies externos. Uma API de contexto para integrações MCP, desktop nativo, agentes em larga escala e recursos 3D só entram após validação técnica e planejamento próprios. Consulte o
 [`roadmap executável`](./docs/ROADMAP.md) e a documentação [`Supabase`](./docs/SUPABASE.md)
 para ver a ordem completa.
