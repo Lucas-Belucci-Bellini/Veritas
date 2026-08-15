@@ -174,3 +174,11 @@ O contrato de snapshot agora inclui `projectId`, `roomId`, `contentHash`, `baseV
 A migração `supabase/migrations/20260815000000_room_001_multi_room_conflict.sql` foi aplicada no projeto Supabase existente `hcwzsxdcvmswebunznak`. Ela cria `veritas_circuit_rooms`, o RPC de criação de salas, policies por tópico multi-room, escrita de `circuit_snapshot` apenas para owner/editor e sincronização transacional com rejeição quando `p_base_version` diverge da versão atual. A sala `main` é reconhecida sem registro adicional; salas nomeadas precisam existir no banco.
 
 A entrega adicionou o cliente `src/realtime/circuitRooms.ts`, testes de isolamento entre `alpha` e `beta`, validação de identificadores, troca de sala, baseVersion e conflito RPC. O estado local-first permanece funcional sem Supabase. A suíte passou com 22 arquivos e 206 testes, além de typecheck e lint limpos.
+
+## Atualização da implementação — v0.7.1 undo/redo e atalhos — 2026-08-15
+
+O editor visual agora mantém um histórico local de snapshots `CircuitDocument` por meio de `CircuitHistory`. O histórico deduplica documentos idênticos, limita a memória a 100 entradas por padrão (máximo configurável de 500), clona snapshots para impedir mutação externa, descarta o futuro após nova edição e limpa passado/futuro quando um documento diferente é aberto.
+
+A barra do editor expõe `Desfazer` e `Refazer`. Os atalhos `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` e `Ctrl/Cmd+Y` funcionam quando o foco não está em input, textarea, select ou elemento editável. Viewers em colaboração não alteram o histórico nem executam undo/redo. O documento restaurado passa pelos mesmos conversores `CircuitDocument`/React Flow usados pelo carregamento local e remoto, preservando o modo local-first.
+
+O histórico é de sessão do editor e não substitui o histórico remoto imutável. Salvamento local, sincronização Supabase, Broadcast e versionamento continuam independentes; undo/redo serve para recuperar rapidamente alterações da sessão antes de salvar ou sincronizar.

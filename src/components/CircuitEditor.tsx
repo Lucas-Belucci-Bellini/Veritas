@@ -29,6 +29,7 @@ import {
 } from '../circuit'
 import { GateSymbol } from '../circuit/GateSymbol'
 import type { GateOp } from '../circuit/graph'
+import { CircuitHistory } from '../circuit/history'
 import { TruthTableView } from './TruthTableView'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
 import type { ValueStyle } from '../lib/values'
@@ -87,6 +88,8 @@ export function CircuitEditor() {
   const [valueStyle, setValueStyle] = useState<ValueStyle>('vf')
   const [hydrated, setHydrated] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const historyRef = useRef<CircuitHistory | null>(null)
+  const [historyRevision, setHistoryRevision] = useState(0)
   const storage = useCircuitProjects()
   const { user } = useAuth()
   const cloud = useCloudCircuitProjects()
@@ -100,9 +103,12 @@ export function CircuitEditor() {
   const [collaboratorUserId, setCollaboratorUserId] = useState('')
   const [collaboratorRole, setCollaboratorRole] = useState<CollaboratorRole>('editor')
 
-  const document = useMemo(() => toDocument(nodes, edges), [nodes, edges])
+  const document = useMemo(() => ({ ...toDocument(nodes, edges), name: projectName.trim() || 'Circuito visual' }), [nodes, edges, projectName])
+  if (!historyRef.current) historyRef.current = new CircuitHistory(document)
   const applyRemoteDocument = useCallback((remoteDocument: CircuitDocument) => {
     if (validateCircuit(remoteDocument).length > 0) return
+    historyRef.current?.replace(remoteDocument)
+    setHistoryRevision((current) => current + 1)
     const flow = fromDocument(remoteDocument)
     setNodes(flow.nodes)
     setEdges(flow.edges)
@@ -113,11 +119,15 @@ export function CircuitEditor() {
   const collaborationBaseVersion = cloud.versions[0]?.versionNumber ?? 0
   const collaboration = useCircuitCollaboration({
     projectId: cloudProjectId,
-    roomId: 'main',
+    roomId: activeRoomId,
     baseVersion: collaborationBaseVersion,
     enabled: Boolean(user && cloudProjectId),
     onRemoteDocument: applyRemoteDocument,
   })
+  useEffect(() => {
+    if (historyRef.current?.commit(document)) setHistoryRevision((current) => current + 1)
+  }, [document])
+
   const issues = useMemo(() => validateCircuit(document), [document])
   const outputNodes = useMemo(
     () => nodes.filter((node) => node.data.componentType === 'output'),
@@ -162,6 +172,8 @@ export function CircuitEditor() {
     if (!storage.ready || hydrated) return
     const latest = storage.projects[0]
     if (latest) {
+      historyRef.current?.replace(latest.document)
+      setHistoryRevision((current) => current + 1)
       loadProject(latest, setNodes, setEdges, setProjectName, setActiveProjectId)
       setNotice(`Circuito local "${latest.name}" restaurado.`)
     }
@@ -200,6 +212,58 @@ export function CircuitEditor() {
 
   const { broadcast: broadcastRemote, status: collaborationStatus } = collaboration
   const readOnlyCollaboration = Boolean(user && collaborators.some((collaborator) => collaborator.userId === user.id && collaborator.role === 'viewer'))
+  const canUndo = historyRevision >= 0 && (historyRef.current?.canUndo() ?? false)
+  const canRedo = historyRevision >= 0 && (historyRef.current?.canRedo() ?? false)
+
+  const restoreHistoryDocument = useCallback((nextDocument: CircuitDocument) => {
+    const flow = fromDocument(nextDocument)
+    setNodes(flow.nodes)
+    setEdges(flow.edges)
+    setProjectName(nextDocument.name)
+    setSelectedRow(null)
+  }, [setEdges, setNodes])
+
+  const undo = useCallback(() => {
+    if (readOnlyCollaboration) {
+      setNotice('Visualizadores não podem desfazer alterações.')
+      return
+    }
+    const previous = historyRef.current?.undo()
+    if (!previous) return
+    restoreHistoryDocument(previous)
+    setHistoryRevision((current) => current + 1)
+    setNotice('Última alteração desfeita.')
+  }, [readOnlyCollaboration, restoreHistoryDocument])
+
+  const redo = useCallback(() => {
+    if (readOnlyCollaboration) {
+      setNotice('Visualizadores não podem refazer alterações.')
+      return
+    }
+    const next = historyRef.current?.redo()
+    if (!next) return
+    restoreHistoryDocument(next)
+    setHistoryRevision((current) => current + 1)
+    setNotice('Alteração refeita.')
+  }, [readOnlyCollaboration, restoreHistoryDocument])
+
+  useEffect(() => {
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) return
+      if (!(event.metaKey || event.ctrlKey)) return
+      const key = event.key.toLowerCase()
+      if (key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+      } else if (key === 'y') {
+        event.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', handleHistoryShortcut)
+    return () => window.removeEventListener('keydown', handleHistoryShortcut)
+  }, [redo, undo])
 
   useEffect(() => {
     if (collaborationStatus !== 'connected') return
@@ -264,8 +328,12 @@ export function CircuitEditor() {
   }
 
   const reset = () => {
-    setNodes(createDemoNodes())
-    setEdges(createDemoEdges())
+    const nextNodes = createDemoNodes()
+    const nextEdges = createDemoEdges()
+    historyRef.current?.replace({ ...toDocument(nextNodes, nextEdges), name: 'Circuito AND' })
+    setHistoryRevision((current) => current + 1)
+    setNodes(nextNodes)
+    setEdges(nextEdges)
     setProjectName('Circuito AND')
     setActiveProjectId(null)
     setSelectedRow(null)
@@ -294,6 +362,8 @@ export function CircuitEditor() {
   }
 
   const openLocal = (project: CircuitProject) => {
+    historyRef.current?.replace(project.document)
+    setHistoryRevision((current) => current + 1)
     loadProject(project, setNodes, setEdges, setProjectName, setActiveProjectId)
     setSelectedRow(null)
     setNotice(`Circuito local "${project.name}" aberto.`)
@@ -396,6 +466,8 @@ export function CircuitEditor() {
   }
 
   const openCloud = (project: (typeof cloud.projects)[number]) => {
+    historyRef.current?.replace(project.document)
+    setHistoryRevision((current) => current + 1)
     const flow = fromDocument(project.document)
     setNodes(flow.nodes)
     setEdges(flow.edges)
@@ -409,6 +481,8 @@ export function CircuitEditor() {
   }
 
   const openCloudVersion = (version: (typeof cloud.versions)[number]) => {
+    historyRef.current?.replace(version.document)
+    setHistoryRevision((current) => current + 1)
     const flow = fromDocument(version.document)
     setNodes(flow.nodes)
     setEdges(flow.edges)
@@ -501,6 +575,12 @@ export function CircuitEditor() {
         <div className="flex flex-wrap gap-2">
           <button type="button" className="key text-xs" onClick={reset}>
             Novo exemplo
+          </button>
+          <button type="button" className="key text-xs" onClick={undo} disabled={!canUndo || readOnlyCollaboration} aria-label="Desfazer última alteração" title="Ctrl/Cmd+Z">
+            Desfazer
+          </button>
+          <button type="button" className="key text-xs" onClick={redo} disabled={!canRedo || readOnlyCollaboration} aria-label="Refazer alteração" title="Ctrl/Cmd+Shift+Z ou Ctrl/Cmd+Y">
+            Refazer
           </button>
           <button type="button" className="key text-xs" onClick={saveLocal}>
             Salvar local
@@ -917,6 +997,10 @@ function loadProject(
   setEdges(flow.edges)
   setProjectName(project.name)
   setActiveProjectId(project.id)
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)
 }
 
 function safeFileName(value: string): string {
