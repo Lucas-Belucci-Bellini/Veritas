@@ -194,3 +194,9 @@ O contrato rejeita valores negativos, overflow, largura zero, literais inválido
 O campo opcional `options.width` agora atravessa `ComponentOptions`, o estado visual do CircuitEditor, serialização do documento, hidratação de projetos e validação de arquivos locais. A ausência do campo continua significando `width = 1`, preservando documentos v1 existentes.
 
 O modelo valida largura entre 1 e 64 bits, rejeita width inválido e informa `unsupported-width` para sinais vetoriais enquanto `evaluateCircuit`, tabela verdade e exportadores ainda são escalares. Conexões entre larguras válidas diferentes produzem `width-mismatch`; snapshots Realtime e importação local rejeitam widths malformados antes de alcançar a UI. A próxima fatia implementará avaliação vetorial e só então habilitará a largura no editor para criação de novos sinais.
+
+## Atualização da implementação — avaliação vetorial v0.8.0 — 2026-08-15
+
+A API `evaluateCircuitVectors()` foi adicionada em paralelo à avaliação booleana. Ela usa o mesmo netlist e a mesma ordenação topológica, mas aceita `BitVector`, `bigint`, número ou literal binário/hexadecimal como entrada e retorna valores vetoriais para todos os componentes e saídas. AND, OR, XOR e NOT operam bit a bit e exigem larguras compatíveis.
+
+A API vetorial chama `toNetlist(document, { allowBuses: true })`; a API `evaluateCircuit()` continua chamando a validação padrão e rejeita width diferente de 1. Isso cria uma transição explícita: documentos escalares existentes continuam funcionando, enquanto circuitos vetoriais podem ser avaliados por testes e futuras telas sem habilitar silenciosamente a tabela verdade ou os exportadores escalares.

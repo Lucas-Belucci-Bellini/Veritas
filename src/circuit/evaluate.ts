@@ -4,6 +4,7 @@ import {
   type Netlist,
   type PortRef,
 } from '../simulation/components'
+import { bitVector, type BitVector, bitwiseAnd, bitwiseNot, bitwiseOr, bitwiseXor, parseBusLiteral } from '../bus'
 import {
   toNetlist,
   type CircuitDocument,
@@ -24,12 +25,33 @@ export interface CircuitEvaluationOptions {
   defaultInput?: boolean
 }
 
+export type VectorInput = BitVector | bigint | number | string
+
+export interface CircuitVectorEvaluation {
+  values: Record<string, BitVector>
+  outputs: Record<string, BitVector>
+  order: string[]
+}
+
+export interface CircuitVectorEvaluationOptions {
+  /** Valor padrão aplicado a entradas ausentes, repetido na largura da porta. */
+  defaultInput?: VectorInput
+}
+
 export function evaluateCircuit(
   document: CircuitDocument,
   inputs: Record<string, boolean> = {},
   options: CircuitEvaluationOptions = {},
 ): CircuitEvaluation {
   return evaluateNetlist(toNetlist(document), inputs, options)
+}
+
+export function evaluateCircuitVectors(
+  document: CircuitDocument,
+  inputs: Record<string, VectorInput> = {},
+  options: CircuitVectorEvaluationOptions = {},
+): CircuitVectorEvaluation {
+  return evaluateVectorNetlist(toNetlist(document, { allowBuses: true }), inputs, options)
 }
 
 /**
@@ -103,6 +125,107 @@ export function evaluateNetlist(
   }
 
   return { values, outputs, order }
+}
+
+function evaluateVectorNetlist(
+  netlist: Netlist,
+  inputs: Record<string, VectorInput>,
+  options: CircuitVectorEvaluationOptions,
+): CircuitVectorEvaluation {
+  const components = new Map<string, ComponentSpec>()
+  for (const component of netlist.components) {
+    if (components.has(component.id)) throw new Error(`Componente duplicado: "${component.id}".`)
+    components.set(component.id, component)
+  }
+
+  const dependencies = new Map<string, number>()
+  const dependents = new Map<string, string[]>()
+  for (const component of components.values()) dependencies.set(component.id, 0)
+  for (const component of components.values()) {
+    for (const input of component.inputs ?? []) {
+      if (!input) continue
+      if (!components.has(input.node)) throw new Error(`O componente "${component.id}" está ligado em "${input.node}", que não existe.`)
+      const targets = dependents.get(input.node) ?? []
+      targets.push(component.id)
+      dependents.set(input.node, targets)
+      dependencies.set(component.id, (dependencies.get(component.id) ?? 0) + 1)
+    }
+  }
+
+  const queue = [...components.values()].filter((component) => dependencies.get(component.id) === 0).map((component) => component.id)
+  const order: string[] = []
+  while (queue.length > 0) {
+    const id = queue.shift()!
+    order.push(id)
+    for (const target of dependents.get(id) ?? []) {
+      const remaining = (dependencies.get(target) ?? 0) - 1
+      dependencies.set(target, remaining)
+      if (remaining === 0) queue.push(target)
+    }
+  }
+  if (order.length !== components.size) throw new Error('O circuito contém um ciclo e não pode ser avaliado como combinacional.')
+
+  const values: Record<string, BitVector> = {}
+  for (const id of order) {
+    const component = components.get(id)!
+    const componentInputs = (component.inputs ?? []).map((input) => readVectorPort(values, input))
+    values[id] = evaluateVectorComponent(component, componentInputs, inputs, options)
+  }
+
+  const outputs: Record<string, BitVector> = {}
+  for (const component of components.values()) {
+    if (component.type === 'output') outputs[component.id] = values[component.id] ?? bitVector(component.options?.width ?? 1, 0)
+  }
+  return { values, outputs, order }
+}
+
+function evaluateVectorComponent(
+  component: ComponentSpec,
+  componentInputs: BitVector[],
+  inputs: Record<string, VectorInput>,
+  options: CircuitVectorEvaluationOptions,
+): BitVector {
+  const width = component.options?.width ?? componentInputs[0]?.width ?? 1
+  switch (component.type as EditorComponentType) {
+    case 'input':
+      return coerceVector(inputs[component.id] ?? options.defaultInput ?? 0, width)
+    case 'constant':
+      return coerceVector(component.options?.value ?? false, width)
+    case 'output':
+      return componentInputs[0] ?? bitVector(width, 0)
+    case 'and':
+      return foldVectors(componentInputs, width, bitwiseAnd)
+    case 'or':
+      return foldVectors(componentInputs, width, bitwiseOr)
+    case 'xor':
+      return foldVectors(componentInputs, width, bitwiseXor)
+    case 'not':
+      return bitwiseNot(componentInputs[0] ?? bitVector(width, 0))
+    default:
+      throw new Error(`O componente "${component.id}" não é suportado no avaliador vetorial.`)
+  }
+}
+
+function foldVectors(values: BitVector[], width: number, operation: (left: BitVector, right: BitVector) => BitVector): BitVector {
+  if (values.length === 0) return bitVector(width, 0)
+  return values.slice(1).reduce((left, right) => operation(left, right), values[0])
+}
+
+function coerceVector(value: VectorInput | boolean, width: number): BitVector {
+  if (typeof value === 'object' && value !== null && 'bits' in value) {
+    const vector = value as BitVector
+    if (vector.width !== width) throw new Error(`A entrada vetorial espera ${width} bits, mas recebeu ${vector.width}.`)
+    return vector
+  }
+  if (typeof value === 'string') return parseBusLiteral(value, width)
+  return bitVector(width, typeof value === 'boolean' ? (value ? 1n : 0n) : value)
+}
+
+function readVectorPort(values: Record<string, BitVector>, reference: PortRef): BitVector {
+  const source = values[reference.node]
+  if (!source) throw new Error(`A saída de "${reference.node}" ainda não está disponível.`)
+  if (reference.port !== undefined && reference.port !== 0) throw new Error(`A porta vetorial ${reference.port} não existe em "${reference.node}".`)
+  return source
 }
 
 function evaluateComponent(

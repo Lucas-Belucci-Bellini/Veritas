@@ -55,6 +55,11 @@ export interface CircuitDocument {
   connections: CircuitConnection[]
 }
 
+export interface CircuitValidationOptions {
+  /** Permite widths 2–64 para o avaliador vetorial; a API escalar mantém false. */
+  allowBuses?: boolean
+}
+
 export interface CircuitIssue {
   code:
   | 'duplicate-node'
@@ -109,7 +114,7 @@ export function createCircuitDocument(name = 'Circuito sem título'): CircuitDoc
   }
 }
 
-export function validateCircuit(document: CircuitDocument): CircuitIssue[] {
+export function validateCircuit(document: CircuitDocument, options: CircuitValidationOptions = {}): CircuitIssue[] {
   const issues: CircuitIssue[] = []
   const nodes = new Map<string, CircuitNode>()
 
@@ -137,7 +142,7 @@ export function validateCircuit(document: CircuitDocument): CircuitIssue[] {
         nodeId: node.id,
         message: `A largura do componente "${node.id}" precisa ser um inteiro entre 1 e ${MAX_BUS_WIDTH}.`,
       })
-    } else if (width !== 1) {
+    } else if (width !== 1 && !options.allowBuses) {
       issues.push({
         code: 'unsupported-width',
         nodeId: node.id,
@@ -261,8 +266,8 @@ export function isValidCircuitWidth(width: number): boolean {
 }
 
 /** Converte o documento visual para o netlist consumido pelo simulador. */
-export function toNetlist(document: CircuitDocument): Netlist {
-  const issues = validateCircuit(document)
+export function toNetlist(document: CircuitDocument, options: CircuitValidationOptions = {}): Netlist {
+  const issues = validateCircuit(document, options)
   if (issues.length > 0) throw new CircuitValidationError(issues)
 
   const inputsByNode = new Map<string, PortRef[]>()

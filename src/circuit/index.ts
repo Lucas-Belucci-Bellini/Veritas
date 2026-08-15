@@ -3,6 +3,7 @@ export {
   CIRCUIT_DOCUMENT_VERSION,
   EDITOR_COMPONENT_TYPES,
   CircuitValidationError,
+  circuitNodeWidth,
   createCircuitDocument,
   editorInputCount,
   isEditorComponentType,
@@ -15,10 +16,11 @@ export type {
   CircuitIssue,
   CircuitNode,
   CircuitPosition,
+  CircuitValidationOptions,
   EditorComponentType,
 } from './editorModel'
-export { evaluateCircuit, evaluateNetlist } from './evaluate'
-export type { CircuitEvaluation, CircuitEvaluationOptions } from './evaluate'
+export { evaluateCircuit, evaluateCircuitVectors, evaluateNetlist } from './evaluate'
+export type { CircuitEvaluation, CircuitEvaluationOptions, CircuitVectorEvaluation, CircuitVectorEvaluationOptions, VectorInput } from './evaluate'
 export { buildCircuitTruthTable } from './truthTable'
 export type { CircuitTruthTableOptions } from './truthTable'
 export { buildCircuitContext } from './context'
