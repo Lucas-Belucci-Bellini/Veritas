@@ -37,6 +37,8 @@ export interface ComponentOptions {
   value?: boolean
   /** `input`, `dff`, `tff`, `clock`: valor no instante zero. */
   initial?: boolean
+  /** Largura do sinal em bits; ausente equivale a um bit. */
+  width?: number
 }
 
 export interface ComponentSpec {

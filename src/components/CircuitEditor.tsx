@@ -48,6 +48,7 @@ interface EditorNodeData extends Record<string, unknown> {
   componentType: EditorComponentType
   label: string
   inputs: number
+  width: number
   op?: GateOp
   value?: boolean
 }
@@ -892,7 +893,9 @@ function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
     type: node.data.componentType,
     position: node.position,
     label: node.data.label,
-    options: node.data.componentType === 'constant' ? { value: node.data.value ?? false } : undefined,
+    options: node.data.componentType === 'constant'
+      ? { value: node.data.value ?? false, ...(node.data.width !== 1 ? { width: node.data.width } : {}) }
+      : node.data.width !== 1 ? { width: node.data.width } : undefined,
   }))
 
   return {
@@ -926,6 +929,7 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       componentType: type,
       label,
       inputs: editorInputCount(type),
+      width: 1,
       op: type === 'not' ? 'not' : type === 'and' || type === 'or' || type === 'xor' ? type : undefined,
       value: defaultValue,
     },
@@ -971,6 +975,7 @@ function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edg
         data: {
           ...node.data,
           label: source.label ?? node.data.label,
+          width: source.options?.width ?? 1,
           value: source.options?.value ?? source.options?.initial ?? node.data.value,
         },
       }

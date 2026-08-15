@@ -120,4 +120,20 @@ describe('arquivo de circuitos', () => {
 
     expect(() => parseCircuitFile(invalid)).toThrow('nenhum projeto válido')
   })
+
+  it('recusa width inválido antes de persistir o documento importado', () => {
+    const invalid = JSON.stringify({
+      format: 'veritas-circuits',
+      version: 1,
+      projects: [{
+        name: 'Width inválido',
+        document: {
+          ...document,
+          nodes: document.nodes.map((node, index) => index === 0 ? { ...node, options: { width: 0 } } : node),
+        },
+      }],
+    })
+
+    expect(() => parseCircuitFile(invalid)).toThrow('nenhum projeto válido')
+  })
 })

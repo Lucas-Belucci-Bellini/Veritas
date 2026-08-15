@@ -1,4 +1,5 @@
 import type { RealtimeChannel, User } from '@supabase/supabase-js'
+import { MAX_BUS_WIDTH } from '../bus'
 import type { CircuitDocument } from '../circuit'
 import { buildCircuitContext } from '../circuit'
 import { supabase } from '../lib/supabase'
@@ -233,7 +234,15 @@ function isRoomPresence(value: RoomPresence | null): value is RoomPresence {
 function isCircuitDocument(value: unknown): value is CircuitDocument {
   if (!isRecord(value) || value.format !== 'veritas-circuit' || value.version !== 1 || typeof value.name !== 'string') return false
   if (!Array.isArray(value.nodes) || !Array.isArray(value.connections)) return false
-  return value.nodes.every((node) => isRecord(node) && typeof node.id === 'string' && typeof node.type === 'string' && isRecord(node.position) && isFiniteNumber(node.position.x) && isFiniteNumber(node.position.y)) && value.connections.every((connection) => isRecord(connection) && isRecord(connection.source) && isRecord(connection.target) && typeof connection.source.node === 'string' && typeof connection.target.node === 'string' && Number.isInteger(connection.target.port))
+  return value.nodes.every((node) => isValidRemoteNode(node)) && value.connections.every((connection) => isRecord(connection) && isRecord(connection.source) && isRecord(connection.target) && typeof connection.source.node === 'string' && typeof connection.target.node === 'string' && Number.isInteger(connection.target.port))
+}
+
+function isValidRemoteNode(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.type !== 'string' || !isRecord(value.position) || !isFiniteNumber(value.position.x) || !isFiniteNumber(value.position.y)) return false
+  if (value.options === undefined) return true
+  if (!isRecord(value.options)) return false
+  const width = value.options.width
+  return width === undefined || (typeof width === 'number' && Number.isInteger(width) && width >= 1 && width <= MAX_BUS_WIDTH)
 }
 
 function colorForUser(userId: string): string {

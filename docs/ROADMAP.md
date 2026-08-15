@@ -188,3 +188,9 @@ O histórico é de sessão do editor e não substitui o histórico remoto imutá
 A primeira fatia do próximo release foi iniciada em `src/bus/bitVector.ts`. `BitVector` representa sinais como bits imutáveis em ordem MSB → LSB, com largura entre 1 e 64 bits. O núcleo oferece parse de literais binários e hexadecimais, formatação binária/hexadecimal, conversão para `bigint`, AND/OR/XOR/NOT bitwise, `splitBus` e `combineBus`.
 
 O contrato rejeita valores negativos, overflow, largura zero, literais inválidos, partes incompatíveis e combinações cujo total não coincide com a largura original. Essa fundação é deliberadamente independente da engine escalar atual: nenhuma avaliação 1-bit foi alterada silenciosamente. A próxima fatia deverá adicionar largura explícita a portas do modelo visual, migração defensiva do formato e operações de compatibilidade antes de tocar no exportador HDL ou na tabela verdade.
+
+## Atualização da implementação — schema seguro de width — 2026-08-15
+
+O campo opcional `options.width` agora atravessa `ComponentOptions`, o estado visual do CircuitEditor, serialização do documento, hidratação de projetos e validação de arquivos locais. A ausência do campo continua significando `width = 1`, preservando documentos v1 existentes.
+
+O modelo valida largura entre 1 e 64 bits, rejeita width inválido e informa `unsupported-width` para sinais vetoriais enquanto `evaluateCircuit`, tabela verdade e exportadores ainda são escalares. Conexões entre larguras válidas diferentes produzem `width-mismatch`; snapshots Realtime e importação local rejeitam widths malformados antes de alcançar a UI. A próxima fatia implementará avaliação vetorial e só então habilitará a largura no editor para criação de novos sinais.

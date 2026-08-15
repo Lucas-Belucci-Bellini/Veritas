@@ -1,5 +1,6 @@
 import { isEditorComponentType, validateCircuit, type CircuitDocument } from '../circuit'
 import { db, type CircuitProject, type NewCircuitProject } from './db'
+import { MAX_BUS_WIDTH } from '../bus'
 import type { ComponentType } from '../simulation/components'
 
 export const CIRCUIT_FILE_VERSION = 1 as const
@@ -155,6 +156,8 @@ function isNodeLike(value: unknown): value is CircuitDocument['nodes'][number] {
     if (!isRecord(value.options)) return false
     if (value.options.value !== undefined && typeof value.options.value !== 'boolean') return false
     if (value.options.initial !== undefined && typeof value.options.initial !== 'boolean') return false
+    const width = value.options.width
+    if (width !== undefined && (typeof width !== 'number' || !Number.isInteger(width) || width < 1 || width > MAX_BUS_WIDTH)) return false
   }
   return true
 }

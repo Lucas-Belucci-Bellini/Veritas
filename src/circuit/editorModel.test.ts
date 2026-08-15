@@ -81,4 +81,27 @@ describe('editorModel', () => {
       expect.arrayContaining([expect.objectContaining({ code: 'cycle' })]),
     )
   })
+
+  it('mantém documentos escalares sem options.width compatíveis', () => {
+    expect(validateCircuit(andCircuit())).toEqual([])
+  })
+
+  it('rejeita width inválido, largura ainda não suportada e conexão incompatível', () => {
+    const document = andCircuit()
+    document.nodes[0].options = { width: 4 }
+    document.nodes[1].options = { width: 2 }
+    document.nodes[2].options = { width: 4 }
+
+    expect(validateCircuit(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'unsupported-width', nodeId: 'a' }),
+      expect.objectContaining({ code: 'unsupported-width', nodeId: 'b' }),
+      expect.objectContaining({ code: 'unsupported-width', nodeId: 'gate' }),
+      expect.objectContaining({ code: 'width-mismatch', nodeId: 'gate' }),
+    ]))
+
+    document.nodes[0].options = { width: 0 }
+    expect(validateCircuit(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'invalid-width', nodeId: 'a' }),
+    ]))
+  })
 })

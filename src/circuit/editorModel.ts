@@ -1,3 +1,4 @@
+import { MAX_BUS_WIDTH } from '../bus'
 import {
   outputCount,
   type ComponentOptions,
@@ -65,6 +66,9 @@ export interface CircuitIssue {
   | 'self-connection'
   | 'missing-input'
   | 'cycle'
+  | 'invalid-width'
+  | 'unsupported-width'
+  | 'width-mismatch'
   message: string
   nodeId?: string
 }
@@ -126,6 +130,20 @@ export function validateCircuit(document: CircuitDocument): CircuitIssue[] {
       })
       continue
     }
+    const width = circuitNodeWidth(node)
+    if (!isValidCircuitWidth(width)) {
+      issues.push({
+        code: 'invalid-width',
+        nodeId: node.id,
+        message: `A largura do componente "${node.id}" precisa ser um inteiro entre 1 e ${MAX_BUS_WIDTH}.`,
+      })
+    } else if (width !== 1) {
+      issues.push({
+        code: 'unsupported-width',
+        nodeId: node.id,
+        message: `O componente "${node.id}" usa ${width} bits, mas a avaliação visual atual ainda aceita somente sinais escalares de 1 bit.`,
+      })
+    }
     nodes.set(node.id, node)
   }
 
@@ -162,6 +180,16 @@ export function validateCircuit(document: CircuitDocument): CircuitIssue[] {
         message: `A entrada ${connection.target.port} não existe no componente "${target.id}".`,
       })
       continue
+    }
+
+    const sourceWidth = circuitNodeWidth(source)
+    const targetWidth = circuitNodeWidth(target)
+    if (isValidCircuitWidth(sourceWidth) && isValidCircuitWidth(targetWidth) && sourceWidth !== targetWidth) {
+      issues.push({
+        code: 'width-mismatch',
+        nodeId: target.id,
+        message: `A conexão entre "${source.id}" (${sourceWidth} bits) e "${target.id}" (${targetWidth} bits) exige larguras iguais.`,
+      })
     }
 
     const inputKey = `${target.id}:${connection.target.port}`
@@ -222,6 +250,14 @@ export function validateCircuit(document: CircuitDocument): CircuitIssue[] {
   for (const node of nodes.values()) visit(node.id)
 
   return issues
+}
+
+export function circuitNodeWidth(node: CircuitNode): number {
+  return node.options?.width ?? 1
+}
+
+export function isValidCircuitWidth(width: number): boolean {
+  return Number.isInteger(width) && width >= 1 && width <= MAX_BUS_WIDTH
 }
 
 /** Converte o documento visual para o netlist consumido pelo simulador. */
