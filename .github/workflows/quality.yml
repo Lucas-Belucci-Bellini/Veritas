@@ -1,0 +1,75 @@
+name: Veritas quality
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Tests, build and local smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit and integration tests
+        run: npm test -- --run
+
+      - name: Typecheck frontend and MCP
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build MCP bundle
+        run: npm run build:mcp
+
+      - name: Start production-like preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/veritas-preview.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/veritas-preview.pid"
+
+      - name: Wait for preview
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/veritas-preview.log"
+          exit 1
+
+      - name: HTTP/PWA smoke test
+        env:
+          SMOKE_URL: http://127.0.0.1:4173
+        run: npm run smoke:release
+
+      - name: Upload preview log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veritas-preview-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/veritas-preview.log

@@ -1,0 +1,137 @@
+name: Veritas release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão SemVer com prefixo v, por exemplo v0.10.0-alpha.1 ou v1.0.0'
+        required: true
+        type: string
+      prerelease:
+        description: 'Marcar como pre-release no GitHub'
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: veritas-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate release candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test suite
+        run: npm test -- --run
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build MCP
+        run: npm run build:mcp
+
+      - name: Preview and smoke test
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/veritas-release-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          SMOKE_URL=http://127.0.0.1:4173 npm run smoke:release
+
+      - name: Upload preview log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veritas-release-preview-log-${{ github.run_id }}
+          path: ${{ runner.temp }}/veritas-release-preview.log
+
+  publish:
+    name: Create tag and GitHub release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate version input
+        env:
+          VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Versão inválida: $VERSION"
+            echo 'Use v0.10.0-alpha.1 ou v1.0.0.'
+            exit 1
+          fi
+          if [[ "$PRERELEASE" == "true" && "$VERSION" != *-* ]]; then
+            echo 'Uma release marcada como prerelease precisa conter sufixo como -alpha.1 ou -beta.1.'
+            exit 1
+          fi
+          if [[ "$PRERELEASE" == "false" && "$VERSION" == *-* ]]; then
+            echo 'Uma versão com sufixo prerelease precisa ser marcada como prerelease.'
+            exit 1
+          fi
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "A tag $VERSION já existe."
+            exit 1
+          fi
+
+      - name: Publish release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          args=(
+            release create "$VERSION"
+            --target main
+            --title "Veritas $VERSION"
+            --generate-notes
+          )
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          gh "${args[@]}"
+
+      - name: Print release URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: gh release view "$VERSION" --json url --jq .url
