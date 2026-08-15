@@ -17,6 +17,7 @@
     "build:mcp": "vite build --config vite.mcp.config.ts",
     "build:plugin": "vite build --config vite.plugin.config.ts",
     "smoke:release": "node scripts/smoke-release.mjs",
+    "beta:preflight": "bash scripts/beta-preflight.sh",
     "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict"
   },
   "dependencies": {

@@ -37,6 +37,19 @@ O script [`scripts/smoke-release.mjs`](../scripts/smoke-release.mjs) é executad
 SMOKE_URL=https://veritas-opal-seven.vercel.app npm run smoke:release
 ```
 
+O comando [`npm run beta:preflight`](../scripts/beta-preflight.mjs) consolida versão candidata, árvore Git, suíte, typecheck, lint, build frontend, build MCP, smoke e a presença de um relatório RLS. Para uma promoção beta, execute-o com os gates externos obrigatórios:
+
+```bash
+BETA_EXPECTED_VERSION=0.8.0-rc.1 \
+SMOKE_URL=https://veritas-opal-seven.vercel.app \
+BETA_PREFLIGHT_REQUIRE_SMOKE=1 \
+BETA_PREFLIGHT_REQUIRE_RLS=1 \
+BETA_RLS_REPORT=artifacts/rls-acceptance.md \
+npm run beta:preflight
+```
+
+O preflight não cria sessões Supabase nem substitui a prova de RLS. Siga [`docs/BETA-RLS-ACCEPTANCE.md`](BETA-RLS-ACCEPTANCE.md) para executar RLS-001 a RLS-022 com usuários reais e produzir o relatório sanitizado.
+
 Ele valida três superfícies públicas sem acessar conta de usuário: a homepage deve retornar HTML com `#root`, `manifest.webmanifest` deve ser JSON com `name`, `start_url`, `display` e ícones, e `sw.js` deve conter o service worker esperado. O mesmo script roda no Preview local do Vite para detectar falhas de build antes do deployment.
 
 Para uma validação beta, o smoke HTTP deve ser complementado por uma matriz de navegadores. A matriz mínima inclui Chromium desktop, Firefox desktop, Safari/iOS ou WebKit, viewport móvel e uma segunda abertura em modo offline após o service worker ter sido instalado.
