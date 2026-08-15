@@ -1,6 +1,9 @@
 name: Veritas release
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
@@ -25,12 +28,37 @@ jobs:
     name: Validate release candidate
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
     steps:
-      - name: Checkout main
+      - name: Checkout release ref
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
           fetch-depth: 0
+
+      - name: Resolve release metadata
+        id: metadata
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            version="$REF_NAME"
+            prerelease=false
+            if [[ "$version" == *-* ]]; then prerelease=true; fi
+          else
+            version="$INPUT_VERSION"
+            prerelease="$INPUT_PRERELEASE"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Validando $version (prerelease=$prerelease)"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -40,6 +68,38 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate version and tag source
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+          PRERELEASE: ${{ steps.metadata.outputs.prerelease }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Versão inválida: $VERSION"
+            echo 'Use v0.8.0-rc.1 ou v1.0.0.'
+            exit 1
+          fi
+          if [[ "$PRERELEASE" == "true" && "$VERSION" != *-* ]]; then
+            echo 'Uma release marcada como prerelease precisa conter sufixo como -alpha.1, -beta.1 ou -rc.1.'
+            exit 1
+          fi
+          if [[ "$PRERELEASE" == "false" && "$VERSION" == *-* ]]; then
+            echo 'Uma versão com sufixo prerelease precisa ser marcada como prerelease.'
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            tag_commit="$(git rev-list -n 1 "$VERSION")"
+            if [[ "$tag_commit" != "$COMMIT_SHA" ]]; then
+              echo "A tag $VERSION não aponta para o commit do workflow."
+              exit 1
+            fi
+          elif git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "A tag $VERSION já existe."
+            exit 1
+          fi
 
       - name: Test suite
         run: npm test -- --run
@@ -82,49 +142,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout main
+      - name: Checkout release ref
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
           fetch-depth: 0
-
-      - name: Validate version input
-        env:
-          VERSION: ${{ inputs.version }}
-          PRERELEASE: ${{ inputs.prerelease }}
-        run: |
-          set -euo pipefail
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "Versão inválida: $VERSION"
-            echo 'Use v0.8.0-rc.1 ou v1.0.0.'
-            exit 1
-          fi
-          if [[ "$PRERELEASE" == "true" && "$VERSION" != *-* ]]; then
-            echo 'Uma release marcada como prerelease precisa conter sufixo como -alpha.1 ou -beta.1.'
-            exit 1
-          fi
-          if [[ "$PRERELEASE" == "false" && "$VERSION" == *-* ]]; then
-            echo 'Uma versão com sufixo prerelease precisa ser marcada como prerelease.'
-            exit 1
-          fi
-          if git rev-parse "$VERSION" >/dev/null 2>&1; then
-            echo "A tag $VERSION já existe."
-            exit 1
-          fi
 
       - name: Publish release with generated notes
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
-          PRERELEASE: ${{ inputs.prerelease }}
+          EVENT_NAME: ${{ github.event_name }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
         run: |
           set -euo pipefail
-          args=(
-            release create "$VERSION"
-            --target main
-            --title "Veritas $VERSION"
-            --generate-notes
-          )
+          args=(release create "$VERSION" --title "Veritas $VERSION" --generate-notes)
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            args+=(--verify-tag)
+          else
+            args+=(--target main)
+          fi
           if [[ "$PRERELEASE" == "true" ]]; then
             args+=(--prerelease)
           fi
@@ -133,5 +170,5 @@ jobs:
       - name: Print release URL
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: gh release view "$VERSION" --json url --jq .url
