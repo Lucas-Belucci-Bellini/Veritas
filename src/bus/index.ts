@@ -1,0 +1,18 @@
+export {
+  MAX_BUS_WIDTH,
+  BitVectorError,
+  bitVector,
+  bitwiseAnd,
+  bitwiseNot,
+  bitwiseOr,
+  bitwiseXor,
+  combineBus,
+  oneBus,
+  parseBusLiteral,
+  splitBus,
+  toBigInt,
+  toBinary,
+  toHex,
+  zeroBus,
+  type BitVector,
+} from './bitVector'

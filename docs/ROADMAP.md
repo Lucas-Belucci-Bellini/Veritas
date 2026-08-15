@@ -182,3 +182,9 @@ O editor visual agora mantém um histórico local de snapshots `CircuitDocument`
 A barra do editor expõe `Desfazer` e `Refazer`. Os atalhos `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` e `Ctrl/Cmd+Y` funcionam quando o foco não está em input, textarea, select ou elemento editável. Viewers em colaboração não alteram o histórico nem executam undo/redo. O documento restaurado passa pelos mesmos conversores `CircuitDocument`/React Flow usados pelo carregamento local e remoto, preservando o modo local-first.
 
 O histórico é de sessão do editor e não substitui o histórico remoto imutável. Salvamento local, sincronização Supabase, Broadcast e versionamento continuam independentes; undo/redo serve para recuperar rapidamente alterações da sessão antes de salvar ou sincronizar.
+
+## Atualização da implementação — fundação v0.8.0 de barramentos — 2026-08-15
+
+A primeira fatia do próximo release foi iniciada em `src/bus/bitVector.ts`. `BitVector` representa sinais como bits imutáveis em ordem MSB → LSB, com largura entre 1 e 64 bits. O núcleo oferece parse de literais binários e hexadecimais, formatação binária/hexadecimal, conversão para `bigint`, AND/OR/XOR/NOT bitwise, `splitBus` e `combineBus`.
+
+O contrato rejeita valores negativos, overflow, largura zero, literais inválidos, partes incompatíveis e combinações cujo total não coincide com a largura original. Essa fundação é deliberadamente independente da engine escalar atual: nenhuma avaliação 1-bit foi alterada silenciosamente. A próxima fatia deverá adicionar largura explícita a portas do modelo visual, migração defensiva do formato e operações de compatibilidade antes de tocar no exportador HDL ou na tabela verdade.
