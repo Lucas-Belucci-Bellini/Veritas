@@ -21,15 +21,19 @@ import {
   buildCircuitTruthTable,
   editorInputCount,
   evaluateCircuit,
+  evaluateCircuitVectors,
   exportCircuit,
   validateCircuit,
   type CircuitDocument,
+  type CircuitEvaluation,
   type CircuitNode,
+  type CircuitVectorEvaluation,
   type EditorComponentType,
 } from '../circuit'
 import { GateSymbol } from '../circuit/GateSymbol'
 import type { GateOp } from '../circuit/graph'
 import { CircuitHistory } from '../circuit/history'
+import { toBinary } from '../bus'
 import { TruthTableView } from './TruthTableView'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
 import type { ValueStyle } from '../lib/values'
@@ -51,6 +55,7 @@ interface EditorNodeData extends Record<string, unknown> {
   width: number
   op?: GateOp
   value?: boolean
+  busValue?: string
 }
 
 type EditorFlowNode = Node<EditorNodeData>
@@ -98,6 +103,7 @@ export function CircuitEditor() {
   const [rooms, setRooms] = useState<CircuitRoom[]>([])
   const [activeRoomId, setActiveRoomId] = useState('main')
   const [newRoomId, setNewRoomId] = useState('')
+  const [nextSignalWidth, setNextSignalWidth] = useState(1)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
@@ -129,7 +135,9 @@ export function CircuitEditor() {
     if (historyRef.current?.commit(document)) setHistoryRevision((current) => current + 1)
   }, [document])
 
-  const issues = useMemo(() => validateCircuit(document), [document])
+  const hasBuses = useMemo(() => document.nodes.some((node) => (node.options?.width ?? 1) > 1), [document])
+  const issues = useMemo(() => validateCircuit(document, { allowBuses: true }), [document])
+  const scalarIssues = useMemo(() => validateCircuit(document), [document])
   const outputNodes = useMemo(
     () => nodes.filter((node) => node.data.componentType === 'output'),
     [nodes],
@@ -182,22 +190,29 @@ export function CircuitEditor() {
   }, [hydrated, setEdges, setNodes, storage.projects, storage.ready])
 
   const truthTable = useMemo(() => {
-    if (issues.length > 0) return null
+    if (scalarIssues.length > 0) return null
     try {
       return buildCircuitTruthTable(document, { outputId: selectedOutputId })
     } catch {
       return null
     }
-  }, [document, issues, selectedOutputId])
+  }, [document, scalarIssues, selectedOutputId])
 
-  const selectedEvaluation = useMemo(() => {
+  const selectedEvaluation = useMemo<CircuitEvaluation | CircuitVectorEvaluation | null>(() => {
+    if (hasBuses) {
+      try {
+        return evaluateCircuitVectors(document)
+      } catch {
+        return null
+      }
+    }
     if (!truthTable || selectedRow === null) return null
     try {
       return evaluateCircuit(document, assignmentAt(truthTable, selectedRow))
     } catch {
       return null
     }
-  }, [document, selectedRow, truthTable])
+  }, [document, hasBuses, selectedRow, truthTable])
 
   const renderedNodes = useMemo(
     () =>
@@ -205,10 +220,11 @@ export function CircuitEditor() {
         ...node,
         data: {
           ...node.data,
-          value: selectedEvaluation?.values[node.id]?.[0],
+          value: selectedEvaluation ? evaluationIsLit(selectedEvaluation, node.id) : undefined,
+          busValue: selectedEvaluation && hasBuses ? evaluationBinary(selectedEvaluation, node.id) : undefined,
         },
       })),
-    [nodes, selectedEvaluation],
+    [hasBuses, nodes, selectedEvaluation],
   )
 
   const { broadcast: broadcastRemote, status: collaborationStatus } = collaboration
@@ -277,7 +293,7 @@ export function CircuitEditor() {
   const renderedEdges = useMemo(
     () =>
       edges.map((edge) => {
-        const live = selectedEvaluation?.values[edge.source]?.[0] === true
+        const live = selectedEvaluation ? evaluationIsLit(selectedEvaluation, edge.source) : false
         return {
           ...edge,
           animated: live,
@@ -325,7 +341,7 @@ export function CircuitEditor() {
     }
     setNotice('')
     setSelectedRow(null)
-    setNodes((current) => [...current, createNode(type, current.length, nextNodeId(type, current))])
+    setNodes((current) => [...current, createNode(type, current.length, nextNodeId(type, current), nextSignalWidth)])
   }
 
   const reset = () => {
@@ -415,8 +431,8 @@ export function CircuitEditor() {
       setNotice('Entre na sua conta para usar a análise de IA.')
       return
     }
-    if (issues.length > 0) {
-      setNotice('Corrija o circuito antes de pedir uma análise de IA.')
+    if (scalarIssues.length > 0) {
+      setNotice(hasBuses ? 'A análise de IA ainda requer um circuito escalar de 1 bit.' : 'Corrija o circuito antes de pedir uma análise de IA.')
       return
     }
     setAiLoading(true)
@@ -555,16 +571,18 @@ export function CircuitEditor() {
 
   const validationMessage =
     issues[0]?.message ??
-    (truthTable
-      ? `Circuito válido: ${truthTable.variables.length} entrada(s), ${truthTable.totalRows} linha(s).`
-      : 'Adicione componentes e conecte as entradas para começar.')
+    (hasBuses
+      ? `Circuito vetorial válido: avaliação bitwise ativa para ${document.nodes.filter((node) => (node.options?.width ?? 1) > 1).length} componente(s).`
+      : truthTable
+        ? `Circuito válido: ${truthTable.variables.length} entrada(s), ${truthTable.totalRows} linha(s).`
+        : 'Adicione componentes e conecte as entradas para começar.')
 
   return (
     <section className="card p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold tracking-wide text-brand-600 uppercase dark:text-brand-300">
-            v0.7.0 · prévia
+            v0.8.0 · prévia
           </p>
           <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
             Editor visual combinacional
@@ -573,7 +591,13 @@ export function CircuitEditor() {
             Monte um circuito no canvas, conecte as portas e valide a lógica sem precisar começar por uma expressão.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="circuit-signal-width">
+            Largura
+            <select id="circuit-signal-width" value={nextSignalWidth} onChange={(event) => setNextSignalWidth(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700">
+              {[1, 2, 4, 8, 16, 32, 64].map((width) => <option key={width} value={width}>{width} bit{width === 1 ? '' : 's'}</option>)}
+            </select>
+          </label>
           <button type="button" className="key text-xs" onClick={reset}>
             Novo exemplo
           </button>
@@ -592,10 +616,10 @@ export function CircuitEditor() {
           <button type="button" className="key text-xs" onClick={exportLocal}>
             Exportar
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={issues.length > 0}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={scalarIssues.length > 0}>
             Verilog
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={issues.length > 0}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={scalarIssues.length > 0}>
             VHDL
           </button>
           <button type="button" className="key text-xs" onClick={() => fileInputRef.current?.click()}>
@@ -769,8 +793,8 @@ export function CircuitEditor() {
               <p className="mt-1 text-xs text-violet-800/80 dark:text-violet-200/80">Analisa o contexto do circuito e propõe uma limpeza conservadora das portas.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="key text-xs" disabled={aiLoading} onClick={() => void runAi('analyze')}>{aiLoading ? 'Analisando…' : 'Analisar com IA'}</button>
-              <button type="button" className="key text-xs" disabled={aiLoading} onClick={() => void runAi('optimize')}>{aiLoading ? 'Otimizando…' : 'Otimizar portas'}</button>
+              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses} onClick={() => void runAi('analyze')} title={hasBuses ? 'A análise vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Analisando…' : 'Analisar com IA'}</button>
+              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses} onClick={() => void runAi('optimize')} title={hasBuses ? 'A otimização vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Otimizando…' : 'Otimizar portas'}</button>
             </div>
           </div>
           {aiResult && (
@@ -850,9 +874,9 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
 
   if (data.kind === 'input' || data.kind === 'constant') {
     return (
-      <div className="flex items-center" style={{ height: 32 }}>
+      <div className="flex items-center" style={{ height: 32 }} title={data.width > 1 ? `${data.label} · ${data.width} bits · ${data.busValue ?? 'sem avaliação'}` : data.label}>
         <span className={`grid h-8 min-w-8 place-items-center rounded-full border-2 px-2 font-mono text-sm font-bold transition-colors ${lit ? 'border-amber-500 bg-amber-400/25 text-amber-700 dark:text-amber-200' : 'border-slate-400 bg-white text-slate-700 dark:border-slate-500 dark:bg-slate-800 dark:text-slate-100'}`}>
-          {data.label}
+          {data.width > 1 ? `${data.label} [${data.busValue ?? '—'}]` : data.label}
         </span>
         <span className={`h-0.5 w-4 ${lit ? 'bg-amber-500' : 'bg-slate-400 dark:bg-slate-500'}`} />
         <Handle type="source" position={Position.Right} className={dot} />
@@ -862,17 +886,17 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
 
   if (data.kind === 'output') {
     return (
-      <div className="flex items-center gap-2" title={data.label} style={{ height: 40 }}>
+      <div className="flex items-center gap-2" title={data.width > 1 ? `${data.label} · ${data.width} bits · ${data.busValue ?? 'sem avaliação'}` : data.label} style={{ height: 40 }}>
         <Handle type="target" position={Position.Left} id="a" className={dot} />
         <span className={`h-0.5 w-4 ${lit ? 'bg-amber-500' : 'bg-slate-400 dark:bg-slate-500'}`} />
         <span className={`h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${lit ? 'border-amber-500 bg-amber-400 shadow-[0_0_12px_2px_rgb(245_158_11/0.6)]' : 'border-slate-400 dark:border-slate-500'}`} />
-        <span className="expr font-mono text-xs font-semibold whitespace-nowrap">{data.label}</span>
+        <span className="expr font-mono text-xs font-semibold whitespace-nowrap">{data.width > 1 ? `${data.label} [${data.width}b]` : data.label}</span>
       </div>
     )
   }
 
   return (
-    <div className="relative" style={{ width: 72, height: 56 }} title={data.label}>
+    <div className="relative" style={{ width: 72, height: 56 }} title={data.width > 1 ? `${data.label} · ${data.width} bits · ${data.busValue ?? 'sem avaliação'}` : data.label}>
       <GateSymbol op={data.op ?? 'and'} lit={lit} />
       {data.inputs === 2 ? (
         <>
@@ -915,7 +939,7 @@ function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
   }
 }
 
-function createNode(type: EditorComponentType, index: number, id = `${type}-${index + 1}`): EditorFlowNode {
+function createNode(type: EditorComponentType, index: number, id = `${type}-${index + 1}`, width = 1): EditorFlowNode {
   const kind = type === 'input' || type === 'constant' ? type : type === 'output' ? 'output' : 'gate'
   const defaultValue = type === 'constant'
   const label = type === 'input' ? `I${index + 1}` : type === 'output' ? `O${index + 1}` : NODE_LABELS[type]
@@ -929,7 +953,7 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       componentType: type,
       label,
       inputs: editorInputCount(type),
-      width: 1,
+      width,
       op: type === 'not' ? 'not' : type === 'and' || type === 'or' || type === 'xor' ? type : undefined,
       value: defaultValue,
     },
@@ -1002,6 +1026,18 @@ function loadProject(
   setEdges(flow.edges)
   setProjectName(project.name)
   setActiveProjectId(project.id)
+}
+
+function evaluationIsLit(evaluation: CircuitEvaluation | CircuitVectorEvaluation, nodeId: string): boolean {
+  const value = evaluation.values[nodeId]
+  if (!value) return false
+  return 'bits' in value ? value.bits.some(Boolean) : value[0] === true
+}
+
+function evaluationBinary(evaluation: CircuitEvaluation | CircuitVectorEvaluation, nodeId: string): string {
+  const value = evaluation.values[nodeId]
+  if (!value) return ''
+  return 'bits' in value ? toBinary(value) : value[0] ? '1' : '0'
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {

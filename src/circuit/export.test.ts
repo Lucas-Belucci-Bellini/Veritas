@@ -48,4 +48,14 @@ describe('exportCircuit', () => {
     expect(() => exportVerilog(invalid)).toThrow(CircuitValidationError)
     expect(() => exportVhdl(invalid)).toThrow('desconectada')
   })
+
+  it('mantém exportadores escalares bloqueados para circuitos multi-bit', () => {
+    const vector = {
+      ...document,
+      nodes: document.nodes.map((node) => ({ ...node, options: { width: 4 } })),
+    }
+
+    expect(() => exportVerilog(vector)).toThrow('somente sinais escalares')
+    expect(() => exportVhdl(vector)).toThrow('somente sinais escalares')
+  })
 })

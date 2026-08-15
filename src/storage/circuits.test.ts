@@ -66,6 +66,18 @@ describe('circuitProjects', () => {
     expect((await listCircuitProjects()).map((project) => project.name)).toEqual(['Persistente'])
   })
 
+  it('preserva width ao salvar e reabrir um circuito vetorial', async () => {
+    const vector = {
+      ...document,
+      nodes: document.nodes.map((node) => ({ ...node, options: { width: 8 } })),
+    }
+    const id = await createCircuitProject({ name: 'Barramento 8-bit', document: vector })
+    db.close()
+    await db.open()
+
+    expect((await getCircuitProject(id))?.document.nodes.every((node) => node.options?.width === 8)).toBe(true)
+  })
+
   it('lista os circuitos do mais recente para o mais antigo', async () => {
     await createCircuitProject({ name: 'Antigo', document })
     await new Promise((resolve) => setTimeout(resolve, 5))
