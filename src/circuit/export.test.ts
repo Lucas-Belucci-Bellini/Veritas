@@ -21,9 +21,9 @@ describe('exportCircuit', () => {
     const output = exportVerilog(document)
 
     expect(output).toContain('module Somador_simples (')
-    expect(output).toContain('A input')
-    expect(output).toContain('B input')
-    expect(output).toContain('Y output')
+    expect(output).toContain('input A')
+    expect(output).toContain('input B')
+    expect(output).toContain('output Y')
     expect(output).toContain('wire A_B;')
     expect(output).toContain('assign A_B = A & B;')
     expect(output).toContain('assign Y = A_B;')
@@ -49,13 +49,21 @@ describe('exportCircuit', () => {
     expect(() => exportVhdl(invalid)).toThrow('desconectada')
   })
 
-  it('mantém exportadores escalares bloqueados para circuitos multi-bit', () => {
+  it('gera portas e sinais vetoriais em Verilog e VHDL', () => {
     const vector = {
       ...document,
       nodes: document.nodes.map((node) => ({ ...node, options: { width: 4 } })),
     }
+    const verilog = exportVerilog(vector)
+    const vhdl = exportVhdl(vector)
 
-    expect(() => exportVerilog(vector)).toThrow('somente sinais escalares')
-    expect(() => exportVhdl(vector)).toThrow('somente sinais escalares')
+    expect(verilog).toContain('input [3:0] A')
+    expect(verilog).toContain('output [3:0] Y')
+    expect(verilog).toContain('wire [3:0] A_B;')
+    expect(verilog).toContain('assign A_B = A & B;')
+    expect(vhdl).toContain('A : in std_logic_vector(3 downto 0)')
+    expect(vhdl).toContain('Y : out std_logic_vector(3 downto 0)')
+    expect(vhdl).toContain('signal A_B : std_logic_vector(3 downto 0);')
+    expect(vhdl).toContain('A_B <= A and B;')
   })
 })

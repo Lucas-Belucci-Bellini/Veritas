@@ -11,10 +11,10 @@ export function exportVerilog(document: CircuitDocument): string {
   const model = buildExportModel(document)
   const moduleName = sanitizeIdentifier(document.name, 'veritas_circuit')
   const ports = [
-    ...model.inputs.map((node) => `${model.names.get(node.id)} input`),
-    ...model.outputs.map((node) => `${model.names.get(node.id)} output`),
+    ...model.inputs.map((node) => `${verilogDirection(node, 'input', model)}`),
+    ...model.outputs.map((node) => `${verilogDirection(node, 'output', model)}`),
   ]
-  const declarations = model.internalNodes.map((node) => `  wire ${model.names.get(node.id)};`)
+  const declarations = model.internalNodes.map((node) => `  wire${verilogWidth(node)} ${model.names.get(node.id)};`)
   const assignments = model.nodes.flatMap((node) => {
     if (node.type === 'input' || node.type === 'output') return []
     return [`  assign ${model.names.get(node.id)} = ${verilogExpression(node, model)};`]
@@ -40,10 +40,10 @@ export function exportVhdl(document: CircuitDocument): string {
   const model = buildExportModel(document)
   const entityName = sanitizeIdentifier(document.name, 'veritas_circuit')
   const ports = [
-    ...model.inputs.map((node) => `    ${model.names.get(node.id)} : in std_logic`),
-    ...model.outputs.map((node) => `    ${model.names.get(node.id)} : out std_logic`),
+    ...model.inputs.map((node) => `    ${model.names.get(node.id)} : in ${vhdlType(node)}`),
+    ...model.outputs.map((node) => `    ${model.names.get(node.id)} : out ${vhdlType(node)}`),
   ]
-  const declarations = model.internalNodes.map((node) => `  signal ${model.names.get(node.id)} : std_logic;`)
+  const declarations = model.internalNodes.map((node) => `  signal ${model.names.get(node.id)} : ${vhdlType(node)};`)
   const assignments = model.nodes.flatMap((node) => {
     if (node.type === 'input' || node.type === 'output') return []
     return [`  ${model.names.get(node.id)} <= ${vhdlExpression(node, model)};`]
@@ -72,7 +72,7 @@ export function exportVhdl(document: CircuitDocument): string {
 }
 
 function assertValid(document: CircuitDocument): void {
-  const issues = validateCircuit(document)
+  const issues = validateCircuit(document, { allowBuses: true })
   if (issues.length > 0) throw new CircuitValidationError(issues)
 }
 
@@ -109,7 +109,7 @@ function sourceExpression(node: CircuitNode, model: ExportModel): string {
 }
 
 function verilogExpression(node: CircuitNode, model: ExportModel): string {
-  if (node.type === 'constant') return node.options?.value ? "1'b1" : "1'b0"
+  if (node.type === 'constant') return verilogLiteral(nodeWidth(node), node.options?.value ?? false)
   const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
   if (node.type === 'not') return `~${operands[0]}`
   const operator = node.type === 'and' ? ' & ' : node.type === 'or' ? ' | ' : ' ^ '
@@ -117,11 +117,37 @@ function verilogExpression(node: CircuitNode, model: ExportModel): string {
 }
 
 function vhdlExpression(node: CircuitNode, model: ExportModel): string {
-  if (node.type === 'constant') return node.options?.value ? "'1'" : "'0'"
+  if (node.type === 'constant') return vhdlLiteral(nodeWidth(node), node.options?.value ?? false)
   const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
   if (node.type === 'not') return `not ${operands[0]}`
   const operator = node.type === 'and' ? ' and ' : node.type === 'or' ? ' or ' : ' xor '
   return operands.join(operator)
+}
+
+function verilogDirection(node: CircuitNode, direction: 'input' | 'output', model: ExportModel): string {
+  return `${direction}${verilogWidth(node)} ${model.names.get(node.id)}`
+}
+
+function verilogWidth(node: CircuitNode): string {
+  const width = nodeWidth(node)
+  return width === 1 ? '' : ` [${width - 1}:0]`
+}
+
+function vhdlType(node: CircuitNode): string {
+  const width = nodeWidth(node)
+  return width === 1 ? 'std_logic' : `std_logic_vector(${width - 1} downto 0)`
+}
+
+function verilogLiteral(width: number, value: boolean): string {
+  return width === 1 ? (value ? "1'b1" : "1'b0") : `{${width}{1'b${value ? '1' : '0'}}}`
+}
+
+function vhdlLiteral(width: number, value: boolean): string {
+  return width === 1 ? (value ? "'1'" : "'0'") : `(others => '${value ? '1' : '0'}')`
+}
+
+function nodeWidth(node: CircuitNode): number {
+  return node.options?.width ?? 1
 }
 
 function operandsFor(node: CircuitNode, model: ExportModel) {

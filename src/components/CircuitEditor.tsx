@@ -29,12 +29,13 @@ import {
   type CircuitEvaluation,
   type CircuitNode,
   type CircuitVectorEvaluation,
+  type CircuitVectorTruthTable,
   type EditorComponentType,
 } from '../circuit'
 import { GateSymbol } from '../circuit/GateSymbol'
 import type { GateOp } from '../circuit/graph'
 import { CircuitHistory } from '../circuit/history'
-import { toBinary } from '../bus'
+import { parseBusLiteral, toBinary, type BitVector } from '../bus'
 import { TruthTableView } from './TruthTableView'
 import { VectorTruthTableView } from './VectorTruthTableView'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
@@ -93,6 +94,7 @@ export function CircuitEditor() {
   const [activeProjectId, setActiveProjectId] = useState<number | null>(null)
   const [selectedOutputId, setSelectedOutputId] = useState<string | undefined>()
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
+  const [selectedVectorRow, setSelectedVectorRow] = useState<number | null>(null)
   const [valueStyle, setValueStyle] = useState<ValueStyle>('vf')
   const [hydrated, setHydrated] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -212,7 +214,7 @@ export function CircuitEditor() {
   const selectedEvaluation = useMemo<CircuitEvaluation | CircuitVectorEvaluation | null>(() => {
     if (hasBuses) {
       try {
-        return evaluateCircuitVectors(document)
+        return evaluateCircuitVectors(document, vectorAssignmentFromRow(document, vectorTruthTable, selectedVectorRow))
       } catch {
         return null
       }
@@ -223,7 +225,7 @@ export function CircuitEditor() {
     } catch {
       return null
     }
-  }, [document, hasBuses, selectedRow, truthTable])
+  }, [document, hasBuses, selectedRow, selectedVectorRow, truthTable, vectorTruthTable])
 
   const renderedNodes = useMemo(
     () =>
@@ -845,7 +847,7 @@ export function CircuitEditor() {
             </div>
             <span className="text-xs text-slate-400 dark:text-slate-500">{vectorTruthTable.classification}</span>
           </div>
-          <VectorTruthTableView table={vectorTruthTable} />
+          <VectorTruthTableView table={vectorTruthTable} selectedRow={selectedVectorRow} onSelectRow={setSelectedVectorRow} />
         </section>
       )}
 
@@ -1050,6 +1052,12 @@ function loadProject(
   setEdges(flow.edges)
   setProjectName(project.name)
   setActiveProjectId(project.id)
+}
+
+function vectorAssignmentFromRow(document: CircuitDocument, table: CircuitVectorTruthTable | null, rowIndex: number | null): Record<string, BitVector> {
+  if (!table || rowIndex === null || !table.rows[rowIndex]) return {}
+  const inputs = document.nodes.filter((node) => node.type === 'input')
+  return Object.fromEntries(inputs.map((node, index) => [node.id, parseBusLiteral(table.rows[rowIndex][index], node.options?.width ?? 1)]))
 }
 
 function evaluationIsLit(evaluation: CircuitEvaluation | CircuitVectorEvaluation, nodeId: string): boolean {

@@ -2,9 +2,11 @@ import type { CircuitVectorTruthTable } from '../circuit'
 
 interface VectorTruthTableViewProps {
   table: CircuitVectorTruthTable
+  selectedRow: number | null
+  onSelectRow: (row: number) => void
 }
 
-export function VectorTruthTableView({ table }: VectorTruthTableViewProps) {
+export function VectorTruthTableView({ table, selectedRow, onSelectRow }: VectorTruthTableViewProps) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
       <table className="min-w-full border-collapse text-left text-xs">
@@ -23,7 +25,19 @@ export function VectorTruthTableView({ table }: VectorTruthTableViewProps) {
         </thead>
         <tbody>
           {table.rows.map((row, rowIndex) => (
-            <tr key={`vector-row-${rowIndex}`} className="border-t border-slate-100 dark:border-slate-800">
+            <tr
+              key={`vector-row-${rowIndex}`}
+              tabIndex={0}
+              aria-selected={selectedRow === rowIndex}
+              onClick={() => onSelectRow(rowIndex)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  onSelectRow(rowIndex)
+                }
+              }}
+              className={`cursor-pointer border-t border-slate-100 outline-none focus:bg-brand-50 dark:border-slate-800 dark:focus:bg-brand-950/30 ${selectedRow === rowIndex ? 'bg-brand-50 dark:bg-brand-950/40' : ''}`}
+            >
               {row.map((value, columnIndex) => {
                 const column = table.columns[columnIndex]
                 return (
