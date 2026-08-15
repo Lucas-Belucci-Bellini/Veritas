@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css'
 import { assignmentAt } from '../engine'
 import {
   buildCircuitTruthTable,
+  buildCircuitVectorTruthTable,
   editorInputCount,
   evaluateCircuit,
   evaluateCircuitVectors,
@@ -35,6 +36,7 @@ import type { GateOp } from '../circuit/graph'
 import { CircuitHistory } from '../circuit/history'
 import { toBinary } from '../bus'
 import { TruthTableView } from './TruthTableView'
+import { VectorTruthTableView } from './VectorTruthTableView'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
 import type { ValueStyle } from '../lib/values'
 import type { CircuitProject } from '../storage/db'
@@ -197,6 +199,15 @@ export function CircuitEditor() {
       return null
     }
   }, [document, scalarIssues, selectedOutputId])
+
+  const vectorTruthTable = useMemo(() => {
+    if (!hasBuses || issues.length > 0) return null
+    try {
+      return buildCircuitVectorTruthTable(document)
+    } catch {
+      return null
+    }
+  }, [document, hasBuses, issues])
 
   const selectedEvaluation = useMemo<CircuitEvaluation | CircuitVectorEvaluation | null>(() => {
     if (hasBuses) {
@@ -823,6 +834,19 @@ export function CircuitEditor() {
             </div>
           ))}
         </div>
+      )}
+
+      {vectorTruthTable && (
+        <section className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-800">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">Tabela verdade vetorial</h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Cada célula representa um barramento completo em ordem MSB → LSB.</p>
+            </div>
+            <span className="text-xs text-slate-400 dark:text-slate-500">{vectorTruthTable.classification}</span>
+          </div>
+          <VectorTruthTableView table={vectorTruthTable} />
+        </section>
       )}
 
       {truthTable && (

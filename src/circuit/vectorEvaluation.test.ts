@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bitVector, toBinary } from '../bus'
-import { createCircuitDocument, evaluateCircuit, evaluateCircuitVectors, type CircuitDocument } from './index'
+import { buildCircuitVectorTruthTable, createCircuitDocument, evaluateCircuit, evaluateCircuitVectors, type CircuitDocument } from './index'
 
 function vectorAndCircuit(width = 4): CircuitDocument {
   return {
@@ -45,5 +45,25 @@ describe('evaluateCircuitVectors', () => {
 
   it('rejeita largura acima do limite antes de avaliar', () => {
     expect(() => evaluateCircuitVectors(vectorAndCircuit(65), { a: 1, b: 1 })).toThrow('entre 1 e 64')
+  })
+
+  it('gera tabela vetorial determinística com cardinalidade e truncamento explícitos', () => {
+    const table = buildCircuitVectorTruthTable(vectorAndCircuit(), { maxRows: 4 })
+
+    expect(table.totalInputBits).toBe(8)
+    expect(table.totalRows).toBe(256)
+    expect(table.generatedRows).toBe(4)
+    expect(table.truncated).toBe(true)
+    expect(table.columns.map((column) => [column.label, column.width])).toEqual([
+      ['a', 4],
+      ['b', 4],
+      ['out', 4],
+    ])
+    expect(table.rows[0]).toEqual(['0000', '0000', '0000'])
+    expect(table.rows[3]).toEqual(['0000', '0011', '0000'])
+  })
+
+  it('bloqueia tabela vetorial acima do limite de bits', () => {
+    expect(() => buildCircuitVectorTruthTable(vectorAndCircuit(8))).toThrow('limite seguro é 12')
   })
 })
