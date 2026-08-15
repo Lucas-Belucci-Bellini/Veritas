@@ -4,7 +4,7 @@
 
 ## 1. Estado atual
 
-A versão de referência do repositório é a **v0.6.2**. O projeto já possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial básica e servidor MCP.
+A versão de referência do repositório é a **v0.8.0-rc.1**. O projeto já possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial básica e servidor MCP.
 
 | Área | Situação real | Evidência no repositório |
 | --- | --- | --- |

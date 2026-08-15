@@ -78,7 +78,7 @@ Os mesmos JSON de entrada devem ser executados pelo pacote MCP diretamente e por
 
 O workflow [`quality.yml`](../.github/workflows/quality.yml) roda em pull requests e pushes para `main`. Ele executa a suíte, constrói a aplicação e o MCP, inicia o preview Vite e executa `npm run smoke:release` contra `http://127.0.0.1:4173`.
 
-O workflow [`release.yml`](../.github/workflows/release.yml) é manual para reduzir o risco de publicar uma versão acidental. No GitHub, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.10.0-alpha.1` e marque `prerelease=true`. O job de validação roda antes do job de publicação. Se tudo passar, o job de publicação executa `gh release create`, cria a tag apontando para `main`, gera notas automaticamente e marca a release como pre-release quando solicitado.
+O workflow [`release.yml`](../.github/workflows/release.yml) é manual para reduzir o risco de publicar uma versão acidental. No GitHub, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.8.0-rc.1` e marque `prerelease=true`. O job de validação roda antes do job de publicação. Se tudo passar, o job de publicação executa `gh release create`, cria a tag apontando para `main`, gera notas automaticamente e marca a release como pre-release quando solicitado.
 
 O arquivo [`release.yml`](../.github/release.yml) organiza as notas por labels `breaking-change`, `feature`, `bug`, `security`, `documentation` e `education`. PRs sem categoria caem em `Other changes`.
 

@@ -29,7 +29,8 @@ com um resumo executivo em [`plano.md`](./plano.md).
 | v0.7.0 | Editor visual combinacional, tabela verdade automática e persistência local IndexedDB |
 | v0.7.1 | Autenticação Supabase, sincronização em nuvem, histórico remoto e análise/otimização por IA |
 | v0.7.2 | Colaboração Realtime, exportação Verilog/VHDL e painel de métricas da IA |
-| v0.8.0 | ALGO-001 executor determinístico local-first e ALGO-002 Watch/BranchTrace |
+| v0.8.0-rc.1 | Barramentos multi-bit, tabela verdade vetorial, seleção de linhas e exportação HDL dimensionada |
+| v0.8.0 (prévia anterior) | ALGO-001 executor determinístico local-first e ALGO-002 Watch/BranchTrace |
 | v0.9.0 | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -69,6 +70,20 @@ automática: circuitos locais só são enviados após uma ação explícita.
 O leitor do `.veritas` recusa arquivo de outro programa, JSON quebrado e versão
 de formato mais nova do que a que ele entende, em vez de importar lixo em
 silêncio.
+
+### Barramentos multi-bit (v0.8.0-rc.1)
+
+No editor visual, escolha a largura de novos sinais no seletor **Largura**: 1, 2, 4,
+8, 16, 32 ou 64 bits. A ausência de largura continua significando um sinal escalar
+compatível com os circuitos anteriores. Para circuitos vetoriais, o canvas mostra o
+valor binário em ordem **MSB → LSB**, a tabela verdade permite selecionar uma linha
+e a exportação gera portas e fios dimensionados em Verilog e VHDL.
+
+A tabela verdade vetorial é deliberadamente limitada a 12 bits totais de entrada por
+padrão, para evitar explosão combinatória e travamento da interface. A análise de IA
+continua disponível para circuitos escalares e aparece desabilitada para circuitos
+vetoriais até que o contexto de IA multi-bit seja finalizado. O modo local-first e o
+IndexedDB preservam a largura mesmo sem Supabase configurado.
 
 ### Performance (v0.4.9)
 
@@ -218,6 +233,7 @@ npm run lint       # oxlint
 npm run typecheck  # TypeScript do site e do servidor MCP
 npm run build      # build de produção em dist/
 npm run build:mcp  # servidor MCP em mcp/dist/
+npm run smoke:release  # smoke HTTP/PWA contra SMOKE_URL ou a URL padrão
 ```
 
 ## Como o código está organizado

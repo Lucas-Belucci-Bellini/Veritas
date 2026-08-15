@@ -4,7 +4,7 @@
 **Produto:** Veritas — editor e simulador didático de lógica digital
 **Repositório:** https://github.com/Lucas-Belucci-Bellini/Veritas
 **Preview/produção atual:** https://veritas-opal-seven.vercel.app
-**Versão declarada no `package.json`:** `0.6.2`
+**Versão declarada no `package.json`:** `0.8.0-rc.1`
 
 ## 1. Decisão de posicionamento
 
@@ -16,13 +16,13 @@ O público inicial é composto por estudantes de lógica digital, professores, a
 
 ## 2. Diagnóstico atual
 
-O projeto já possui uma base forte para uma prévia pública: editor visual combinacional, tabela verdade, persistência IndexedDB, autenticação e nuvem Supabase, histórico remoto, colaboração Realtime, exportação Verilog/VHDL, monitoramento da IA, workspace ALGO-001/002/003 e ferramentas MCP locais. A suíte atual registra 200 testes aprovados, além de typecheck, lint e build limpos.
+O projeto já possui uma base forte para uma prévia pública: editor visual combinacional, tabela verdade, persistência IndexedDB, autenticação e nuvem Supabase, histórico remoto, colaboração Realtime, exportação Verilog/VHDL, monitoramento da IA, workspace ALGO-001/002/003 e ferramentas MCP locais. A suíte atual registra 226 testes aprovados, além de typecheck, lint, build frontend, build MCP e smoke PWA limpos.
 
 Há, porém, quatro fatos que impedem chamar o estado atual de `1.0.0` sem uma rodada de endurecimento:
 
 | Área | Estado atual | Consequência para o lançamento |
 | --- | --- | --- |
-| Versionamento | `package.json` continua em `0.6.2` e o GitHub ainda não possui releases/tags publicados. | Criar uma sequência de pré-releases antes do estável. |
+| Versionamento | `package.json` está em `0.8.0-rc.1`; o GitHub ainda não possui releases/tags estáveis publicados. | Executar a candidata manualmente e manter a sequência de pré-releases antes do estável. |
 | Distribuição | Existe deployment Vercel público, mas o fluxo de Preview/Production, domínio, headers e rollback ainda precisa ser formalizado. | Tratar o deployment atual como preview até concluir o checklist. |
 | MCP | Ferramentas determinísticas estão disponíveis por `stdio`; transporte HTTP remoto autenticado ainda é roadmap. | Não prometer integração web remota no lançamento inicial. |
 | Colaboração | Broadcast de snapshots e Presence funcionam, mas não são CRDT nem merge campo a campo. | Rotular como colaboração beta/preview e documentar o risco de sobrescrita concorrente. |
@@ -33,10 +33,10 @@ A recomendação é usar SemVer e manter os artefatos publicados imutáveis: cor
 
 | Release | Objetivo | Público | Critério de saída |
 | --- | --- | --- | --- |
-| `v0.10.0-alpha.1` | Alpha técnico | Usuário interno e colaboradores próximos | Produto abre, salva localmente, executa tabela verdade e não tem blocker P0. |
-| `v0.10.0-alpha.2` | Alpha pedagógico | 5–10 estudantes/professores convidados | Tutorial concluído por usuários externos e exercícios principais reproduzidos. |
-| `v0.11.0-beta.1` | Beta público | Comunidade aberta | Fluxos principais monitorados, RLS auditado, exportadores compilados por ferramentas HDL e rollback ensaiado. |
-| `v0.11.x` | Correções de beta | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
+| `v0.8.0-alpha.1` | Alpha técnico multi-bit | Usuário interno e colaboradores próximos | Produto abre, salva localmente, avalia circuitos escalares e vetoriais limitados, sem blocker P0. |
+| `v0.8.0-beta.1` | Beta pedagógico | 5–10 estudantes/professores convidados | Tutorial concluído, tabela vetorial limitada reproduzida e exportação HDL validada por fixtures. |
+| `v0.8.0-rc.1` | Release candidate | Testadores convidados e mantenedores | Quality gates verdes, RLS auditado, smoke externo aprovado e nenhum P0/P1 aberto. |
+| `v0.8.x` | Correções de beta/RC | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
 | `v1.0.0` | Lançamento estável | Público geral | API/documento público estável, política de dados, suporte básico e critérios P0/P1 encerrados. |
 
 Cada release deve ser criada a partir de uma tag Git e acompanhada de release notes; o GitHub permite publicar releases com notas, assets, prerelease e geração automática de changelog [1] [2].
@@ -47,7 +47,7 @@ O `v1.0.0` deve conter apenas capacidades que consigam ser explicadas, testadas 
 
 | Dentro do `v1.0.0` | Fora do `v1.0.0` ou explicitamente beta |
 | --- | --- |
-| Canvas de portas `input`, `output`, `constant`, `and`, `or`, `not`, `xor`. | ALU, barramentos multi-bit, memória e simulação sequencial completa. |
+| Canvas de portas `input`, `output`, `constant`, `and`, `or`, `not`, `xor`. | ALU, memória e simulação sequencial completa; barramentos avançados permanecem em evolução. |
 | Tabela verdade com limite de interface documentado. | Tabelas ilimitadas ou expressões com milhões de linhas na UI. |
 | IndexedDB funcionando sem conta ou Supabase configurado. | Dependência obrigatória de rede para abrir e editar um circuito. |
 | Login, salvamento, histórico e RLS por usuário. | Compartilhamento sem política de autorização. |
@@ -85,7 +85,7 @@ O checklist funcional deve complementar os comandos automatizados:
 | Acessibilidade | Navegação por teclado, foco visível, labels, contraste e mensagens de erro em português claro. |
 | Recuperação | Ensaiar rollback da deployment anterior e restaurar uma versão de circuito do histórico remoto. |
 
-Os limites de produto devem ser explícitos. Uma sugestão para o lançamento é permitir até 12 variáveis na tabela verdade visual por padrão, oferecer um modo avançado limitado por `maxRows` e recusar qualquer expansão que comprometa a responsividade.
+Os limites de produto devem ser explícitos. A tabela booleana mantém limite próprio de variáveis e a tabela vetorial usa, por padrão, até 12 bits totais de entrada, com `maxRows` limitado e rejeição de qualquer expansão que comprometa a responsividade.
 
 ## 6. Distribuição web/PWA
 
@@ -122,10 +122,10 @@ O cronograma abaixo é uma sequência operacional para uma equipe pequena; os pr
 | --- | --- | --- |
 | 0 | Freeze de escopo, inventário de riscos, escolha do nome/domínio, definição de limites e política de dados. | Documento de release aprovado. |
 | 1 | Endurecimento P0: RLS, IndexedDB, PWA, exportadores, ciclos, loops, MCP e erros. | Quality gates automatizados e smoke checklist. |
-| 2 | `v0.10.0-alpha.1` e teste interno com dados reais de aulas. | Tag, GitHub prerelease, release notes e feedback registrado. |
+| 2 | `v0.8.0-alpha.1` e teste interno com circuitos escalares/vetoriais limitados. | Tag, GitHub prerelease, release notes e feedback registrado. |
 | 3 | Correções e tutorial; alpha convidado com 5–10 pessoas. | Relatório de onboarding e lista P1/P2. |
-| 4 | `v0.11.0-beta.1`, Preview/Production formalizados, monitoramento e rollback ensaiados. | Beta público com limitações visíveis. |
-| 5 | Correções beta, testes HDL com toolchains, acessibilidade e compatibilidade móvel. | Release candidate sem P0/P1 aberto. |
+| 4 | `v0.8.0-beta.1`, Preview/Production formalizados, monitoramento e rollback ensaiados. | Beta público com limitações visíveis. |
+| 5 | Correções beta, testes HDL com toolchains, acessibilidade e compatibilidade móvel. | `v0.8.0-rc.1` sem P0/P1 aberto. |
 | 6 | `v1.0.0`, anúncio, documentação, exemplos e canal de suporte. | Release estável e postmortem de lançamento agendado. |
 
 ## 10. Critério objetivo para dizer “lançamos”

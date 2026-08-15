@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versão SemVer com prefixo v, por exemplo v0.10.0-alpha.1 ou v1.0.0'
+        description: 'Versão SemVer com prefixo v, por exemplo v0.8.0-rc.1 ou v1.0.0'
         required: true
         type: string
       prerelease:
@@ -96,7 +96,7 @@ jobs:
           set -euo pipefail
           if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "Versão inválida: $VERSION"
-            echo 'Use v0.10.0-alpha.1 ou v1.0.0.'
+            echo 'Use v0.8.0-rc.1 ou v1.0.0.'
             exit 1
           fi
           if [[ "$PRERELEASE" == "true" && "$VERSION" != *-* ]]; then

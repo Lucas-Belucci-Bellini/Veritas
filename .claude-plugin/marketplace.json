@@ -11,7 +11,7 @@
       "source": "./plugins/veritas-logic",
       "displayName": "Veritas — lógica booleana",
       "description": "Tabelas verdade, simplificação por Quine-McCluskey, mapas de Karnaugh, formas normais SOP/POS, simulação de circuitos sequenciais e uma biblioteca de 1121 chips.",
-      "version": "0.6.2",
+      "version": "0.8.0-rc.1",
       "author": {
         "name": "Lucas Belucci Bellini",
         "url": "https://github.com/Lucas-Belucci-Bellini"
