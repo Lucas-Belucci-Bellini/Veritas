@@ -40,6 +40,7 @@ import { CircuitVersionHistory } from './CircuitVersionHistory'
 import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
 import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollaborator, type CircuitCollaborator, type CollaboratorRole } from '../realtime/circuitCollaborators'
+import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realtime/circuitRooms'
 
 interface EditorNodeData extends Record<string, unknown> {
   kind: 'input' | 'constant' | 'gate' | 'output'
@@ -90,6 +91,9 @@ export function CircuitEditor() {
   const { user } = useAuth()
   const cloud = useCloudCircuitProjects()
   const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
+  const [rooms, setRooms] = useState<CircuitRoom[]>([])
+  const [activeRoomId, setActiveRoomId] = useState('main')
+  const [newRoomId, setNewRoomId] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
@@ -106,8 +110,11 @@ export function CircuitEditor() {
     setSelectedRow(null)
     setNotice('Alteração remota recebida de outro colaborador.')
   }, [setEdges, setNodes])
+  const collaborationBaseVersion = cloud.versions[0]?.versionNumber ?? 0
   const collaboration = useCircuitCollaboration({
     projectId: cloudProjectId,
+    roomId: 'main',
+    baseVersion: collaborationBaseVersion,
     enabled: Boolean(user && cloudProjectId),
     onRemoteDocument: applyRemoteDocument,
   })
@@ -127,6 +134,21 @@ export function CircuitEditor() {
       if (active) setCollaborators(items)
     }).catch(() => {
       if (active) setCollaborators([])
+    })
+    return () => { active = false }
+  }, [cloudProjectId, user])
+
+  useEffect(() => {
+    if (!user || !cloudProjectId) {
+      setRooms([])
+      setActiveRoomId('main')
+      return
+    }
+    let active = true
+    void listCircuitRooms(cloudProjectId).then((items) => {
+      if (active) setRooms(items.filter((item) => item.kind === 'document'))
+    }).catch(() => {
+      if (active) setRooms([])
     })
     return () => { active = false }
   }, [cloudProjectId, user])
@@ -185,7 +207,7 @@ export function CircuitEditor() {
       void broadcastRemote(document)
     }, 120)
     return () => clearTimeout(timer)
-  }, [broadcastRemote, collaborationStatus, document])
+  }, [broadcastRemote, collaborationBaseVersion, collaborationStatus, document])
 
   const renderedEdges = useMemo(
     () =>
@@ -346,6 +368,8 @@ export function CircuitEditor() {
     setEdges(flow.edges)
     setProjectName(optimized.name)
     setCloudProjectId(null)
+    setRooms([])
+    setActiveRoomId('main')
     setSelectedRow(null)
     setNotice('Otimização aplicada localmente. Sincronize novamente se quiser enviá-la para a nuvem.')
   }
@@ -363,6 +387,7 @@ export function CircuitEditor() {
       const name = projectName.trim() || document.name
       const result = await cloud.sync(name, { ...document, name }, cloudProjectId ?? undefined)
       setCloudProjectId(result.project.id)
+      setActiveRoomId('main')
       setProjectName(result.project.name)
       setNotice(`Circuito "${result.project.name}" sincronizado na nuvem na versão ${result.version.versionNumber}.`)
     } catch (error) {
@@ -376,6 +401,7 @@ export function CircuitEditor() {
     setEdges(flow.edges)
     setProjectName(project.name)
     setCloudProjectId(project.id)
+    setActiveRoomId('main')
     setActiveProjectId(null)
     setSelectedRow(null)
     void cloud.loadVersions(project.id)
@@ -389,6 +415,22 @@ export function CircuitEditor() {
     setProjectName(version.name)
     setSelectedRow(null)
     setNotice(`Versão ${version.versionNumber} aberta como prévia. Sincronize para criar uma nova versão.`)
+  }
+
+  const createRoom = async () => {
+    if (!cloudProjectId || !/^[A-Za-z0-9_-]{1,64}$/.test(newRoomId.trim())) {
+      setNotice('Use um identificador de sala com até 64 caracteres: letras, números, hífen ou sublinhado.')
+      return
+    }
+    try {
+      const room = await createCircuitRoom(cloudProjectId, newRoomId, 'document')
+      setRooms((current) => [...current.filter((item) => item.roomId !== room.roomId), room].sort((left, right) => left.createdAt - right.createdAt))
+      setActiveRoomId(room.roomId)
+      setNewRoomId('')
+      setNotice(`Sala "${room.roomId}" criada e ativada.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível criar a sala.')
+    }
   }
 
   const inviteCollaborator = async () => {
@@ -598,8 +640,16 @@ export function CircuitEditor() {
       {user && cloudProjectId && collaboration.status !== 'disabled' && (
         <div className={`mt-3 rounded-xl border p-3 text-xs ${collaboration.status === 'connected' ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/20 dark:text-emerald-200' : collaboration.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/70 dark:bg-rose-950/20 dark:text-rose-200' : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <strong>{collaboration.status === 'connected' ? 'Colaboração em tempo real ativa' : collaboration.status === 'connecting' ? 'Conectando colaboração…' : 'Colaboração indisponível'}</strong>
+            <strong>{collaboration.status === 'connected' ? 'Colaboração em tempo real ativa' : collaboration.status === 'connecting' ? 'Conectando colaboração…' : 'Colaboração indisponível'} · sala {activeRoomId}</strong>
             {collaboration.participants.length > 0 && <span>{collaboration.participants.length} participante(s) online</span>}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <select value={activeRoomId} onChange={(event) => setActiveRoomId(event.target.value)} className="rounded-lg border border-current/20 bg-transparent px-2 py-1 text-xs" aria-label="Sala de colaboração">
+              <option value="main">main (principal)</option>
+              {rooms.map((room) => <option key={room.roomId} value={room.roomId}>{room.roomId}</option>)}
+            </select>
+            <input value={newRoomId} onChange={(event) => setNewRoomId(event.target.value)} className="min-w-44 flex-1 rounded-lg border border-current/20 bg-transparent px-2 py-1 text-xs" placeholder="nova sala: alpha" aria-label="Identificador da nova sala" />
+            <button type="button" className="key text-xs" onClick={() => void createRoom()} disabled={!newRoomId.trim()}>Criar sala</button>
           </div>
           {collaboration.error && <p className="mt-1">{collaboration.error}</p>}
           {collaboration.participants.length > 0 && <p className="mt-1 opacity-80">{collaboration.participants.map((participant) => participant.label).join(' · ')}</p>}

@@ -94,3 +94,11 @@ A próxima implementação recomendada é `ROOM-001`: extrair `createCircuitColl
 [1]: https://supabase.com/docs/guides/realtime/presence "Supabase Realtime Presence"
 [2]: https://supabase.com/docs/guides/realtime/broadcast "Supabase Realtime Broadcast"
 [3]: https://supabase.com/docs/guides/realtime/authorization "Supabase Realtime Authorization"
+
+## Implementação ROOM-001 — 2026-08-15
+
+A primeira fatia executável foi implementada. `createRoomCollaboration` agora usa o tópico privado `veritas:project:{projectId}:room:{roomId}`, valida identificadores, normaliza snapshots e Presence por projeto/sala/tipo e ignora mensagens recebidas de outra sala. `RoomManager` garante que a troca de sala desconecte a sessão anterior antes de conectar a nova.
+
+O snapshot enviado pelo cliente inclui `baseVersion`, e o hook de sincronização encaminha essa versão ao RPC `veritas_sync_circuit_project`. Quando a versão remota já avançou, o backend retorna `CIRCUIT_CONFLICT current=N` e o frontend produz um `CloudVersionConflictError`; não há LWW silencioso nem sobrescrita automática. A migração aplicada no projeto Supabase existente cria `veritas_circuit_rooms`, autoriza o tópico por projeto/sala e restringe `circuit_snapshot` a owner/editor.
+
+A persistência oficial ainda deve ser confirmada antes do Broadcast definitivo em uma etapa posterior. O comportamento atual mantém o Broadcast como atualização transitória para colaboração visual, enquanto o salvamento versionado permanece a fonte de verdade. CRDT, merge automático, cursores, comentários persistentes e chat continuam fora desta fatia.

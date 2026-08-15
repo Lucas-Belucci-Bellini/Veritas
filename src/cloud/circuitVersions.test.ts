@@ -95,6 +95,18 @@ describe('syncCloudCircuitVersion', () => {
     expect(call[0]).toBe('veritas_sync_circuit_project')
     expect(call[1]).toMatchObject({ p_project_id: null, p_name: 'Primeiro', p_document: document, p_content_hash: expect.any(String) })
     expect(call[1].p_change_summary).toMatchObject({ nodesAdded: 2, connectionsAdded: 1 })
+    expect(call[1].p_base_version).toBe(0)
     expect(result).toMatchObject({ projectId: 'project-1', version: { id: 'version-1', versionNumber: 1 } })
+  })
+
+  it('envia a versão-base e rejeita conflito otimista sem aplicar o salvamento', async () => {
+    fakeSupabase.rpc.mockResolvedValue({
+      data: null,
+      error: { code: 'P0001', message: 'CIRCUIT_CONFLICT current=7' },
+    })
+
+    const { CloudVersionConflictError } = await import('./circuitVersions')
+    await expect(syncCloudCircuitVersion('project-1', 'Concorrente', document, document, 6)).rejects.toBeInstanceOf(CloudVersionConflictError)
+    expect(fakeSupabase.rpc).toHaveBeenCalledWith('veritas_sync_circuit_project', expect.objectContaining({ p_base_version: 6 }))
   })
 })

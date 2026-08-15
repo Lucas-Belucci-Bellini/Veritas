@@ -49,3 +49,13 @@ Antes de publicar, execute os testes, o typecheck, o lint e o build. No Supabase
 [1]: https://supabase.com/docs/guides/realtime/authorization "Supabase — Realtime Authorization"
 [2]: https://supabase.com/docs/guides/realtime/concepts "Supabase — Realtime Concepts"
 [3]: https://supabase.com/docs/reference/javascript/subscribe "Supabase JavaScript — subscribe"
+
+## ROOM-001: salas nomeadas e conflitos explícitos
+
+A colaboração agora suporta sessões document por sala. O tópico privado segue `veritas:project:{projectId}:room:{roomId}`; a sala `main` é implícita e salas nomeadas precisam existir em `veritas_circuit_rooms`. O `CircuitEditor` permite selecionar a sala ativa e criar uma sala document com identificador seguro. A troca de sala remove a sessão anterior antes de conectar o novo canal.
+
+O evento de documento é `circuit_snapshot`. Cada payload carrega `projectId`, `roomId`, `contentHash`, `baseVersion`, `clientId` e `sentAt`. O normalizador rejeita uma mensagem de projeto/sala divergente, versão-base negativa, documento inválido ou evento diferente do contrato. Presence carrega somente metadados de baixa frequência: projeto, sala, tipo, papel, usuário, label e cor.
+
+A persistência usa concorrência otimista explícita. O cliente lê a versão mais recente, envia `p_base_version` ao RPC transacional e recebe `CIRCUIT_CONFLICT current=N` se outro salvamento já avançou a sala/projeto. O frontend converte essa resposta em `CloudVersionConflictError`; nenhuma alteração remota é sobrescrita por LWW silencioso. A resolução por merge, CRDT, cursores e comentários persistentes continuam fora desta fatia.
+
+A migration `room_001_multi_room_conflict` foi aplicada no projeto Supabase existente, seguida por `room_001_security_hardening_v2`. As policies usam o tópico para autorizar somente membros do projeto e restringem `circuit_snapshot` a owner/editor; versões podem ser consultadas por membros autorizados, mas a criação oficial passa pela sincronização validada. O advisor de segurança posterior não apontou novo alerta específico para a migration; os avisos existentes do projeto permanecem documentados para tratamento separado.

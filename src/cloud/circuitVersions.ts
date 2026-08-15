@@ -3,6 +3,19 @@ import { buildCircuitContext } from '../circuit'
 import { supabase } from '../lib/supabase'
 import { compareCircuitDocuments, type CircuitChangeSummary } from './circuitDiff'
 
+export class CloudVersionConflictError extends Error {
+  readonly code = 'CIRCUIT_CONFLICT'
+  readonly currentVersion: number | null
+
+  constructor(currentVersion: number | null = null) {
+    super(currentVersion === null
+      ? 'O circuito foi alterado por outra sessão. Recarregue a versão remota antes de salvar.'
+      : `O circuito foi alterado por outra sessão. A versão remota atual é ${currentVersion}; recarregue-a antes de salvar.`)
+    this.name = 'CloudVersionConflictError'
+    this.currentVersion = currentVersion
+  }
+}
+
 export interface CloudCircuitVersion {
   id: string
   projectId: string
@@ -56,6 +69,7 @@ export async function syncCloudCircuitVersion(
   name: string,
   document: CircuitDocument,
   previousDocument: CircuitDocument | null,
+  baseVersion = 0,
 ): Promise<{ projectId: string; version: CloudCircuitVersion }> {
   const client = requireSupabase()
   await currentUser()
@@ -67,9 +81,13 @@ export async function syncCloudCircuitVersion(
     p_document: document,
     p_content_hash: context.contentHash,
     p_change_summary: diff,
+    p_base_version: baseVersion,
   })
 
-  if (error) throw error
+  if (error) {
+    if (isConflictResponse(error)) throw new CloudVersionConflictError(parseCurrentVersion(error.message))
+    throw error
+  }
   const row = (data as SyncRow[] | null)?.[0]
   if (!row) throw new Error('O Supabase não devolveu a versão criada.')
   const version = toCloudVersion({
@@ -84,6 +102,15 @@ export async function syncCloudCircuitVersion(
   })
   if (!version) throw new Error('O Supabase devolveu uma versão inválida.')
   return { projectId: row.project_id, version }
+}
+
+function isConflictResponse(error: unknown): error is { code?: string; message?: string } {
+  return isRecord(error) && (error.code === 'CIRCUIT_CONFLICT' || error.code === 'P0001') && typeof error.message === 'string' && error.message.includes('CIRCUIT_CONFLICT')
+}
+
+function parseCurrentVersion(message: string | undefined): number | null {
+  const match = message?.match(/current=(\d+)/)
+  return match ? Number(match[1]) : null
 }
 
 function requireSupabase() {

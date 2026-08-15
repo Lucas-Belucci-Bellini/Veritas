@@ -9,6 +9,7 @@ import {
 import {
   listCloudCircuitVersions,
   syncCloudCircuitVersion,
+  CloudVersionConflictError,
   type CloudCircuitVersion,
 } from '../cloud/circuitVersions'
 
@@ -86,7 +87,8 @@ export function useCloudCircuitProjects(): UseCloudCircuitProjects {
       setLoading(true)
       try {
         const previousVersions = id ? await listCloudCircuitVersions(id) : []
-        const result = await syncCloudCircuitVersion(id ?? null, name, document, previousVersions[0]?.document ?? null)
+        const baseVersion = previousVersions[0]?.versionNumber ?? 0
+        const result = await syncCloudCircuitVersion(id ?? null, name, document, previousVersions[0]?.document ?? null, baseVersion)
         const version = result.version
         const project: CloudCircuitProject = {
           id: result.projectId,
@@ -103,7 +105,7 @@ export function useCloudCircuitProjects(): UseCloudCircuitProjects {
       } catch (syncError) {
         const message = messageOf(syncError, 'Não foi possível sincronizar o circuito.')
         setError(message)
-        throw new Error(message)
+        throw syncError instanceof CloudVersionConflictError ? syncError : new Error(message)
       } finally {
         setLoading(false)
       }
