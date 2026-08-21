@@ -26,6 +26,7 @@
     "beta:rollback": "node scripts/rollback-acceptance.mjs",
     "beta:onboarding": "node scripts/onboarding-acceptance.mjs",
     "beta:mcp": "node scripts/mcp-acceptance.mjs",
+    "beta:readiness": "node scripts/beta-readiness.mjs",
     "beta:evidence": "node scripts/aggregate-beta-evidence.mjs",
     "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict"
   },

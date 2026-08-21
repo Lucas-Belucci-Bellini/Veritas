@@ -397,3 +397,9 @@ No modo estrito, a ausência de `BETA_EVIDENCE_MANIFEST`, `BETA_RLS_REPORT`, `BE
 Os runners RLS, Realtime e Edge agora escrevem marcadores de proveniência em seus relatórios. O preflight estrito valida esses marcadores, além dos IDs em PASS: quatro contas descartáveis e `RLS_RUNNER_ALLOW_REAL=1` para RLS; `REALTIME_RUNNER_ALLOW_REAL=1`, `RT_REQUIRE_REAL=1` e sessões autenticadas para Realtime; `RLS_EDGE_REQUIRE_AUTHENTICATED=1` e JWT descartável para Edge.
 
 Relatórios `SAFE`, `SKIP`, `ANONYMOUS_ONLY`, sem marcador, com cenário faltante ou com qualquer cenário não-PASS não são aceitos como evidência de promoção. A mudança não cria contas nem acessa credenciais; ela apenas torna o preflight incapaz de confundir smoke local com aceitação cross-user real.
+
+## Atualização da implementação — doctor de prontidão beta real — 2026-08-21
+
+Foi criado `npm run beta:readiness`, um diagnóstico local e não destrutivo que verifica seis áreas: Supabase público, quatro contas RLS, Realtime cross-user, Edge autenticada, artefatos de evidência e janela de versão beta. O comando não abre sessões, não faz requests, não lê valores de credenciais e não executa runners reais.
+
+O relatório usa `READY`, `BLOCKED` e `SKIP`. No estado atual `v0.9.0-rc.1`, o ensaio local resultou em 0 READY, 5 BLOCKED e 1 SKIP, sem expor segredos. Isso é esperado: as credenciais descartáveis, tokens Realtime, JWT da Edge e artefatos reais ainda não foram fornecidos. O runbook está em `docs/BETA-READINESS-DOCTOR.md`; `READY` confirma apenas presença de configuração, nunca isolamento ou autorização.
