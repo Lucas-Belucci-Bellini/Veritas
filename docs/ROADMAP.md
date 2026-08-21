@@ -329,3 +329,9 @@ A Edge Function `veritas-circuit-ai` foi auditada no projeto Supabase existente 
 Foi criado o comando `npm run beta:edge`, com contrato puro testável para classificação de status, montagem de endpoint e redaction. O runner executa RLS-019 sempre; RLS-020 e RLS-021 exigem explicitamente `RLS_EDGE_REQUIRE_AUTHENTICATED=1` e um token de conta descartável fornecido por variável de ambiente. Sem isso, ficam `SKIP`, nunca `PASS`.
 
 A documentação registra o contrato implantado, o limite de payload, o fallback heurístico e o procedimento sanitizado. A promoção beta continua bloqueada até a análise autenticada e a tentativa de elevação RLS-021 serem executadas com uma conta descartável e UUIDs de outro usuário/projeto, além da matriz restante.
+
+## Atualização da implementação — agregador de evidências beta — 2026-08-21
+
+Foi criado o comando `npm run beta:evidence`, que combina relatórios sanitizados RLS, Edge Function e auditoria estrutural Supabase em `beta-evidence-manifest.json`. O agregador considera `PASS` somente quando todos os IDs esperados passam; `SKIP`, `PENDING`, `FAIL`, relatório ausente ou auditoria inválida deixam o gate `PENDING` e adicionam bloqueadores `openP1`. Falhas RLS explícitas e bypass de JWT são classificados como P0.
+
+A execução real usando o relatório da Edge confirmou `RLS-019 PASS`, `RLS-020 SKIP` e `RLS-021 SKIP`, e terminou com exit code 1, como esperado. O manifesto parcial não foi usado para liberar beta. Os gates ainda pendentes são a matriz cross-user completa, auditoria estrutural anexada nessa execução, Realtime, HDL, acessibilidade/mobile, rollback e onboarding.
