@@ -60,7 +60,7 @@ function guard(run: () => ToolResult) {
 }
 
 const server = new McpServer(
-  { name: 'veritas', version: '0.6.0' },
+  { name: 'veritas', version: '0.9.0-rc.1' },
   {
     instructions:
       'Motor de lógica booleana do Veritas. Use estas ferramentas em vez de calcular tabelas verdade ' +

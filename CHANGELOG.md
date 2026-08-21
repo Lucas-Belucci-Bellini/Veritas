@@ -2,6 +2,50 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.1] — 2026-08-21
+
+### Adicionado
+
+- Workspace sequencial observável com `Step`, `Run`/`Continue`, `Reset`, Watch e timeline limitada para documentos de algoritmo e circuitos.
+- Componentes sequenciais visuais `clock`, `dff`, `tff` e `delay`, com feedback permitido quando atravessa estado e rejeição de ciclos combinacionais puros.
+- Adaptador `CircuitDocument` → `Simulator` para simular documentos sequenciais arbitrários desenhados no canvas.
+- Checkpoint local-first do runtime temporal em `localStorage`, com restauração defensiva e degradação automática para memória quando o storage não está disponível.
+- Configuração editável de período de clock entre 1 e 64 tiques, persistida junto do checkpoint e sincronizada opcionalmente por Realtime.
+- Broadcast privado de `runtime_state` com estado do simulador, entradas, períodos, snapshot, timeline, hash, `baseVersion`, autor e timestamp.
+- Política de frescor para ofertas temporais: expiração após 30 segundos, tolerância de até 5 segundos no futuro e rejeição de timestamps inválidos.
+- Presence temporal, métricas locais de colaboração e histórico em memória dos últimos 12 eventos genéricos.
+- Revalidação da versão-base no momento da aplicação manual, bloqueio visual de ofertas obsoletas e confirmação de sucesso/falha sem substituição silenciosa do runtime local.
+
+### Alterado
+
+- O editor temporal mantém documento estrutural, configuração de clock e estado de execução como fontes de verdade separadas.
+- A aplicação de um estado remoto agora exige confirmação explícita e uma `baseVersion` ainda compatível com o documento atual.
+- Falhas de observabilidade e de colaboração continuam best-effort; o runtime local segue executável sem Supabase ou Realtime.
+- O pipeline de qualidade valida a suíte, typecheck, lint, build frontend, build MCP e smoke PWA antes da promoção da candidata.
+
+### Limitações conhecidas
+
+- A colaboração temporal usa Broadcast/Presence transitórios; o histórico remoto versionado continua sendo a fonte de verdade do documento.
+- O runtime temporal ainda é escalar e não oferece simulação sequencial vetorial, memória ou merge CRDT.
+- O MCP remoto por HTTP autenticado permanece no roadmap; o perfil publicado continua baseado em stdio local.
+- Tabela verdade, análise de IA e exportação HDL continuam bloqueadas para documentos com estado sequencial.
+- A candidata ainda requer validação operacional real de dois usuários, toolchains HDL, acessibilidade/mobile e rollback antes do beta definitivo.
+
+### Validação
+
+- 256 testes aprovados em 31 arquivos.
+- Typecheck frontend e MCP sem erros.
+- Lint sem warnings ou erros.
+- Build frontend/PWA e build MCP aprovados.
+- Smoke PWA remoto aprovado em `https://veritas-opal-seven.vercel.app`.
+- `git diff --check` aprovado.
+
+### Próximos passos
+
+- Executar os gates RC no workflow do GitHub e publicar a release `v0.9.0-rc.1`.
+- Validar RLS, isolamento Realtime, toolchains HDL, acessibilidade/mobile e rollback em ambiente controlado.
+- Continuar o ciclo v0.9.0 com os próximos requisitos sequenciais antes de promover uma versão estável.
+
 ## [0.8.0-rc.1] — 2026-08-15
 
 ### Adicionado

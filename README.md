@@ -31,7 +31,8 @@ com um resumo executivo em [`plano.md`](./plano.md).
 | v0.7.2 | Colaboração Realtime, exportação Verilog/VHDL e painel de métricas da IA |
 | v0.8.0-rc.1 | Barramentos multi-bit, tabela verdade vetorial, seleção de linhas e exportação HDL dimensionada |
 | v0.8.0 (prévia anterior) | ALGO-001 executor determinístico local-first e ALGO-002 Watch/BranchTrace |
-| v0.9.0 | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
+| v0.9.0-rc.1 | Workspace sequencial visual, checkpoints temporais, colaboração de runtime e proteção contra ofertas obsoletas |
+| v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
 ### Motor lógico
