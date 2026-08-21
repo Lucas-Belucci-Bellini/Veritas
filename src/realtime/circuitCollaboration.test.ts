@@ -150,6 +150,27 @@ describe('createCircuitCollaboration', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'user-2', roomId: 'alpha', baseVersion: 4, document }))
   })
 
+  it('ignora snapshot atrasado depois de aceitar uma versão mais nova', async () => {
+    const collaboration = createCircuitCollaboration('project-1', 'alpha')
+    const listener = vi.fn()
+    await collaboration.connect()
+    collaboration.onRemoteDocument(listener)
+
+    const broadcastCallback = fakeChannel.on.mock.calls.find(([kind, config]) => kind === 'broadcast' && config.event === 'circuit_snapshot')?.[2] as ((payload: { payload: unknown }) => void)
+    const basePayload = {
+      projectId: 'project-1',
+      roomId: 'alpha',
+      clientId: 'user-2',
+      document,
+      contentHash: 'hash',
+    }
+    broadcastCallback({ payload: { ...basePayload, baseVersion: 5, sentAt: '2026-08-21T00:00:05.000Z' } })
+    broadcastCallback({ payload: { ...basePayload, baseVersion: 4, sentAt: '2026-08-21T00:00:06.000Z', contentHash: 'stale' } })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ baseVersion: 5, contentHash: 'hash' }))
+  })
+
   it('impede viewer de transmitir configuração temporal', async () => {
     const collaboration = createCircuitCollaboration('project-1', 'alpha', 'viewer')
     await collaboration.connect()

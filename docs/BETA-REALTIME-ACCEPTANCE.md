@@ -53,6 +53,8 @@ Cada cenário deve ser executado com o tópico completo, canal privado, status d
 
 O runner também rejeita localmente nomes de eventos que não pertençam a `circuit_snapshot`, `runtime_config` ou `runtime_state`, sanitiza `Bearer`, `token`, `password` e `api_key`, e limita mensagens a 240 caracteres. Essas proteções reduzem vazamento no relatório, mas não substituem as policies PostgreSQL.
 
+Após a validação estrutural, cada sessão aplica uma ordenação determinística independente para `circuit_snapshot`, `runtime_config` e `runtime_state`: maior `baseVersion`, depois `sentAt`, depois `clientId` e, por fim, o hash. Duplicatas e eventos atrasados são descartados antes de alcançar a UI, e o estado de ordenação é reiniciado ao desconectar da sala. Isso protege a convergência local contra entregas fora de ordem, mas não substitui a autorização do Supabase nem prova convergência cross-user real.
+
 ## 4. Execução e relatório
 
 A execução segura padrão não abre sessões reais:
@@ -110,4 +112,6 @@ Qualquer bypass cross-user, viewer publicando, room inexistente assinável ou ev
 
 [3]: ../src/realtime/roomCollaboration.ts "Veritas — colaboração por sala e eventos temporais"
 
-[4]: ../supabase/migrations/20260821060000_allow_temporal_realtime_events.sql "Veritas — allowlist Realtime temporal"
+[4]: ../src/realtime/eventOrdering.ts "Veritas — ordenação determinística de eventos"
+
+[5]: ../supabase/migrations/20260821060000_allow_temporal_realtime_events.sql "Veritas — allowlist Realtime temporal"

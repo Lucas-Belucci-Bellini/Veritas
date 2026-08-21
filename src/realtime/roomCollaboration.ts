@@ -5,6 +5,7 @@ import type { DocumentRuntimeState } from '../simulation/documentRuntime'
 import { isRuntimeStateFresh } from './runtimeFreshness'
 import { buildCircuitContext } from '../circuit'
 import { supabase } from '../lib/supabase'
+import { createRealtimeOrderingState, reduceRealtimeEvent, type RealtimeEventKind } from './eventOrdering'
 
 export type RoomKind = 'document' | 'review' | 'chat'
 export type RoomRole = 'owner' | 'editor' | 'viewer'
@@ -89,10 +90,18 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
   let currentUser: User | null = null
   let connected = false
   let lastReceivedHash: string | null = null
+  let orderingState = createRealtimeOrderingState()
   const snapshotListeners = new Set<(message: RoomSnapshot) => void>()
   const runtimeConfigListeners = new Set<(message: RoomRuntimeConfig) => void>()
   const runtimeStateListeners = new Set<(message: RoomRuntimeState) => void>()
   const presenceListeners = new Set<(presence: RoomPresence[]) => void>()
+
+  const acceptEvent = (kind: RealtimeEventKind, baseVersion: number, sentAt: string, clientId: string, hash: string): boolean => {
+    const decision = reduceRealtimeEvent(orderingState, kind, { baseVersion, sentAt, clientId, hash })
+    if (!decision.accepted) return false
+    orderingState = decision.state
+    return true
+  }
 
   const notifyPresence = () => {
     if (!channel) return
@@ -118,17 +127,20 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
         .on('broadcast', { event: 'circuit_snapshot' }, (payload) => {
           const message = normalizeSnapshot(payload.payload, normalizedRoom)
           if (!message || message.clientId === currentUser?.id) return
+          if (!acceptEvent('snapshot', message.baseVersion, message.sentAt, message.clientId, message.contentHash)) return
           lastReceivedHash = message.contentHash
           snapshotListeners.forEach((listener) => listener(message))
         })
         .on('broadcast', { event: 'runtime_config' }, (payload) => {
           const message = normalizeRuntimeConfig(payload.payload, normalizedRoom)
           if (!message || message.clientId === currentUser?.id) return
+          if (!acceptEvent('runtime_config', message.baseVersion, message.sentAt, message.clientId, message.configHash)) return
           runtimeConfigListeners.forEach((listener) => listener(message))
         })
         .on('broadcast', { event: 'runtime_state' }, (payload) => {
           const message = normalizeRuntimeState(payload.payload, normalizedRoom)
           if (!message || message.clientId === currentUser?.id) return
+          if (!acceptEvent('runtime_state', message.baseVersion, message.sentAt, message.clientId, message.stateHash)) return
           runtimeStateListeners.forEach((listener) => listener(message))
         })
         .on('presence', { event: 'sync' }, notifyPresence)
@@ -155,6 +167,7 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
       connected = false
       currentUser = null
       lastReceivedHash = null
+      orderingState = createRealtimeOrderingState()
       snapshotListeners.clear()
       presenceListeners.clear()
       runtimeConfigListeners.clear()
@@ -170,6 +183,8 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
         lastReceivedHash = null
         return
       }
+      const sentAt = new Date().toISOString()
+      acceptEvent('snapshot', baseVersion, sentAt, currentUser.id, contentHash)
       await channel.send({
         type: 'broadcast',
         event: 'circuit_snapshot',
@@ -180,7 +195,7 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
           baseVersion,
           clientId: currentUser.id,
           document,
-          sentAt: new Date().toISOString(),
+          sentAt,
         },
       })
     },
@@ -191,6 +206,9 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
         throw new Error('A versão-base da configuração temporal precisa ser um inteiro não negativo.')
       }
       const normalizedPeriods = normalizeClockPeriods(clockPeriods)
+      const sentAt = new Date().toISOString()
+      const configHash = hashRuntimeConfig(normalizedPeriods)
+      acceptEvent('runtime_config', baseVersion, sentAt, currentUser.id, configHash)
       await channel.send({
         type: 'broadcast',
         event: 'runtime_config',
@@ -198,10 +216,10 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
           projectId: normalizedRoom.projectId,
           roomId: normalizedRoom.roomId,
           clockPeriods: normalizedPeriods,
-          configHash: hashRuntimeConfig(normalizedPeriods),
+          configHash,
           baseVersion,
           clientId: currentUser.id,
-          sentAt: new Date().toISOString(),
+          sentAt,
         },
       })
     },
@@ -212,6 +230,8 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
         throw new Error('A versão-base do estado temporal precisa ser um inteiro não negativo.')
       }
       const stateHash = hashRuntimeState(state)
+      const sentAt = new Date().toISOString()
+      acceptEvent('runtime_state', baseVersion, sentAt, currentUser.id, stateHash)
       await channel.send({
         type: 'broadcast',
         event: 'runtime_state',
@@ -222,7 +242,7 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
           stateHash,
           baseVersion,
           clientId: currentUser.id,
-          sentAt: new Date().toISOString(),
+          sentAt,
         },
       })
     },
@@ -296,7 +316,7 @@ function normalizeRoomRef(room: RoomRef): RoomRef {
 function normalizeRuntimeState(value: unknown, room: RoomRef): RoomRuntimeState | null {
   if (!isRecord(value)) return null
   if (value.projectId !== room.projectId || value.roomId !== room.roomId) return null
-  if (typeof value.clientId !== 'string' || typeof value.stateHash !== 'string' || typeof value.sentAt !== 'string') return null
+  if (typeof value.clientId !== 'string' || typeof value.stateHash !== 'string' || typeof value.sentAt !== 'string' || !isValidTimestamp(value.sentAt)) return null
   if (!isRuntimeStateFresh(value.sentAt)) return null
   if (!isNonNegativeInteger(value.baseVersion) || !isRuntimeState(value.state)) return null
   if (hashRuntimeState(value.state) !== value.stateHash) return null
@@ -341,7 +361,7 @@ function hashRuntimePayload(value: string): string {
 function normalizeRuntimeConfig(value: unknown, room: RoomRef): RoomRuntimeConfig | null {
   if (!isRecord(value)) return null
   if (value.projectId !== room.projectId || value.roomId !== room.roomId) return null
-  if (typeof value.clientId !== 'string' || typeof value.configHash !== 'string' || typeof value.sentAt !== 'string') return null
+  if (typeof value.clientId !== 'string' || typeof value.configHash !== 'string' || typeof value.sentAt !== 'string' || !isValidTimestamp(value.sentAt)) return null
   if (!isNonNegativeInteger(value.baseVersion) || !isRecord(value.clockPeriods)) return null
   const clockPeriods = normalizeClockPeriods(value.clockPeriods)
   if (Object.keys(clockPeriods).length !== Object.keys(value.clockPeriods).length) return null
@@ -375,7 +395,7 @@ function hashRuntimeConfig(clockPeriods: Readonly<Record<string, number>>): stri
 function normalizeSnapshot(value: unknown, room: RoomRef): RoomSnapshot | null {
   if (!isRecord(value)) return null
   if (value.projectId !== room.projectId || value.roomId !== room.roomId) return null
-  if (typeof value.clientId !== 'string' || typeof value.contentHash !== 'string' || typeof value.sentAt !== 'string') return null
+  if (typeof value.clientId !== 'string' || typeof value.contentHash !== 'string' || typeof value.sentAt !== 'string' || !isValidTimestamp(value.sentAt)) return null
   if (!isNonNegativeInteger(value.baseVersion) || !isCircuitDocument(value.document)) return null
   return {
     projectId: room.projectId,
@@ -419,6 +439,10 @@ function colorForUser(userId: string): string {
   let hash = 0
   for (const character of userId) hash = (hash * 31 + character.charCodeAt(0)) >>> 0
   return palette[hash % palette.length]
+}
+
+function isValidTimestamp(value: string): boolean {
+  return Number.isFinite(Date.parse(value))
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

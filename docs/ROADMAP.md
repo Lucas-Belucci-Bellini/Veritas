@@ -453,3 +453,9 @@ A política foi documentada em `docs/BETA-EVIDENCE-MANIFEST.md`. A permissão do
 A calculadora agora aproveita os offsets já fornecidos por `VeritasError` para exibir posição linha/coluna, trecho afetado e um marcador visual no campo de expressão. O formatter puro `src/engine/expressionErrorPresentation.ts` mantém a semântica do parser intacta, trata erros no fim da entrada e continua funcionando no modo local-first.
 
 O `ExpressionInput` associa o feedback ao campo com `aria-describedby`, mantém `aria-invalid` e anuncia o erro em uma região `role="alert"`. A mensagem original e a sugestão do parser continuam preservadas; o novo contexto não depende apenas de cor ou de hover. Foram adicionados testes para primeira linha, quebra de linha e EOF.
+
+## Atualização da implementação — ordenação determinística Realtime — 2026-08-21
+
+A colaboração Realtime passou a usar o contrato puro `src/realtime/eventOrdering.ts`. Cada sala mantém um último evento por tipo (`snapshot`, `runtime_config` e `runtime_state`) e aceita somente a ordem lexicográfica por `baseVersion`, timestamp ISO, `clientId` e hash. Duplicatas, eventos atrasados e desempates perdedores são descartados antes de notificar a UI; a ordenação é reiniciada ao desconectar.
+
+A validação estrutural agora rejeita timestamps inválidos, e os eventos locais entram no mesmo redutor antes do envio. Foram adicionados testes unitários para a ordem determinística e teste de integração com snapshots fora de ordem. O runbook `docs/BETA-REALTIME-ACCEPTANCE.md` registra o comportamento e sua limitação: isso protege convergência local, mas não substitui RLS/Realtime cross-user real nem prova autorização do Supabase.
