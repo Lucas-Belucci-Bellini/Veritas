@@ -55,3 +55,23 @@ describe('documentRuntime', () => {
     expect(simulator.read('ff')).toBe(false)
   })
 })
+
+
+describe('configuração temporal do documento', () => {
+  it('aplica override de período ao runtime sem alterar o documento', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'Clock configurável',
+      nodes: [{ id: 'clk', type: 'clock', position: { x: 0, y: 0 }, options: { period: 1 } }],
+      connections: [],
+    }
+    const simulator = createDocumentRuntime(document, { clockPeriods: { clk: 4 } })
+
+    simulator.tick(3)
+    expect(simulator.read('clk')).toBe(false)
+    simulator.tick()
+    expect(simulator.read('clk')).toBe(true)
+    expect(document.nodes[0].options?.period).toBe(1)
+  })
+})

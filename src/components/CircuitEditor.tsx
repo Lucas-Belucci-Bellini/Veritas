@@ -126,12 +126,23 @@ export function CircuitEditor() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [sequentialSnapshot, setSequentialSnapshot] = useState<DocumentRuntimeSnapshot | null>(null)
+  const [remoteClockPeriods, setRemoteClockPeriods] = useState<Record<string, number> | null>(null)
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
   const [collaboratorUserId, setCollaboratorUserId] = useState('')
   const [collaboratorRole, setCollaboratorRole] = useState<CollaboratorRole>('editor')
 
   const document = useMemo(() => ({ ...toDocument(nodes, edges), name: projectName.trim() || 'Circuito visual' }), [nodes, edges, projectName])
   if (!historyRef.current) historyRef.current = new CircuitHistory(document)
+  const applyRemoteRuntimeConfig = useCallback((message: { clockPeriods: Record<string, number>; baseVersion: number }) => {
+    const currentVersion = cloud.versions[0]?.versionNumber ?? 0
+    if (message.baseVersion !== currentVersion) {
+      setNotice(`Configuração temporal remota rejeitada: versão-base ${message.baseVersion} diverge da atual ${currentVersion}.`)
+      return
+    }
+    setRemoteClockPeriods({ ...message.clockPeriods })
+    setNotice('Configuração temporal remota recebida; runtime reiniciado sem alterar o documento.')
+  }, [cloud.versions])
+
   const applyRemoteDocument = useCallback((remoteDocument: CircuitDocument) => {
     if (validateCircuit(remoteDocument).length > 0) return
     historyRef.current?.replace(remoteDocument)
@@ -150,6 +161,7 @@ export function CircuitEditor() {
     baseVersion: collaborationBaseVersion,
     enabled: Boolean(user && cloudProjectId),
     onRemoteDocument: applyRemoteDocument,
+    onRemoteRuntimeConfig: applyRemoteRuntimeConfig,
   })
   useEffect(() => {
     if (historyRef.current?.commit(document)) setHistoryRevision((current) => current + 1)
@@ -267,10 +279,16 @@ export function CircuitEditor() {
     [hasBuses, hasSequential, nodes, selectedEvaluation, sequentialSnapshot],
   )
 
-  const { broadcast: broadcastRemote, status: collaborationStatus } = collaboration
+  const { broadcast: broadcastRemote, broadcastRuntimeConfig, status: collaborationStatus } = collaboration
   const readOnlyCollaboration = Boolean(user && collaborators.some((collaborator) => collaborator.userId === user.id && collaborator.role === 'viewer'))
   const canUndo = historyRevision >= 0 && (historyRef.current?.canUndo() ?? false)
   const canRedo = historyRevision >= 0 && (historyRef.current?.canRedo() ?? false)
+  const publishClockPeriods = useCallback((clockPeriods: Readonly<Record<string, number>>) => {
+    if (!user || !cloudProjectId || readOnlyCollaboration || collaborationStatus !== 'connected') return
+    void broadcastRuntimeConfig(clockPeriods, collaborationBaseVersion).catch(() => {
+      setNotice('Não foi possível transmitir a configuração temporal para a room atual.')
+    })
+  }, [broadcastRuntimeConfig, collaborationBaseVersion, collaborationStatus, cloudProjectId, readOnlyCollaboration, user])
 
   const restoreHistoryDocument = useCallback((nextDocument: CircuitDocument) => {
     const flow = fromDocument(nextDocument)
@@ -324,7 +342,12 @@ export function CircuitEditor() {
 
   useEffect(() => {
     setSequentialSnapshot(null)
+    setRemoteClockPeriods(null)
   }, [document])
+
+  useEffect(() => {
+    if (!user || !cloudProjectId) setRemoteClockPeriods(null)
+  }, [activeRoomId, cloudProjectId, user])
 
   useEffect(() => {
     if (collaborationStatus !== 'connected') return
@@ -782,7 +805,13 @@ export function CircuitEditor() {
       </div>
 
       {hasSequential && issues.length === 0 && (
-        <SequentialCircuitPanel document={document} onSnapshot={setSequentialSnapshot} />
+        <SequentialCircuitPanel
+          document={document}
+          requestedClockPeriods={remoteClockPeriods ?? undefined}
+          onSnapshot={setSequentialSnapshot}
+          onClockPeriodsChange={publishClockPeriods}
+          readOnly={readOnlyCollaboration}
+        />
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">

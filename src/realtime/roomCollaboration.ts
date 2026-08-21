@@ -33,11 +33,23 @@ export interface RoomSnapshot {
   sentAt: string
 }
 
+export interface RoomRuntimeConfig {
+  projectId: string
+  roomId: string
+  clockPeriods: Record<string, number>
+  configHash: string
+  baseVersion: number
+  clientId: string
+  sentAt: string
+}
+
 export interface RoomSession {
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   broadcast: (document: CircuitDocument, baseVersion: number) => Promise<void>
+  broadcastRuntimeConfig: (clockPeriods: Readonly<Record<string, number>>, baseVersion: number) => Promise<void>
   onSnapshot: (listener: (message: RoomSnapshot) => void) => () => void
+  onRuntimeConfig: (listener: (message: RoomRuntimeConfig) => void) => () => void
   onPresence: (listener: (presence: RoomPresence[]) => void) => () => void
   isConnected: () => boolean
   room: RoomRef
@@ -64,6 +76,7 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
   let connected = false
   let lastReceivedHash: string | null = null
   const snapshotListeners = new Set<(message: RoomSnapshot) => void>()
+  const runtimeConfigListeners = new Set<(message: RoomRuntimeConfig) => void>()
   const presenceListeners = new Set<(presence: RoomPresence[]) => void>()
 
   const notifyPresence = () => {
@@ -93,6 +106,11 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
           lastReceivedHash = message.contentHash
           snapshotListeners.forEach((listener) => listener(message))
         })
+        .on('broadcast', { event: 'runtime_config' }, (payload) => {
+          const message = normalizeRuntimeConfig(payload.payload, normalizedRoom)
+          if (!message || message.clientId === currentUser?.id) return
+          runtimeConfigListeners.forEach((listener) => listener(message))
+        })
         .on('presence', { event: 'sync' }, notifyPresence)
         .on('presence', { event: 'join' }, notifyPresence)
         .on('presence', { event: 'leave' }, notifyPresence)
@@ -119,6 +137,7 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
       lastReceivedHash = null
       snapshotListeners.clear()
       presenceListeners.clear()
+      runtimeConfigListeners.clear()
     },
     async broadcast(document, baseVersion) {
       if (!channel || !connected || !currentUser) return
@@ -144,9 +163,34 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
         },
       })
     },
+    async broadcastRuntimeConfig(clockPeriods, baseVersion) {
+      if (role === 'viewer') throw new Error('Visualizadores não podem publicar configuração temporal.')
+      if (!channel || !connected || !currentUser) return
+      if (!Number.isInteger(baseVersion) || baseVersion < 0) {
+        throw new Error('A versão-base da configuração temporal precisa ser um inteiro não negativo.')
+      }
+      const normalizedPeriods = normalizeClockPeriods(clockPeriods)
+      await channel.send({
+        type: 'broadcast',
+        event: 'runtime_config',
+        payload: {
+          projectId: normalizedRoom.projectId,
+          roomId: normalizedRoom.roomId,
+          clockPeriods: normalizedPeriods,
+          configHash: hashRuntimeConfig(normalizedPeriods),
+          baseVersion,
+          clientId: currentUser.id,
+          sentAt: new Date().toISOString(),
+        },
+      })
+    },
     onSnapshot(listener) {
       snapshotListeners.add(listener)
       return () => snapshotListeners.delete(listener)
+    },
+    onRuntimeConfig(listener) {
+      runtimeConfigListeners.add(listener)
+      return () => runtimeConfigListeners.delete(listener)
     },
     onPresence(listener) {
       presenceListeners.add(listener)
@@ -201,6 +245,40 @@ function normalizeRoomRef(room: RoomRef): RoomRef {
   if (!isSafeIdentifier(room.roomId, 64)) throw new Error('roomId inválido para colaboração.')
   if (!['document', 'review', 'chat'].includes(room.kind)) throw new Error('Tipo de sala inválido.')
   return { projectId: room.projectId, roomId: room.roomId, kind: room.kind }
+}
+
+function normalizeRuntimeConfig(value: unknown, room: RoomRef): RoomRuntimeConfig | null {
+  if (!isRecord(value)) return null
+  if (value.projectId !== room.projectId || value.roomId !== room.roomId) return null
+  if (typeof value.clientId !== 'string' || typeof value.configHash !== 'string' || typeof value.sentAt !== 'string') return null
+  if (!isNonNegativeInteger(value.baseVersion) || !isRecord(value.clockPeriods)) return null
+  const clockPeriods = normalizeClockPeriods(value.clockPeriods)
+  if (Object.keys(clockPeriods).length !== Object.keys(value.clockPeriods).length) return null
+  if (hashRuntimeConfig(clockPeriods) !== value.configHash) return null
+  return {
+    projectId: room.projectId,
+    roomId: room.roomId,
+    clockPeriods,
+    configHash: value.configHash,
+    baseVersion: value.baseVersion,
+    clientId: value.clientId,
+    sentAt: value.sentAt,
+  }
+}
+
+function normalizeClockPeriods(value: Record<string, unknown> | Readonly<Record<string, number>>): Record<string, number> {
+  const entries = Object.entries(value).filter(([id, period]) => isSafeIdentifier(id, 80) && typeof period === 'number' && Number.isInteger(period) && period >= 1 && period <= 64)
+  return Object.fromEntries(entries) as Record<string, number>
+}
+
+function hashRuntimeConfig(clockPeriods: Readonly<Record<string, number>>): string {
+  const canonical = JSON.stringify(Object.entries(clockPeriods).sort(([left], [right]) => left.localeCompare(right)))
+  let hash = 2166136261
+  for (let index = 0; index < canonical.length; index += 1) {
+    hash ^= canonical.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
 function normalizeSnapshot(value: unknown, room: RoomRef): RoomSnapshot | null {

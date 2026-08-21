@@ -240,3 +240,9 @@ O checkpoint inclui entradas, snapshot do simulador e os últimos 32 estados da 
 A quinta fatia do v0.9.0 permite alterar o período de cada componente `clock` diretamente no painel temporal, com opções de 1 a 64 tiques. A mudança não muta o documento visual: ela cria um runtime derivado, reinicia a execução e limpa a timeline anterior para que estados produzidos por cadências diferentes não sejam misturados.
 
 A configuração escolhida é persistida junto ao checkpoint do documento e restaurada na próxima abertura. Períodos inválidos são descartados pelo parser local; valores efetivos permanecem limitados ao intervalo seguro de 1 a 64 tiques. O próximo passo é levar essa configuração temporal para a colaboração opcional, preservando o documento canônico e tratando mudanças concorrentes explicitamente.
+
+## Atualização da implementação — configuração temporal em colaboração Realtime
+
+A sexta fatia do v0.9.0 adiciona o evento privado `runtime_config` ao tópico já isolado por projeto e room. O payload carrega apenas `clockPeriods`, `baseVersion`, `configHash`, `clientId` e timestamp; o documento canônico e a timeline não são transmitidos por esse evento.
+
+O cliente valida projeto, room, versão-base, identificadores, faixa de 1–64 tiques e hash canônico antes de aplicar uma configuração remota. Se a versão-base recebida divergir da versão remota atual, o editor rejeita explicitamente a mudança. Viewers não podem publicar configuração temporal; editors e owners podem transmitir apenas quando conectados à room autorizada. A aplicação remota reinicia somente o runtime local e não altera o documento do circuito.

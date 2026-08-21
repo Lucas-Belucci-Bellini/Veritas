@@ -55,6 +55,43 @@ describe('createCircuitCollaboration', () => {
     expect(collaboration.isConnected()).toBe(true)
   })
 
+  it('transmite configuração temporal com hash e versão-base', async () => {
+    const collaboration = createCircuitCollaboration('project-1', 'alpha')
+    await collaboration.connect()
+    await collaboration.broadcastRuntimeConfig({ clk: 4 }, 3)
+
+    expect(fakeChannel.send).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'broadcast',
+      event: 'runtime_config',
+      payload: expect.objectContaining({
+        projectId: 'project-1',
+        roomId: 'alpha',
+        clockPeriods: { clk: 4 },
+        baseVersion: 3,
+        configHash: expect.any(String),
+      }),
+    }))
+  })
+
+  it('valida configuração temporal recebida, isola a sala e ignora o próprio cliente', async () => {
+    const collaboration = createCircuitCollaboration('project-1', 'alpha')
+    const listener = vi.fn()
+    collaboration.onRemoteRuntimeConfig(listener)
+    await collaboration.connect()
+    await collaboration.broadcastRuntimeConfig({ clk: 2 }, 4)
+    const sentPayload = fakeChannel.send.mock.calls.find(([value]) => value.event === 'runtime_config')?.[0].payload
+    const broadcastCallback = fakeChannel.on.mock.calls.find(([kind, config]) => kind === 'broadcast' && config.event === 'runtime_config')?.[2] as ((payload: { payload: unknown }) => void)
+
+    broadcastCallback({ payload: { ...sentPayload, roomId: 'beta', clientId: 'user-2' } })
+    broadcastCallback({ payload: { ...sentPayload, clientId: 'user-2' } })
+    broadcastCallback({ payload: { ...sentPayload, clientId: 'user-1' } })
+    broadcastCallback({ payload: { ...sentPayload, clientId: 'user-2', clockPeriods: { clk: 0 } } })
+    broadcastCallback({ payload: { ...sentPayload, clientId: 'user-2', configHash: 'bad-hash' } })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ roomId: 'alpha', baseVersion: 4, clockPeriods: { clk: 2 } }))
+  })
+
   it('valida snapshots recebidos, isola a sala e ignora o próprio cliente', async () => {
     const collaboration = createCircuitCollaboration('project-1', 'alpha')
     const listener = vi.fn()
@@ -69,6 +106,14 @@ describe('createCircuitCollaboration', () => {
 
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'user-2', roomId: 'alpha', baseVersion: 4, document }))
+  })
+
+  it('impede viewer de transmitir configuração temporal', async () => {
+    const collaboration = createCircuitCollaboration('project-1', 'alpha', 'viewer')
+    await collaboration.connect()
+
+    await expect(collaboration.broadcastRuntimeConfig({ clk: 2 }, 1)).rejects.toThrow('Visualizadores')
+    expect(fakeChannel.send).not.toHaveBeenCalledWith(expect.objectContaining({ event: 'runtime_config' }))
   })
 
   it('desconecta e remove o canal ao sair do editor', async () => {
@@ -96,7 +141,9 @@ describe('ROOM-001', () => {
           connect: vi.fn().mockResolvedValue(undefined),
           disconnect: vi.fn().mockResolvedValue(undefined),
           broadcast: vi.fn().mockResolvedValue(undefined),
+          broadcastRuntimeConfig: vi.fn().mockResolvedValue(undefined),
           onSnapshot: vi.fn(() => () => undefined),
+          onRuntimeConfig: vi.fn(() => () => undefined),
           onPresence: vi.fn(() => () => undefined),
           isConnected: vi.fn(() => false),
         }

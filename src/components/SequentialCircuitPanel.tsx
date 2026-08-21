@@ -34,11 +34,15 @@ function signal(value: boolean): string {
 
 interface SequentialCircuitPanelProps {
   document: CircuitDocument
+  requestedClockPeriods?: Readonly<Record<string, number>>
+  readOnly?: boolean
   onSnapshot?: (snapshot: DocumentRuntimeSnapshot) => void
+  onClockPeriodsChange?: (clockPeriods: Readonly<Record<string, number>>) => void
 }
 
-export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircuitPanelProps) {
+export function SequentialCircuitPanel({ document, requestedClockPeriods, readOnly = false, onSnapshot, onClockPeriodsChange }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
+  const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
   const documentKey = useMemo(() => runtimeDocumentKey(document), [document])
   const [inputs, setInputs] = useState<Record<string, boolean>>({})
@@ -73,7 +77,8 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
     if (clearSaved) clearRuntimeCheckpoint(documentKey, storage)
     try {
       const saved = clearSaved ? null : readRuntimeCheckpoint(documentKey, storage)
-      const nextClockPeriods = overrideClockPeriods ?? saved?.clockPeriods ?? Object.fromEntries(clockIds.map((id) => [id, document.nodes.find((node) => node.id === id)?.options?.period ?? 1]))
+      const defaultClockPeriods = Object.fromEntries(clockIds.map((id) => [id, document.nodes.find((node) => node.id === id)?.options?.period ?? 1]))
+      const nextClockPeriods = { ...defaultClockPeriods, ...(saved?.clockPeriods ?? {}), ...(overrideClockPeriods ?? {}) }
       const simulator = createDocumentRuntime(document, { clockPeriods: nextClockPeriods })
       let restored = false
       if (saved) {
@@ -95,6 +100,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
       setTimeline(nextTimeline)
       setError('')
       setPersistenceStatus(restored ? 'checkpoint restaurado' : storage ? 'pronto para salvar localmente' : 'somente memória')
+      if (overrideClockPeriods) persist(simulator, nextInputs, nextClockPeriods, nextTimeline)
       onSnapshot?.(snapshot)
     } catch (cause) {
       simulatorRef.current = null
@@ -106,9 +112,23 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
 
   useEffect(() => {
     initializeRuntime(false)
+    appliedRemotePeriodsRef.current = null
     // O runtime deve reiniciar quando o documento visual mudar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentKey])
+
+  useEffect(() => {
+    if (!requestedClockPeriods) {
+      appliedRemotePeriodsRef.current = null
+      return
+    }
+    const signature = JSON.stringify(Object.entries(requestedClockPeriods).sort(([left], [right]) => left.localeCompare(right)))
+    if (signature === appliedRemotePeriodsRef.current) return
+    appliedRemotePeriodsRef.current = signature
+    initializeRuntime(true, { ...requestedClockPeriods })
+    // A configuração remota aprovada reinicia o runtime sem alterar o documento canônico.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedClockPeriods])
 
   function ensureSimulator(): Simulator | null {
     if (simulatorRef.current) return simulatorRef.current
@@ -174,6 +194,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
     const nextClockPeriods = { ...clockPeriods, [id]: Math.max(1, Math.min(64, Math.floor(period))) }
     setClockPeriods(nextClockPeriods)
     initializeRuntime(true, nextClockPeriods)
+    onClockPeriodsChange?.(nextClockPeriods)
   }
 
   const statusText = error ? 'erro' : current ? `tique ${current.tick}` : 'preparando'
@@ -199,7 +220,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
           {clockIds.map((id) => (
             <label key={id} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 dark:border-emerald-900 dark:bg-slate-900 dark:text-slate-200">
               {id}
-              <select value={clockPeriods[id] ?? 1} onChange={(event) => changeClockPeriod(id, Number(event.target.value))} className="rounded border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700" aria-label={`Período do clock ${id}`}>
+              <select value={clockPeriods[id] ?? 1} onChange={(event) => changeClockPeriod(id, Number(event.target.value))} disabled={readOnly} className="rounded border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700 disabled:cursor-not-allowed disabled:opacity-50" aria-label={`Período do clock ${id}`}>
                 {[1, 2, 3, 4, 8, 16, 32, 64].map((period) => <option key={period} value={period}>{period} tique{period === 1 ? '' : 's'}</option>)}
               </select>
             </label>
