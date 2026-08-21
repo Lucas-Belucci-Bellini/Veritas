@@ -487,3 +487,9 @@ O chunk inicial caiu de aproximadamente 565 kB para 456 kB após a primeira sepa
 Foi adicionado `WorkspaceBoundary` ao App para capturar falhas de carregamento dos módulos sob demanda. O usuário recebe uma mensagem em português, sem detalhes internos do bundle, e o botão `Tentar novamente` recarrega a aplicação para buscar os chunks novamente. O fallback usa `role="alert"` e `aria-live="assertive"`; o estado de carregamento continua em `role="status"`/`aria-live="polite"`.
 
 O boundary cobre ALGO-002, LogicCaseLab, SequentialWorkspace, CircuitEditor, ProjectsPanel e ChipLibrary. A calculadora principal continua fora dessa fronteira, e o modo local-first não depende do carregamento dos workspaces avançados.
+
+## Atualização da implementação — contrato de canais wireless — 2026-08-21
+
+Foi criado `src/circuit/wirelessChannels.ts` com normalização e resolução determinística de canais `transmitter`/`receiver`. A regra aceita um transmissor por canal, ordena receptores por `nodeId`, valida canal vazio, endpoint duplicado, receptor órfão e largura incompatível.
+
+Esta é uma fatia de domínio intencionalmente segura: ainda não adiciona tipos wireless ao documento persistido, ao canvas, ao avaliador ou aos exportadores. A próxima etapa deverá integrar esses tipos de forma coordenada para não aceitar parcialmente circuitos que a validação, o Realtime ou o HDL não consigam representar.

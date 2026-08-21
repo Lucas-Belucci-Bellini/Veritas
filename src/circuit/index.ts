@@ -33,3 +33,5 @@ export { buildCircuitIssueGuidance, summarizeCircuitIssues } from './validationF
 export type { CircuitIssueGuidance, CircuitValidationSummary } from './validationFeedback'
 export { decideRemoteCircuitUpdate } from './remoteConflict'
 export type { RemoteConflictAction, RemoteConflictDecision, RemoteConflictReason } from './remoteConflict'
+export { normalizeWirelessChannel, resolveWirelessChannels } from './wirelessChannels'
+export type { WirelessChannel, WirelessChannelIssue, WirelessChannelResolution, WirelessEndpoint, WirelessEndpointKind } from './wirelessChannels'
