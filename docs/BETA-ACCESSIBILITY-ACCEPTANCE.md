@@ -12,9 +12,9 @@ O gate é executado por `npm run beta:accessibility` e produz um relatório sani
 |---|---|---|
 | A11Y-001 | Landmarks | Existe skip link visível no foco, `main#main-content`, título `h1#app-title` e relação `aria-labelledby`. |
 | A11Y-002 | Teclado | Linhas da tabela verdade possuem foco, `aria-selected`, nome de linha e seleção por Enter/Espaço. |
-| A11Y-003 | Feedback | Avisos offline/PWA e o status do CircuitEditor usam `aria-live="polite"` e `aria-atomic="true"`. |
-| A11Y-004 | Mobile/PWA | O documento declara `lang="pt-BR"`, viewport responsivo e o canvas usa altura limitada por viewport com `min-height`. |
-| A11Y-005 | Regressão | O contrato A11Y passa em Vitest e mantém IDs, sanitização e resumo determinísticos. |
+| A11Y-003 | Feedback PWA | Avisos offline/PWA usam `aria-live="polite"` e `aria-atomic="true"`. |
+| A11Y-004 | Editor responsivo e feedback acessível | O documento declara `lang="pt-BR"`, viewport responsivo, o canvas usa altura limitada por viewport e `min-height`, o status de validação é anunciado e as orientações de correção são expostas em lista acessível. Os tooltips do editor têm gatilho focável, `aria-describedby`, `role="tooltip"` e visibilidade por foco. |
+| A11Y-005 | Regressão | Os contratos A11Y e `validationFeedback` passam em Vitest e mantêm IDs, sanitização, resumo e orientações determinísticos. |
 
 ## 2. Melhorias implementadas
 
@@ -22,7 +22,9 @@ O shell principal agora oferece “Pular para o conteúdo principal”, torna o 
 
 As linhas selecionáveis da tabela verdade continuam funcionando por clique e também por teclado. A seleção é anunciada com `aria-selected` e cada linha recebe um nome previsível. Os avisos de conectividade e atualização do service worker passaram a usar região viva educada, sem interromper a leitura do usuário.
 
-O CircuitEditor recebeu landmark para a paleta de componentes, nome para o canvas, status vivo e label explícito no UUID do colaborador. A altura do canvas usa `min-height` e limite relativo à viewport para evitar que o editor ocupe uma área desproporcional em telas móveis.
+O CircuitEditor recebeu landmark para a paleta de componentes, nome para o canvas, status vivo e label explícito no UUID do colaborador. A altura do canvas usa `min-height` e limite relativo à viewport para evitar que o editor ocupe uma área desproporcional em telas móveis. O bloco de validação agora anuncia o total de problemas, mostra ações de correção e identifica o componente afetado sem depender apenas de cor ou `title`.
+
+Os controles de largura, Clock e Delay usam `AccessibleTooltip`: o gatilho pode receber foco por teclado, possui nome acessível e referencia o texto explicativo com `aria-describedby`. A visibilidade por `group-focus-within` permite consultar a orientação sem mouse.
 
 ## 3. Execução local
 
@@ -37,7 +39,7 @@ ACCESSIBILITY_REPORT_PATH=artifacts/accessibility-acceptance-$(date +%Y%m%d-%H%M
 npm run beta:accessibility
 ```
 
-O workflow `.github/workflows/quality.yml` executa o mesmo comando em cada push e pull request para `main`, depois de testes, typecheck, lint, builds e gate HDL. A validação de viewport e de foco visual deve ser complementada por inspeção manual em Chromium desktop, Firefox desktop, WebKit/iOS ou Safari e viewport móvel antes da promoção beta definitiva.
+O workflow `.github/workflows/quality.yml` executa o mesmo comando em cada push e pull request para `main`, depois de testes, typecheck, lint, builds e gate HDL. A validação estrutural agora também protege o resumo de validação e o tooltip do editor. A confirmação de viewport, foco visual e leitura do tooltip deve ser complementada por inspeção manual em Chromium desktop, Firefox desktop, WebKit/iOS ou Safari e viewport móvel antes da promoção beta definitiva.
 
 ## 4. Manifesto beta
 
@@ -66,6 +68,10 @@ A promoção beta continua condicionada aos demais gates: matriz RLS cross-user 
 
 [3]: ../src/components/PwaStatus.tsx "Veritas — feedback offline e atualização PWA"
 
-[4]: ../src/components/CircuitEditor.tsx "Veritas — canvas responsivo e colaboração"
+[4]: ../src/components/CircuitEditor.tsx "Veritas — canvas responsivo, validação e colaboração"
 
-[5]: https://www.w3.org/WAI/standards-guidelines/wcag/ "W3C — Web Content Accessibility Guidelines"
+[5]: ../src/components/AccessibleTooltip.tsx "Veritas — tooltip acessível por foco"
+
+[6]: ../src/circuit/validationFeedback.ts "Veritas — orientações acionáveis de validação"
+
+[7]: https://www.w3.org/WAI/standards-guidelines/wcag/ "W3C — Web Content Accessibility Guidelines"

@@ -425,3 +425,11 @@ O editor visual agora transforma os códigos de `CircuitIssue` em orientações 
 Foi adicionado o componente `AccessibleTooltip`, que associa cada orientação a uma descrição acessível por foco e hover. Os controles de largura de sinal, período de Clock e tiques de Delay agora explicam seus efeitos sem depender somente do atributo `title`. O contrato `validationFeedback` possui testes determinísticos para todos os códigos de validação, circuito válido e resumo de múltiplos problemas.
 
 A suíte completa, typecheck, lint, build frontend/PWA, build MCP e smoke local passaram. A inspeção no build local confirmou a presença do resumo `Validação do circuito` e do tooltip acessível. A inspeção manual em navegadores móveis, leitor de tela e zoom continua parte do gate beta externo e não foi convertida em aprovação automática.
+
+## Atualização da implementação — gate A11Y para feedback e tooltips — 2026-08-21
+
+O runner `npm run beta:accessibility` foi fortalecido sem alterar os cinco IDs públicos A11Y-001 a A11Y-005. O cenário A11Y-004 agora verifica, além de viewport e canvas responsivo, o status vivo do CircuitEditor, o resumo `Validação do circuito`, a lista de orientações e o componente `AccessibleTooltip` com gatilho focável, `aria-describedby`, `role="tooltip"` e visibilidade por foco.
+
+O cenário A11Y-005 executa em conjunto os testes do contrato de acessibilidade e de `validationFeedback`, evitando que o novo feedback perca cobertura. O runbook `docs/BETA-ACCESSIBILITY-ACCEPTANCE.md` foi alinhado. A execução produziu 5 PASS, e a suíte completa permaneceu com 314 testes aprovados; typecheck, lint, build frontend/PWA e build MCP também passaram.
+
+Esse gate estrutural não substitui a inspeção manual com leitor de tela, navegadores móveis, zoom, rotação e dispositivo físico. A promoção beta continua bloqueada até essas evidências externas e os demais gates cross-user reais estarem completos.

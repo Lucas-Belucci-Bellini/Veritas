@@ -42,15 +42,15 @@ function checkIncludesAcross(id, operation, checks) {
 
 function runRegression() {
   try {
-    execFileSync('npm', ['test', '--', '--run', 'src/release/accessibilityAcceptanceContract.test.ts'], {
+    execFileSync('npm', ['test', '--', '--run', 'src/release/accessibilityAcceptanceContract.test.ts', 'src/circuit/validationFeedback.test.ts'], {
       cwd: process.cwd(),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: Number(process.env.ACCESSIBILITY_TEST_TIMEOUT_MS || 30000),
     })
-    return result('A11Y-005', 'PASS', 'regressão do contrato acessível', 'accessibilityAcceptanceContract.test.ts aprovado')
+    return result('A11Y-005', 'PASS', 'regressão dos contratos acessíveis', 'accessibilityAcceptanceContract.test.ts e validationFeedback.test.ts aprovados')
   } catch (error) {
-    return result('A11Y-005', 'FAIL', 'regressão do contrato acessível', [error?.stdout, error?.stderr, error?.message].filter(Boolean).join('\n'))
+    return result('A11Y-005', 'FAIL', 'regressão dos contratos acessíveis', [error?.stdout, error?.stderr, error?.message].filter(Boolean).join('\n'))
   }
 }
 
@@ -59,9 +59,23 @@ function main() {
     checkIncludes('A11Y-001', 'landmarks e skip link', 'src/App.tsx', ['Pular para o conteúdo principal', 'id="main-content"', 'aria-labelledby="app-title"']),
     checkIncludes('A11Y-002', 'tabela verdade por teclado', 'src/components/TruthTableView.tsx', ['tabIndex={0}', 'aria-selected=', "event.key === 'Enter'", "event.key === ' '"]),
     checkIncludes('A11Y-003', 'anúncios de status', 'src/components/PwaStatus.tsx', ['aria-live="polite"', 'aria-atomic="true"']),
-    checkIncludesAcross('A11Y-004', 'viewport e canvas responsivo', [
+    checkIncludesAcross('A11Y-004', 'viewport, canvas e feedback acessível', [
       ['index.html', ['lang="pt-BR"', 'name="viewport"', 'width=device-width']],
-      ['src/components/CircuitEditor.tsx', ['h-[min(420px,70vh)]', 'aria-label="Canvas de edição do circuito"']],
+      ['src/components/CircuitEditor.tsx', [
+        'h-[min(420px,70vh)]',
+        'aria-label="Canvas de edição do circuito"',
+        'role="status"',
+        'aria-live="polite"',
+        'aria-atomic="false"',
+        'Validação do circuito',
+        'aria-label="Orientações para corrigir o circuito"',
+      ]],
+      ['src/components/AccessibleTooltip.tsx', [
+        'tabIndex={0}',
+        'aria-describedby={tooltipId}',
+        'role="tooltip"',
+        'group-focus-within:opacity-100',
+      ]],
     ]),
   ]
   results.push(runRegression())
