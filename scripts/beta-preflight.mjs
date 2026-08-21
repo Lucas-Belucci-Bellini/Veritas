@@ -5,11 +5,13 @@ import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { validateBetaEvidenceManifest } from './betaEvidence.mjs'
 import { validateSupabaseStructuralAudit } from './supabaseStructuralAudit.mjs'
+import { requiredEvidenceFlags } from './betaPreflightContract.mjs'
 
 const root = resolve(new URL('..', import.meta.url).pathname)
 const failures = []
 const skips = []
 const passes = []
+const evidenceFlags = requiredEvidenceFlags(process.env)
 
 function envFlag(name) {
   return ['1', 'true', 'yes', 'on'].includes((process.env[name] ?? '').toLowerCase())
@@ -95,7 +97,7 @@ function checkCleanTree() {
 
 function checkEvidenceManifest() {
   const manifestPath = process.env.BETA_EVIDENCE_MANIFEST
-  const required = envFlag('BETA_PREFLIGHT_REQUIRE_EVIDENCE')
+  const required = evidenceFlags.evidenceManifest
   if (!manifestPath) {
     if (required) {
       failures.push('manifesto beta: BETA_EVIDENCE_MANIFEST não foi definido')
@@ -129,7 +131,7 @@ function checkEvidenceManifest() {
 
 function checkSupabaseStructuralAudit() {
   const reportPath = process.env.BETA_SUPABASE_STRUCTURAL_REPORT
-  const required = envFlag('BETA_PREFLIGHT_REQUIRE_SUPABASE_STRUCTURAL')
+  const required = evidenceFlags.supabaseStructural
   if (!reportPath) {
     if (required) {
       failures.push('auditoria estrutural Supabase: BETA_SUPABASE_STRUCTURAL_REPORT não foi definido')
@@ -162,7 +164,7 @@ function checkSupabaseStructuralAudit() {
 
 function checkRlsReport() {
   const reportPath = process.env.BETA_RLS_REPORT
-  const required = envFlag('BETA_PREFLIGHT_REQUIRE_RLS')
+  const required = evidenceFlags.rls
   if (!reportPath) {
     if (required) {
       failures.push('matriz RLS: BETA_RLS_REPORT não foi definido')
@@ -201,6 +203,7 @@ function checkRlsReport() {
 console.log('Veritas beta preflight')
 console.log(`Diretório: ${root}`)
 console.log(`Versão no package.json: ${readPackageVersion()}`)
+console.log(`Modo estrito beta: ${evidenceFlags.strict ? 'ativo' : 'inativo'}`)
 
 checkVersion()
 checkCleanTree()
@@ -219,11 +222,11 @@ run('build MCP', 'npm', ['run', 'build:mcp'])
 
 if (process.env.SMOKE_URL) {
   run('smoke externo/PWA', 'npm', ['run', 'smoke:release'], { env: { ...process.env, SMOKE_URL: process.env.SMOKE_URL } })
-} else if (envFlag('BETA_PREFLIGHT_REQUIRE_SMOKE')) {
+} else if (evidenceFlags.smoke) {
   failures.push('smoke externo/PWA: SMOKE_URL não foi definido')
   console.error('FAIL smoke externo/PWA: defina SMOKE_URL')
 } else {
-  recordSkip('smoke externo/PWA', 'defina SMOKE_URL; use BETA_PREFLIGHT_REQUIRE_SMOKE=1 para tornar obrigatório')
+  recordSkip('smoke externo/PWA', 'defina SMOKE_URL; use BETA_PREFLIGHT_REQUIRE_SMOKE=1 ou modo beta estrito para tornar obrigatório')
 }
 
 checkRlsReport()

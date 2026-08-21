@@ -385,3 +385,9 @@ Foi criado `npm run beta:mcp`, um runner de subprocesso que negocia `initialize`
 O gate foi integrado ao workflow de qualidade e ao agregador por `BETA_MCP_REPORT`. A documentação em `docs/BETA-MCP-ACCEPTANCE.md` explica a configuração stdio para Claude Code, Codex, Hermes, OpenClaw, Manus e outros clientes MCP locais, sem exigir API key. O contrato separa falhas de domínio, schema, protocolo, transporte e configuração do cliente.
 
 A aceitação prova interoperabilidade local do protocolo e das respostas, mas não substitui o teste de configuração visual em cada host, transporte remoto Streamable HTTP, autenticação remota ou teste de carga. O gate beta continua exigindo repetição da matriz por cliente quando uma integração específica for publicada.
+
+## Atualização da implementação — preflight beta estrito — 2026-08-21
+
+O validador formal `betaEvidence` agora inclui o gate `mcp` na lista obrigatória. O `beta-preflight` ganhou um contrato puro que ativa modo estrito com `BETA_PREFLIGHT_STRICT=1`, com `BETA_PREFLIGHT_REQUIRE_EVIDENCE=1` ou automaticamente para versões `*-beta.N`.
+
+No modo estrito, a ausência de `BETA_EVIDENCE_MANIFEST`, `BETA_RLS_REPORT`, `BETA_SUPABASE_STRUCTURAL_REPORT` ou `SMOKE_URL` é FAIL, não SKIP. O manifesto também precisa declarar RLS, Realtime, HDL, acessibilidade, mobile, rollback, onboarding e MCP como PASS com evidência não vazia e nenhum P0/P1 aberto. O ensaio sem essas variáveis bloqueou a promoção como esperado, preservando a política de não promover sem contas descartáveis e evidências cross-user reais.

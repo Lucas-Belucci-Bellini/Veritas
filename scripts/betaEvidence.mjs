@@ -6,6 +6,7 @@ export const REQUIRED_BETA_EVIDENCE_GATES = [
   'mobile',
   'rollback',
   'onboarding',
+  'mcp',
 ]
 
 function isRecord(value) {

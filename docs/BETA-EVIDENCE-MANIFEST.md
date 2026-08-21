@@ -45,3 +45,24 @@ BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural.json \
 SMOKE_URL=https://veritas-opal-seven.vercel.app \
 npm run beta:preflight
 ```
+
+## Preflight estrito para promoção beta
+
+O `beta-preflight` mantém um modo local permissivo para desenvolvimento, mas entra automaticamente em modo estrito quando `BETA_PREFLIGHT_STRICT=1`, quando `BETA_PREFLIGHT_REQUIRE_EVIDENCE=1` ou quando `BETA_EXPECTED_VERSION`/`GITHUB_REF_NAME` identifica uma versão `*-beta.N`. Nesse modo, não é permitido transformar ausência em `SKIP` para as evidências de promoção.
+
+O preflight estrito exige, no mínimo, `BETA_EVIDENCE_MANIFEST`, `BETA_RLS_REPORT`, `BETA_SUPABASE_STRUCTURAL_REPORT` e `SMOKE_URL`. O manifesto validado exige todos os gates formais, incluindo RLS, Realtime, HDL, acessibilidade, mobile, rollback, onboarding e MCP, com `PASS` explícito, evidência não vazia e `openP0`/`openP1` vazios. A matriz RLS precisa conter RLS-001 a RLS-022 aprovados; o agregador continua classificando sessões ausentes ou `SKIP` como bloqueadores.
+
+Exemplo de execução de promoção:
+
+```bash
+BETA_PREFLIGHT_STRICT=1 \
+BETA_EXPECTED_VERSION=0.9.0-beta.1 \
+BETA_EVIDENCE_MANIFEST=artifacts/beta-evidence-manifest.json \
+BETA_RLS_REPORT=artifacts/rls-acceptance.md \
+BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural.json \
+BETA_SUPABASE_PROJECT_ID=hcwzsxdcvmswebunznak \
+SMOKE_URL=https://veritas-opal-seven.vercel.app \
+npm run beta:preflight
+```
+
+A execução local sem essas variáveis continua útil para desenvolvimento e informa `SKIP`, mas não pode ser usada como prova de promoção. O ensaio de 2026-08-21 confirmou que o modo estrito bloqueia quando manifesto, RLS, auditoria Supabase ou smoke não estão disponíveis.

@@ -37,4 +37,11 @@ describe('validateBetaEvidenceManifest', () => {
     const errors = validateBetaEvidenceManifest({ ...validManifest, gates }, '0.9.0-rc.1')
     expect(errors).toContain('gate rollback não foi declarado')
   })
+
+  it('rejeita manifesto sem o gate MCP obrigatório', () => {
+    const gates = { ...validManifest.gates }
+    delete gates.mcp
+    const errors = validateBetaEvidenceManifest({ ...validManifest, gates }, '0.9.0-rc.1')
+    expect(errors).toContain('gate mcp não foi declarado')
+  })
 })
