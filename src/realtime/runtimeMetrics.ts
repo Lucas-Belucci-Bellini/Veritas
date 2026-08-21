@@ -15,6 +15,7 @@ export interface RuntimeMetrics {
   invalidOrStale: number
   published: number
   publishFailures: number
+  applyFailures: number
   events: RuntimeEvent[]
 }
 
@@ -26,6 +27,7 @@ export type RuntimeMetricEvent =
   | 'invalid-or-stale'
   | 'published'
   | 'publish-failure'
+  | 'apply-failure'
 
 export const EMPTY_RUNTIME_METRICS: RuntimeMetrics = {
   received: 0,
@@ -35,6 +37,7 @@ export const EMPTY_RUNTIME_METRICS: RuntimeMetrics = {
   invalidOrStale: 0,
   published: 0,
   publishFailures: 0,
+  applyFailures: 0,
   events: [],
 }
 
@@ -46,6 +49,7 @@ const EVENT_MESSAGES: Record<RuntimeMetricEvent, string> = {
   'invalid-or-stale': 'oferta inválida ou antiga rejeitada',
   published: 'estado temporal publicado',
   'publish-failure': 'falha ao publicar estado temporal',
+  'apply-failure': 'falha ao aplicar estado temporal',
 }
 
 export function recordRuntimeMetric(metrics: RuntimeMetrics, event: RuntimeMetricEvent, at = new Date().toISOString()): RuntimeMetrics {
@@ -71,6 +75,9 @@ export function recordRuntimeMetric(metrics: RuntimeMetrics, event: RuntimeMetri
       break
     case 'publish-failure':
       next.publishFailures += 1
+      break
+    case 'apply-failure':
+      next.applyFailures += 1
       break
   }
   next.events = [

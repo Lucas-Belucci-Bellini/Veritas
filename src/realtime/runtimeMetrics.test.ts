@@ -4,7 +4,7 @@ import { EMPTY_RUNTIME_METRICS, recordRuntimeMetric } from './runtimeMetrics'
 describe('runtimeMetrics', () => {
   it('registra todos os eventos sem mutar o estado anterior', () => {
     const before = { ...EMPTY_RUNTIME_METRICS }
-    const after = ['received', 'applied', 'version-conflict', 'expired', 'invalid-or-stale', 'published', 'publish-failure']
+    const after = ['received', 'applied', 'version-conflict', 'expired', 'invalid-or-stale', 'published', 'publish-failure', 'apply-failure']
       .reduce((metrics, event, index) => recordRuntimeMetric(metrics, event as Parameters<typeof recordRuntimeMetric>[1], `2026-08-21T01:4${index}:00.000Z`), before)
 
     expect(after).toEqual({
@@ -15,9 +15,11 @@ describe('runtimeMetrics', () => {
       invalidOrStale: 1,
       published: 1,
       publishFailures: 1,
+      applyFailures: 1,
       events: expect.arrayContaining([
         expect.objectContaining({ id: 1, type: 'received', message: 'estado remoto recebido' }),
         expect.objectContaining({ id: 7, type: 'publish-failure', message: 'falha ao publicar estado temporal' }),
+        expect.objectContaining({ id: 8, type: 'apply-failure', message: 'falha ao aplicar estado temporal' }),
       ]),
     })
     expect(before).toEqual(EMPTY_RUNTIME_METRICS)

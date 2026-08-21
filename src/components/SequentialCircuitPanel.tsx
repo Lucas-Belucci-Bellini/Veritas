@@ -11,6 +11,7 @@ import {
 } from '../simulation/documentRuntime'
 import { Simulator } from '../simulation/simulator'
 import { runtimeFreshness } from '../realtime/runtimeFreshness'
+import { runtimeOfferDecision } from '../realtime/runtimeOffer'
 import type { RuntimeMetrics } from '../realtime/runtimeMetrics'
 import {
   clearRuntimeCheckpoint,
@@ -57,6 +58,8 @@ interface SequentialCircuitPanelProps {
   requestedRuntimeState?: DocumentRuntimeState
   requestedRuntimeStateSentAt?: string
   requestedRuntimeStateClientId?: string
+  requestedRuntimeStateBaseVersion?: number
+  currentBaseVersion?: number
   temporalPresenceCount?: number
   temporalConnectionStatus?: string
   runtimeMetrics?: RuntimeMetrics
@@ -65,9 +68,11 @@ interface SequentialCircuitPanelProps {
   onClockPeriodsChange?: (clockPeriods: Readonly<Record<string, number>>) => void
   onRuntimeStateChange?: (state: DocumentRuntimeState) => void
   onRuntimeStateApplied?: () => void
+  onRuntimeStateStale?: () => void
+  onRuntimeStateApplyFailed?: () => void
 }
 
-export function SequentialCircuitPanel({ document, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied }: SequentialCircuitPanelProps) {
+export function SequentialCircuitPanel({ document, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
@@ -203,6 +208,12 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
   }
 
   function applyRemoteRuntimeState(state: DocumentRuntimeState): void {
+    if (requestedRuntimeStateBaseVersion === undefined || currentBaseVersion === undefined || runtimeOfferDecision(requestedRuntimeStateBaseVersion, currentBaseVersion) === 'stale') {
+      setPersistenceStatus('oferta obsoleta')
+      setError('A versão-base da oferta remota não é mais atual. Receba um novo estado antes de aplicar.')
+      onRuntimeStateStale?.()
+      return
+    }
     try {
       const simulator = createDocumentRuntime(document, { clockPeriods: state.clockPeriods })
       simulator.restoreState(state.simulator)
@@ -217,6 +228,8 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       onSnapshot?.(snapshot)
       onRuntimeStateApplied?.()
     } catch (cause) {
+      setPersistenceStatus('falha ao aplicar')
+      onRuntimeStateApplyFailed?.()
       setError(cause instanceof Error ? cause.message : 'Não foi possível aplicar o estado remoto.')
     }
   }
@@ -249,6 +262,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
   const statusText = error ? 'erro' : current ? `tique ${current.tick}` : 'preparando'
   const remoteStateTick = requestedRuntimeState?.snapshot.tick
   const remoteStateAge = requestedRuntimeStateSentAt ? runtimeFreshness(requestedRuntimeStateSentAt)?.ageMs ?? null : null
+  const remoteStateIsCurrent = requestedRuntimeStateBaseVersion !== undefined && currentBaseVersion !== undefined && runtimeOfferDecision(requestedRuntimeStateBaseVersion, currentBaseVersion) === 'current'
   const presenceText = temporalConnectionStatus === 'connected' ? `${temporalPresenceCount} participante${temporalPresenceCount === 1 ? '' : 's'} online` : 'colaboração temporal desconectada'
 
   return (
@@ -285,7 +299,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       {requestedRuntimeState && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100" role="status">
           <span>Estado remoto disponível no tique {remoteStateTick ?? 0}{requestedRuntimeStateClientId ? `, enviado por ${requestedRuntimeStateClientId.slice(0, 8)}` : ''}{remoteStateAge !== null ? ` há ${Math.max(0, Math.round(remoteStateAge / 1000))}s` : ''}; o runtime local não foi substituído.</span>
-          <button type="button" className="key text-xs" onClick={() => applyRemoteRuntimeState(requestedRuntimeState)}>Aplicar estado remoto</button>
+          <button type="button" className="key text-xs" onClick={() => applyRemoteRuntimeState(requestedRuntimeState)} disabled={!remoteStateIsCurrent}>Aplicar estado remoto</button>
         </div>
       )}
 

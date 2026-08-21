@@ -270,3 +270,11 @@ As métricas são somente de sessão e não enviam documento, inputs, estado int
 A décima fatia do v0.9.0 transforma os contadores temporais em um histórico local dos últimos 12 eventos. Cada registro contém apenas horário, tipo e mensagem genérica: recebimento, aplicação, conflito, expiração/rejeição, publicação ou falha. O histórico é imutável por reducer, limitado em memória e reiniciado ao trocar documento ou room.
 
 A UI oferece uma lista recolhível junto dos contadores, permitindo diagnosticar o fluxo sem enviar conteúdo de circuito, inputs, timeline, IDs de projeto ou estado interno para telemetria. O histórico é informativo e nunca se torna requisito para executar, salvar ou colaborar localmente.
+
+## Atualização da implementação — confirmação e proteção de ofertas temporais — 2026-08-21
+
+A décima-primeira fatia do v0.9.0 fecha o fluxo de aplicação manual do `runtime_state`. Cada oferta remota mantém sua `baseVersion` e o painel compara essa versão com a versão estrutural atual no momento da aplicação, não apenas no recebimento. Se houver divergência, o botão fica desabilitado, a oferta é descartada e o usuário recebe a orientação para aguardar um novo estado.
+
+Quando a restauração do `Simulator`, do snapshot e do checkpoint local termina, a interface mostra confirmação explícita de sucesso e limpa a oferta pendente. Exceções durante a restauração produzem uma mensagem de erro sem interromper o runtime local. O reducer de métricas diferencia aplicação concluída, conflito de versão e falha de aplicação; nenhuma dessas métricas envia conteúdo do circuito ou estado temporal para telemetria.
+
+A decisão de versão foi isolada em `src/realtime/runtimeOffer.ts` e coberta por teste unitário. A suíte completa passou com 31 arquivos e 256 testes, seguida por typecheck, lint, build do frontend, build do MCP, `git diff --check` e smoke público do PWA.

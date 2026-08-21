@@ -870,6 +870,8 @@ export function CircuitEditor() {
           requestedRuntimeState={remoteRuntimeState?.state}
           requestedRuntimeStateSentAt={remoteRuntimeState?.sentAt}
           requestedRuntimeStateClientId={remoteRuntimeState?.clientId}
+          requestedRuntimeStateBaseVersion={remoteRuntimeState?.baseVersion}
+          currentBaseVersion={collaborationBaseVersion}
           temporalPresenceCount={collaboration.participants.length}
           temporalConnectionStatus={collaborationStatus}
           runtimeMetrics={runtimeMetrics}
@@ -879,6 +881,16 @@ export function CircuitEditor() {
           onRuntimeStateApplied={() => {
             recordRuntimeEvent('applied')
             setRemoteRuntimeState(null)
+            setNotice('Estado temporal remoto aplicado com sucesso ao runtime local.')
+          }}
+          onRuntimeStateStale={() => {
+            recordRuntimeEvent('version-conflict')
+            setRemoteRuntimeState(null)
+            setNotice('Estado temporal remoto obsoleto; receba uma nova oferta antes de aplicar.')
+          }}
+          onRuntimeStateApplyFailed={() => {
+            recordRuntimeEvent('apply-failure')
+            setNotice('A oferta foi recebida, mas não pôde ser aplicada ao documento atual.')
           }}
           readOnly={readOnlyCollaboration}
         />
