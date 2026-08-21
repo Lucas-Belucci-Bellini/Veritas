@@ -377,3 +377,11 @@ O Veritas agora apresenta um guia de primeiros passos no App, em português, com
 Foi criado `docs/ONBOARDING.md` com o fluxo externo completo, checklist de conclusão, solução de problemas, limites beta e orientações para não compartilhar tokens ou dados privados. O README aponta para esse guia. O modo local-first continua sendo o caminho de entrada; autenticação, IA, sincronização e colaboração são explicitamente opcionais.
 
 O novo `npm run beta:onboarding` executa ONB-001 (tutorial no app), ONB-002 (link no README), ONB-003 (guia cobre IndexedDB/rollback/limites) e ONB-004 (confirmação externa). Os três primeiros passaram; ONB-004 permanece `SKIP` por padrão e só pode virar PASS quando uma pessoa externa concluir o checklist com `ONBOARDING_EXTERNAL_PASS=1`. O agregador beta consome `BETA_ONBOARDING_REPORT`, mantendo `ONBOARDING-EVIDENCE-INCOMPLETE` em `openP1` enquanto a confirmação humana não existir.
+
+## Atualização da implementação — interoperabilidade MCP por stdio — 2026-08-21
+
+Foi criado `npm run beta:mcp`, um runner de subprocesso que negocia `initialize`, verifica `tools/list`, chama vetores golden de `truth_table`, `logic_case` e `propositional_truth_table`, valida erro controlado e confirma que stdout contém somente respostas JSON-RPC 2.0. Os seis cenários MCP-001 a MCP-006 passaram no servidor compilado.
+
+O gate foi integrado ao workflow de qualidade e ao agregador por `BETA_MCP_REPORT`. A documentação em `docs/BETA-MCP-ACCEPTANCE.md` explica a configuração stdio para Claude Code, Codex, Hermes, OpenClaw, Manus e outros clientes MCP locais, sem exigir API key. O contrato separa falhas de domínio, schema, protocolo, transporte e configuração do cliente.
+
+A aceitação prova interoperabilidade local do protocolo e das respostas, mas não substitui o teste de configuração visual em cada host, transporte remoto Streamable HTTP, autenticação remota ou teste de carga. O gate beta continua exigindo repetição da matriz por cliente quando uma integração específica for publicada.

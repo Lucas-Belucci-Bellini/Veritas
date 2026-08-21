@@ -31,6 +31,7 @@ const manifest = aggregateBetaEvidence({
   accessibilityReport: readOptional(process.env.BETA_ACCESSIBILITY_REPORT),
   rollbackReport: readOptional(process.env.BETA_ROLLBACK_REPORT),
   onboardingReport: readOptional(process.env.BETA_ONBOARDING_REPORT),
+  mcpReport: readOptional(process.env.BETA_MCP_REPORT),
   structuralReport: readJsonOptional(process.env.BETA_SUPABASE_STRUCTURAL_REPORT),
   structuralProjectId: process.env.BETA_SUPABASE_PROJECT_ID || '',
   evidencePaths: {
@@ -41,6 +42,7 @@ const manifest = aggregateBetaEvidence({
     accessibility: process.env.BETA_ACCESSIBILITY_REPORT || '',
     rollback: process.env.BETA_ROLLBACK_REPORT || '',
     onboarding: process.env.BETA_ONBOARDING_REPORT || '',
+    mcp: process.env.BETA_MCP_REPORT || '',
     supabaseStructural: process.env.BETA_SUPABASE_STRUCTURAL_REPORT || '',
   },
 })

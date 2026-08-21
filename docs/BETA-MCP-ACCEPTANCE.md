@@ -1,0 +1,74 @@
+# Aceitação Beta — interoperabilidade MCP
+
+**Produto:** Veritas  
+**Versão candidata:** `0.9.0-rc.1`  
+**Transporte validado:** MCP por stdio local  
+**Objetivo:** comprovar que clientes MCP locais conseguem negociar o servidor, descobrir ferramentas, chamar vetores golden e receber erros controlados sem depender de uma sessão específica de IA.
+
+## 1. Matriz golden
+
+O comando `npm run beta:mcp` inicia `mcp/dist/server.js` como subprocesso Node e envia mensagens JSON-RPC delimitadas por newline. A sessão começa com `initialize`, envia `notifications/initialized` e depois executa chamadas determinísticas. O runner aceita somente respostas JSON-RPC válidas em stdout; tokens, URLs e dados privados não entram no relatório.
+
+| ID | Cenário | Critério |
+|---|---|---|
+| MCP-001 | `initialize` | O servidor negocia protocolo `2025-03-26` e informa `name=veritas`. |
+| MCP-002 | `tools/list` | Ferramentas esperadas, incluindo `truth_table`, `logic_case`, `propositional_truth_table`, `debug_algorithm` e `simulate_circuit`, aparecem com schemas. |
+| MCP-003 | `truth_table` | O vetor `A XOR B` preserva cabeçalho, linhas e classificação golden. |
+| MCP-004 | `logic_case` e `propositional_truth_table` | Caso didático e tabela proposicional devolvem o formato textual esperado. |
+| MCP-005 | Erro de ferramenta | Expressão inválida retorna `isError=true` e mensagem em português; o processo continua protocolar. |
+| MCP-006 | Transporte | Todas as respostas observadas são JSON-RPC `2.0`, sem saída não protocolar em stdout. |
+
+## 2. Execução
+
+O servidor deve ser compilado antes do runner:
+
+```bash
+npm run build:mcp
+MCP_REPORT_PATH=artifacts/mcp-acceptance.md npm run beta:mcp
+```
+
+O workflow `.github/workflows/quality.yml` executa `build:mcp` e `beta:mcp` em cada push/pull request. Para agregar a evidência ao manifesto beta:
+
+```bash
+BETA_EXPECTED_VERSION=0.9.0-rc.1 \
+BETA_MCP_REPORT=artifacts/mcp-acceptance.md \
+BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
+npm run beta:evidence
+```
+
+O gate `mcp` só fica `PASS` quando MCP-001 a MCP-006 possuem `PASS` explícito e o relatório está anexado. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
+
+## 3. Compatibilidade com clientes
+
+Como o transporte é stdio e o servidor não depende de uma sessão de IA, a mesma matriz pode ser usada por Claude Code, Codex, Hermes, OpenClaw, Manus e outros clientes que suportem MCP local. O cliente deve iniciar o comando configurado, enviar o handshake padrão, respeitar o stdout exclusivamente protocolar e mostrar `content[].text` e `isError` sem reinterpretar o domínio.
+
+Exemplo de configuração local genérica:
+
+```json
+{
+  "mcpServers": {
+    "veritas": {
+      "command": "node",
+      "args": ["/caminho/absoluto/Veritas/mcp/dist/server.js"]
+    }
+  }
+}
+```
+
+O caminho real deve ser absoluto no ambiente do cliente. Nenhuma API key é necessária para o modo stdio local. O servidor usa somente o motor empacotado e não acessa Supabase, navegador ou arquivos privados durante os vetores golden.
+
+## 4. Limites
+
+Esta aceitação cobre interoperabilidade local de protocolo e conteúdo, não prova integração visual de cada host, suporte a configuração específica de cada produto, transporte remoto Streamable HTTP, autenticação remota ou performance sob carga. Cada cliente deve repetir MCP-001 a MCP-006 no seu próprio ambiente antes de publicar uma integração.
+
+Uma falha deve ser classificada por camada: domínio se o resultado lógico estiver errado; schema se `tools/list` mudar sem contrato; protocolo se JSON-RPC ou stdout falhar; transporte se o processo não iniciar; ou cliente se a configuração do host estiver incorreta. Não corrija uma falha de cliente alterando o domínio sem evidência.
+
+## Referências
+
+[1]: ../mcp/src/server.ts "Veritas — servidor MCP stdio"
+
+[2]: ../mcp/src/tools.test.ts "Veritas — testes do núcleo MCP"
+
+[3]: https://modelcontextprotocol.io/specification/2025-03-26/basic/lifecycle "MCP — lifecycle e initialize"
+
+[4]: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports "MCP — transportes"

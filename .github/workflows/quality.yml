@@ -49,6 +49,9 @@ jobs:
       - name: Build MCP bundle
         run: npm run build:mcp
 
+      - name: MCP interoperability acceptance
+        run: npm run beta:mcp
+
       - name: HDL acceptance
         env:
           HDL_REQUIRE_TOOLCHAINS: '1'

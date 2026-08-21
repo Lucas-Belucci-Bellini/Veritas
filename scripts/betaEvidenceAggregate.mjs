@@ -8,7 +8,7 @@ function isRecord(value) {
 }
 
 function parseStatusLine(line) {
-  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021|RT-\d{3}|HDL-\d{3}|A11Y-\d{3}|RB-\d{3}|ONB-\d{3})\s+(PASS|FAIL|SKIP|PENDING)\b/i)
+  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021|RT-\d{3}|HDL-\d{3}|A11Y-\d{3}|RB-\d{3}|ONB-\d{3}|MCP-\d{3})\s+(PASS|FAIL|SKIP|PENDING)\b/i)
   return match ? { id: match[1], status: match[2].toUpperCase() } : null
 }
 
@@ -45,6 +45,7 @@ export function aggregateBetaEvidence({
   accessibilityReport = '',
   rollbackReport = '',
   onboardingReport = '',
+  mcpReport = '',
   structuralReport = null,
   structuralProjectId = '',
   evidencePaths = {},
@@ -56,6 +57,7 @@ export function aggregateBetaEvidence({
   const accessibilityStatuses = parseEvidenceReport(accessibilityReport)
   const rollbackStatuses = parseEvidenceReport(rollbackReport)
   const onboardingStatuses = parseEvidenceReport(onboardingReport)
+  const mcpStatuses = parseEvidenceReport(mcpReport)
   const openP0 = []
   const openP1 = []
   const gates = {}
@@ -89,6 +91,10 @@ export function aggregateBetaEvidence({
   const onboardingIds = ['ONB-001', 'ONB-002', 'ONB-003', 'ONB-004']
   gates.onboarding = gateFromStatuses(onboardingStatuses, onboardingIds, evidencePaths.onboarding ?? '')
   addBlocker(openP1, 'ONBOARDING-EVIDENCE-INCOMPLETE', gates.onboarding)
+
+  const mcpIds = ['MCP-001', 'MCP-002', 'MCP-003', 'MCP-004', 'MCP-005', 'MCP-006']
+  gates.mcp = gateFromStatuses(mcpStatuses, mcpIds, evidencePaths.mcp ?? '')
+  addBlocker(openP1, 'MCP-EVIDENCE-INCOMPLETE', gates.mcp)
 
   const structuralErrors = structuralReport
     ? validateSupabaseStructuralAudit(structuralReport, structuralProjectId)
