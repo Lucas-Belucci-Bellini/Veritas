@@ -335,3 +335,13 @@ A documentação registra o contrato implantado, o limite de payload, o fallback
 Foi criado o comando `npm run beta:evidence`, que combina relatórios sanitizados RLS, Edge Function e auditoria estrutural Supabase em `beta-evidence-manifest.json`. O agregador considera `PASS` somente quando todos os IDs esperados passam; `SKIP`, `PENDING`, `FAIL`, relatório ausente ou auditoria inválida deixam o gate `PENDING` e adicionam bloqueadores `openP1`. Falhas RLS explícitas e bypass de JWT são classificados como P0.
 
 A execução real usando o relatório da Edge confirmou `RLS-019 PASS`, `RLS-020 SKIP` e `RLS-021 SKIP`, e terminou com exit code 1, como esperado. O manifesto parcial não foi usado para liberar beta. Os gates ainda pendentes são a matriz cross-user completa, auditoria estrutural anexada nessa execução, Realtime, HDL, acessibilidade/mobile, rollback e onboarding.
+
+## Atualização da implementação — autorização Realtime temporal e runner de aceitação — 2026-08-21
+
+A auditoria da colaboração temporal encontrou uma lacuna: `src/realtime/roomCollaboration.ts` já emitia `runtime_config` e `runtime_state`, mas as policies ROOM-001 permitiam apenas `circuit_snapshot`. A migration `20260821060000_allow_temporal_realtime_events.sql` corrige a allowlist de leitura e escrita para `circuit_snapshot`, `runtime_config` e `runtime_state`. Presence continua disponível somente para colaboradores, enquanto todos os eventos Broadcast exigem `private.veritas_can_edit_project(project_id)`, impedindo publicação por viewer.
+
+As migrations `20260815000000_room_001_multi_room_conflict.sql` e `20260821033000_harden_veritas_authorization_surface.sql` foram alinhadas para manter o mesmo contrato em instalações reproduzíveis. O contrato puro `scripts/realtimeAcceptanceContract.mjs` e a declaração TypeScript correspondente expõem a allowlist, os IDs `RT-001` a `RT-005`, a classificação de status bloqueados, a sanitização de mensagens e a montagem do tópico privado.
+
+Foi adicionado `npm run beta:realtime`. O runner exige `REALTIME_RUNNER_ALLOW_REAL=1` antes de abrir sessões e, no modo obrigatório, `RT_REQUIRE_REAL=1`. Os cinco cenários cobrem Presence do owner, `runtime_config` editor→owner, bloqueio de `runtime_state` por viewer, rejeição de usuário externo e rejeição de room inexistente. Tokens não são persistidos e mensagens são truncadas/sanitizadas.
+
+O agregador `npm run beta:evidence` agora consome `BETA_REALTIME_REPORT` e só marca o gate `realtime` como `PASS` quando RT-001 a RT-005 possuem `PASS` explícito. Sem quatro contas descartáveis e sem verificação pós-migration no Supabase existente, o gate permanece `PENDING` e `REALTIME-EVIDENCE-INCOMPLETE` continua bloqueando a promoção para beta.

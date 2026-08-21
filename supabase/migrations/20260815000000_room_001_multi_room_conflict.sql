@@ -112,7 +112,7 @@ create policy veritas_realtime_circuit_read
     and (
       realtime.messages.extension = 'presence'
       or realtime.messages.event is null
-      or realtime.messages.event = 'circuit_snapshot'
+      or realtime.messages.event in ('circuit_snapshot', 'runtime_config', 'runtime_state')
     )
   );
 
@@ -134,7 +134,7 @@ create policy veritas_realtime_circuit_broadcast_write
   on realtime.messages for insert to authenticated
   with check (
     realtime.messages.extension = 'broadcast'
-    and realtime.messages.event = 'circuit_snapshot'
+    and realtime.messages.event in ('circuit_snapshot', 'runtime_config', 'runtime_state')
     and realtime.topic() ~ '^veritas:project:[0-9a-fA-F-]{36}:room:[A-Za-z0-9_-]{1,64}$'
     and public.veritas_can_edit_project(
       substring(realtime.topic() from '^veritas:project:([0-9a-fA-F-]{36}):room:')::uuid

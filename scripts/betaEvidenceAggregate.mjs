@@ -8,7 +8,7 @@ function isRecord(value) {
 }
 
 function parseStatusLine(line) {
-  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021)\s+(PASS|FAIL|SKIP|PENDING)\b/i)
+  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021|RT-\d{3})\s+(PASS|FAIL|SKIP|PENDING)\b/i)
   return match ? { id: match[1], status: match[2].toUpperCase() } : null
 }
 
@@ -40,12 +40,14 @@ export function aggregateBetaEvidence({
   generatedAt = new Date().toISOString(),
   rlsReport = '',
   edgeReport = '',
+  realtimeReport = '',
   structuralReport = null,
   structuralProjectId = '',
   evidencePaths = {},
 } = {}) {
   const rlsStatuses = parseEvidenceReport(rlsReport)
   const edgeStatuses = parseEvidenceReport(edgeReport)
+  const realtimeStatuses = parseEvidenceReport(realtimeReport)
   const openP0 = []
   const openP1 = []
   const gates = {}
@@ -59,6 +61,10 @@ export function aggregateBetaEvidence({
   gates.edge = gateFromStatuses(edgeStatuses, edgeIds, evidencePaths.edge ?? '')
   if (edgeStatuses['RLS-019'] === 'FAIL') openP0.push('EDGE-JWT-BYPASS')
   addBlocker(openP1, 'EDGE-EVIDENCE-INCOMPLETE', gates.edge)
+
+  const realtimeIds = ['RT-001', 'RT-002', 'RT-003', 'RT-004', 'RT-005']
+  gates.realtime = gateFromStatuses(realtimeStatuses, realtimeIds, evidencePaths.realtime ?? '')
+  addBlocker(openP1, 'REALTIME-EVIDENCE-INCOMPLETE', gates.realtime)
 
   const structuralErrors = structuralReport
     ? validateSupabaseStructuralAudit(structuralReport, structuralProjectId)
