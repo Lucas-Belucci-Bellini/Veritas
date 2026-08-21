@@ -206,3 +206,9 @@ O CircuitEditor agora permite escolher 1, 2, 4, 8, 16, 32 ou 64 bits para novos 
 A função `buildCircuitVectorTruthTable()` e o componente `VectorTruthTableView` adicionam a tabela vetorial com colunas dimensionadas, valores MSB → LSB e truncamento determinístico. O limite padrão é de 12 bits totais de entrada, equivalente a no máximo 4.096 combinações; tabelas acima desse limite são rejeitadas em vez de congelar a interface. A tabela booleana existente e a seleção de linhas continuam disponíveis somente no caminho escalar.
 
 Os exportadores agora aceitam widths válidos: Verilog usa `input [N-1:0]`, `output [N-1:0]` e `wire [N-1:0]`; VHDL usa `std_logic_vector(N-1 downto 0)`. Constantes vetoriais são emitidas com replicação segura no Verilog e `(others => '0'/'1')` no VHDL. A seleção de linha vetorial é clicável e acessível pelo teclado, converte os valores MSB → LSB em `BitVector` e ilumina o canvas para a combinação escolhida.
+
+## Atualização da implementação — primeira fatia do v0.9.0
+
+A aplicação agora inclui o `SequentialWorkspace`, uma camada React de observação e controle sobre o `Simulator` existente. A prévia apresenta quatro demos determinísticas: flip-flop D com clock automático, flip-flop T com clock automático, atraso de propagação e contador de 1 bit com feedback. A interface oferece seleção de demo, entradas controláveis, `Step`, `Run`/`Continue`, pulso manual de clock, `Reset`, Watch de sinais e linha do tempo limitada aos últimos 24 estados.
+
+O domínio permanece separado da UI em `src/simulation/workspace.ts`, com contratos para demos, snapshots, aplicação de entradas, pulsos e leitura de sinais. Os testes cobrem captura na borda de subida, alternância T, fila de atraso, contador por feedback e serialização de snapshots. Esta etapa não habilita edição visual de `clock`, `dff`, `tff` ou `delay` dentro do `CircuitEditor`, nem persistência do workspace; esses são os próximos incrementos do v0.9.0.

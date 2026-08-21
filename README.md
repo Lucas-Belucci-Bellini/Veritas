@@ -165,6 +165,21 @@ atraso — os testes cobrem todos eles. E um teste cruzado confere que, para
 expressões combinacionais, o circuito simulado concorda com o avaliador em
 **todas** as linhas da tabela: os dois motores não podem discordar.
 
+### Workspace sequencial visual (v0.9.0 em prévia)
+
+A primeira fatia do v0.9.0 adiciona o `SequentialWorkspace` à aplicação principal.
+Ele apresenta demos determinísticas de flip-flop D, flip-flop T, atraso de
+propagação e contador de 1 bit com feedback, sem duplicar o motor puro do
+simulador. O usuário pode alternar entradas, executar um `Step`, rodar uma
+sequência curta, enviar pulsos manuais de clock e resetar o circuito.
+
+Cada demo mostra um Watch com os sinais relevantes (`D`, `T`, `CLK`, `Q`, `Q̄` e
+`OUT`) e uma linha do tempo limitada aos últimos 24 estados. A UI é somente uma
+camada de observação: o estado permanece no `Simulator`, o limite impede loops de
+interface e o caminho combinacional existente continua independente. A edição
+visual de componentes sequenciais, persistência do workspace e clock ajustável
+ficam para as próximas fatias do v0.9.0.
+
 ### Plugin do Claude Code
 
 Este repositório também é um **marketplace de plugin do Claude Code**. Dá para

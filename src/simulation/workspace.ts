@@ -1,0 +1,171 @@
+import { Simulator } from './simulator'
+import type { Netlist } from './components'
+
+export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'delay' | 'feedback-counter'
+export type SequentialControlMode = 'auto-clock' | 'manual-input' | 'manual-clock'
+
+export interface SequentialWatch {
+  nodeId: string
+  label: string
+  port?: number
+}
+
+export interface SequentialDemo {
+  id: SequentialDemoId
+  title: string
+  description: string
+  controlMode: SequentialControlMode
+  controls: readonly string[]
+  initialInputs: Readonly<Record<string, boolean>>
+  watch: readonly SequentialWatch[]
+  netlist: Netlist
+}
+
+export interface SequentialSnapshot {
+  tick: number
+  values: Record<string, boolean[]>
+}
+
+const DFF_CLOCK: SequentialDemo = {
+  id: 'dff-clock',
+  title: 'Flip-flop D com clock',
+  description: 'O D é capturado somente na borda de subida do clock automático.',
+  controlMode: 'auto-clock',
+  controls: ['d'],
+  initialInputs: { d: false },
+  watch: [
+    { nodeId: 'd', label: 'D' },
+    { nodeId: 'clk', label: 'CLK' },
+    { nodeId: 'ff', label: 'Q' },
+    { nodeId: 'ff', label: 'Q̄', port: 1 },
+  ],
+  netlist: {
+    components: [
+      { id: 'd', type: 'input' },
+      { id: 'clk', type: 'clock', options: { period: 1 } },
+      { id: 'ff', type: 'dff', inputs: [{ node: 'd' }, { node: 'clk' }] },
+      { id: 'qout', type: 'output', inputs: [{ node: 'ff' }] },
+    ],
+  },
+}
+
+const TFF_CLOCK: SequentialDemo = {
+  id: 'tff-clock',
+  title: 'Flip-flop T com clock',
+  description: 'O T permanece ligado e alterna Q a cada borda de subida.',
+  controlMode: 'auto-clock',
+  controls: [],
+  initialInputs: {},
+  watch: [
+    { nodeId: 't', label: 'T' },
+    { nodeId: 'clk', label: 'CLK' },
+    { nodeId: 'ff', label: 'Q' },
+    { nodeId: 'ff', label: 'Q̄', port: 1 },
+  ],
+  netlist: {
+    components: [
+      { id: 't', type: 'constant', options: { value: true } },
+      { id: 'clk', type: 'clock', options: { period: 1 } },
+      { id: 'ff', type: 'tff', inputs: [{ node: 't' }, { node: 'clk' }] },
+      { id: 'qout', type: 'output', inputs: [{ node: 'ff' }] },
+    ],
+  },
+}
+
+const DELAY: SequentialDemo = {
+  id: 'delay',
+  title: 'Atraso de propagação',
+  description: 'O sinal de entrada aparece na saída depois de três tiques.',
+  controlMode: 'manual-input',
+  controls: ['signal'],
+  initialInputs: { signal: false },
+  watch: [
+    { nodeId: 'signal', label: 'IN' },
+    { nodeId: 'delay', label: 'DELAY' },
+    { nodeId: 'out', label: 'OUT' },
+  ],
+  netlist: {
+    components: [
+      { id: 'signal', type: 'input' },
+      { id: 'delay', type: 'delay', options: { ticks: 3 }, inputs: [{ node: 'signal' }] },
+      { id: 'out', type: 'output', inputs: [{ node: 'delay' }] },
+    ],
+  },
+}
+
+const FEEDBACK_COUNTER: SequentialDemo = {
+  id: 'feedback-counter',
+  title: 'Contador de 1 bit com feedback',
+  description: 'Q̄ volta para D; cada pulso completo de clock alterna o estado armazenado.',
+  controlMode: 'manual-clock',
+  controls: ['clk'],
+  initialInputs: { clk: false },
+  watch: [
+    { nodeId: 'clk', label: 'CLK' },
+    { nodeId: 'ff', label: 'Q' },
+    { nodeId: 'ff', label: 'Q̄', port: 1 },
+    { nodeId: 'out', label: 'OUT' },
+  ],
+  netlist: {
+    components: [
+      { id: 'clk', type: 'input' },
+      { id: 'ff', type: 'dff', inputs: [{ node: 'ff', port: 1 }, { node: 'clk' }] },
+      { id: 'out', type: 'output', inputs: [{ node: 'ff' }] },
+    ],
+  },
+}
+
+export const SEQUENTIAL_DEMOS: readonly SequentialDemo[] = [
+  DFF_CLOCK,
+  TFF_CLOCK,
+  DELAY,
+  FEEDBACK_COUNTER,
+]
+
+export function getSequentialDemo(id: SequentialDemoId): SequentialDemo {
+  const demo = SEQUENTIAL_DEMOS.find((candidate) => candidate.id === id)
+  if (!demo) throw new Error(`Demo sequencial desconhecida: ${id}.`)
+  return demo
+}
+
+export function createSequentialSimulator(id: SequentialDemoId): Simulator {
+  return new Simulator(getSequentialDemo(id).netlist)
+}
+
+export function snapshotSequentialSimulator(simulator: Simulator): SequentialSnapshot {
+  return {
+    tick: simulator.tickCount,
+    values: simulator.snapshot(),
+  }
+}
+
+export function applySequentialInputs(
+  simulator: Simulator,
+  inputs: Readonly<Record<string, boolean>>,
+): void {
+  for (const [id, value] of Object.entries(inputs)) simulator.setInput(id, value)
+}
+
+export function pulseClock(
+  simulator: Simulator,
+  inputId: string,
+): readonly SequentialSnapshot[] {
+  simulator.setInput(inputId, true)
+  simulator.tick()
+  const high = snapshotSequentialSimulator(simulator)
+  simulator.setInput(inputId, false)
+  simulator.tick()
+  const low = snapshotSequentialSimulator(simulator)
+  return [high, low]
+}
+
+export function outputValue(
+  snapshot: SequentialSnapshot,
+  watch: Pick<SequentialWatch, 'nodeId' | 'port'>,
+): boolean {
+  return snapshot.values[watch.nodeId]?.[watch.port ?? 0] ?? false
+}
+
+export function signalLabel(value: boolean): string {
+  return value ? '1' : '0'
+}

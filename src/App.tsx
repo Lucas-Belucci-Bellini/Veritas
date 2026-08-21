@@ -27,6 +27,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { AuthPanel } from './components/AuthPanel'
 import { AlgorithmWorkspace } from './components/AlgorithmWorkspace'
 import { LogicCaseLab } from './components/LogicCaseLab'
+import { SequentialWorkspace } from './components/SequentialWorkspace'
 import { createImplicationExample } from './algorithms'
 
 // O React Flow e o Dagre pesam mais que todo o resto do aplicativo somado, e
@@ -340,6 +341,10 @@ function AppContent() {
           </div>
           <AlgorithmWorkspace document={algorithmExample} />
           <LogicCaseLab />
+        </section>
+
+        <section className="card space-y-5 p-4 sm:p-6">
+          <SequentialWorkspace />
         </section>
 
         <Suspense
