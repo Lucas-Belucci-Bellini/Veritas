@@ -310,3 +310,14 @@ O Veritas agora possui o comando `npm run beta:rls`, implementado em `scripts/rl
 O contrato puro em `scripts/rlsAcceptanceContract.mjs` garante os IDs RLS-001 a RLS-022 e remove Bearer tokens/passwords do relatório. Foram adicionados testes determinísticos para ordem dos IDs e redaction. A documentação de aceitação agora inclui o comando, as variáveis e os limites: casos Realtime/Edge sem configuração ficam `SKIP` e não liberam beta; o relatório real só entra no manifesto após revisão da limpeza e dos resultados.
 
 A execução foi validada com `node --check` e o guard de segurança bloqueou corretamente a chamada sem `RLS_RUNNER_ALLOW_REAL=1`. Nenhuma sessão real foi criada nesta etapa, portanto a matriz continua pendente e a promoção beta permanece bloqueada até o runner ser executado com contas descartáveis reais.
+
+## Atualização da implementação — validação server-side de CircuitDocument — 2026-08-21
+
+A RPC `veritas_sync_circuit_project` agora chama `private.veritas_validate_circuit_document` antes de criar ou atualizar o projeto. A função SQL verifica formato `veritas-circuit`, versão 1, nome, nós/tipos/posições, referências, portas, entradas obrigatórias, larguras, conexões duplicadas e ciclos combinacionais. Feedback que passa por componentes stateful (`clock`, `dff`, `tff` ou `delay`) permanece compatível com o simulador temporal.
+
+A migration `20260821043000_validate_circuit_document_server_side.sql` foi aplicada no Supabase existente. A migration corretiva `20260821043500_fix_circuit_document_validation_cycle_alias.sql` removeu uma ambiguidade de alias detectada pelo PostgreSQL durante o contrato de teste e foi versionada para manter o histórico reproduzível.
+
+A consulta real confirmou documento válido com `[]` e documento com referência ausente com `missing-node`/`missing-input`.
+O helper privado possui grants restritos e a RPC continua `SECURITY INVOKER`.
+
+O runner RLS também foi corrigido para criar fixtures com `connections`, o campo canônico do `CircuitDocument`. O cenário RLS-022 passa a ter uma barreira server-side contra clientes adulterados; a matriz cross-user completa continua pendente e ainda bloqueia a promoção beta.

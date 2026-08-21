@@ -44,7 +44,7 @@ function fixtureDocument(name) {
     version: 1,
     name,
     nodes: [{ id: 'input-a', type: 'input', position: { x: 0, y: 0 }, data: { label: 'A' } }],
-    edges: [],
+    connections: [],
   }
 }
 

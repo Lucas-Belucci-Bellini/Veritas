@@ -108,7 +108,7 @@ A tabela abaixo é o roteiro executável. “Rejeitado” pode ser um erro de po
 | RLS-019 | sem JWT | Faça POST para `veritas-circuit-ai` sem bearer token e com token expirado. | HTTP `401`/não autorizado; não há processamento privilegiado. |
 | RLS-020 | owner/editor | Faça POST autenticado com contexto pequeno e válido; repita com instrução opcional. | Resposta estável de análise/fallback; métrica, quando emitida, pertence ao usuário autenticado. |
 | RLS-021 | autenticado | Envie `user_id`, `project_id` ou contexto de outro usuário no body tentando elevar acesso. | Campos não concedem autorização; função rejeita ou ignora a tentativa. |
-| RLS-022 | editor | Envie pela sync um documento com ciclo, referência inexistente ou width inválido. | Rejeição antes da persistência; projeto, hash e histórico permanecem consistentes. |
+| RLS-022 | editor | Envie pela sync um documento com ciclo, referência inexistente ou width inválido. | A RPC rejeita com `22023`/`Invalid circuit document` antes da persistência; projeto, hash e histórico permanecem consistentes. |
 
 ## 6. Verificações específicas de Realtime
 
@@ -157,6 +157,8 @@ npm run beta:rls
 ```
 
 O runner cria uma fixture com prefixo único, executa RLS-001 a RLS-022, tenta limpar a fixture no `finally` e grava somente IDs lógicos, status, operações e mensagens truncadas/sanitizadas. Ele nunca imprime passwords, access tokens ou headers. Sem `RLS_RUNNER_ALLOW_REAL=1`, ele aborta antes de ler qualquer credencial; sem Realtime/Edge habilitados, os casos ficam `SKIP` e não podem ser usados para liberar beta.
+
+A RPC `veritas_sync_circuit_project` também executa `private.veritas_validate_circuit_document` no servidor antes de inserir ou atualizar qualquer projeto. A função verifica formato `veritas-circuit`, versão 1, nome, nós/tipos/posições, portas, nós referenciados, entradas obrigatórias, larguras, conexões duplicadas e ciclos combinacionais; feedback que passa por `clock`, `dff`, `tff` ou `delay` continua permitido. Isso reduz o risco de um cliente adulterado persistir um documento que o editor local rejeitaria, mas não substitui os testes cross-user.
 
 O preflight verifica os gates locais, o smoke público e a presença de `PASS` para todos os IDs. Ele não cria sessões Supabase automaticamente e não substitui a execução humana/controlada da matriz. O relatório gerado pelo runner deve ser revisado e anexado ao manifesto beta somente depois de confirmar a limpeza da fixture e os resultados reais.
 
