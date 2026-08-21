@@ -25,7 +25,9 @@ describe('aggregateBetaEvidence', () => {
     expect(manifest.gates.rls.status).toBe('PENDING')
     expect(manifest.gates.edge.status).toBe('PENDING')
     expect(manifest.gates.realtime.status).toBe('PENDING')
+    expect(manifest.gates.hdl.status).toBe('PENDING')
     expect(manifest.openP1).toContain('RLS-EVIDENCE-INCOMPLETE')
+    expect(manifest.openP1).toContain('HDL-EVIDENCE-INCOMPLETE')
     expect(manifest.openP1).toContain('REALTIME-EVIDENCE-INCOMPLETE')
     expect(manifest.openP1).toContain('EDGE-EVIDENCE-INCOMPLETE')
   })
@@ -34,22 +36,24 @@ describe('aggregateBetaEvidence', () => {
     const rlsReport = Array.from({ length: 22 }, (_, index) => `RLS-${String(index + 1).padStart(3, '0')} PASS`).join('\n')
     const edgeReport = 'RLS-019 PASS\nRLS-020 PASS\nRLS-021 PASS'
     const realtimeReport = 'RT-001 PASS\nRT-002 PASS\nRT-003 PASS\nRT-004 PASS\nRT-005 PASS'
+    const hdlReport = 'HDL-001 PASS\nHDL-002 PASS\nHDL-003 PASS'
     const manifest = aggregateBetaEvidence({
       version: '0.9.0-rc.1',
       rlsReport,
       edgeReport,
       realtimeReport,
+      hdlReport,
       structuralReport: validStructuralReport,
       structuralProjectId: 'hcwzsxdcvmswebunznak',
-      evidencePaths: { rls: 'artifacts/rls.md', edge: 'artifacts/edge.md', realtime: 'artifacts/realtime.md', supabaseStructural: 'artifacts/structural.json' },
+      evidencePaths: { rls: 'artifacts/rls.md', edge: 'artifacts/edge.md', realtime: 'artifacts/realtime.md', hdl: 'artifacts/hdl.md', supabaseStructural: 'artifacts/structural.json' },
     })
     expect(manifest.gates.rls.status).toBe('PASS')
     expect(manifest.gates.edge.status).toBe('PASS')
     expect(manifest.gates.supabaseStructural.status).toBe('PASS')
     expect(manifest.gates.realtime.status).toBe('PASS')
+    expect(manifest.gates.hdl.status).toBe('PASS')
     expect(manifest.openP0).toEqual([])
     expect(manifest.openP1).toEqual([
-      'HDL-EVIDENCE-INCOMPLETE',
       'ACCESSIBILITY-EVIDENCE-INCOMPLETE',
       'MOBILE-EVIDENCE-INCOMPLETE',
       'ROLLBACK-EVIDENCE-INCOMPLETE',
@@ -68,6 +72,6 @@ describe('aggregateBetaEvidence', () => {
   })
 
   it('parseia somente linhas de cenário reconhecidas', () => {
-    expect(parseEvidenceReport('RLS-019 PASS\nRT-001 PASS\ntexto sem contrato\nRLS-020 SKIP')).toEqual({ 'RLS-019': 'PASS', 'RT-001': 'PASS', 'RLS-020': 'SKIP' })
+    expect(parseEvidenceReport('RLS-019 PASS\nRT-001 PASS\nHDL-001 PASS\ntexto sem contrato\nRLS-020 SKIP')).toEqual({ 'RLS-019': 'PASS', 'RT-001': 'PASS', 'HDL-001': 'PASS', 'RLS-020': 'SKIP' })
   })
 })

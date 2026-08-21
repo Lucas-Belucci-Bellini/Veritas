@@ -345,3 +345,11 @@ As migrations `20260815000000_room_001_multi_room_conflict.sql` e `2026082103300
 Foi adicionado `npm run beta:realtime`. O runner exige `REALTIME_RUNNER_ALLOW_REAL=1` antes de abrir sessões e, no modo obrigatório, `RT_REQUIRE_REAL=1`. Os cinco cenários cobrem Presence do owner, `runtime_config` editor→owner, bloqueio de `runtime_state` por viewer, rejeição de usuário externo e rejeição de room inexistente. Tokens não são persistidos e mensagens são truncadas/sanitizadas.
 
 O agregador `npm run beta:evidence` agora consome `BETA_REALTIME_REPORT` e só marca o gate `realtime` como `PASS` quando RT-001 a RT-005 possuem `PASS` explícito. Sem quatro contas descartáveis e sem verificação pós-migration no Supabase existente, o gate permanece `PENDING` e `REALTIME-EVIDENCE-INCOMPLETE` continua bloqueando a promoção para beta.
+
+## Atualização da implementação — fortalecimento do gate HDL — 2026-08-21
+
+A próxima fatia do roadmap fortalece o gate de exportação industrial sem alterar o escopo combinacional já entregue. Foram criadas fixtures públicas equivalentes `tests/fixtures/hdl/vector_and.v` e `tests/fixtures/hdl/vector_and.vhd`, ambas representando o mesmo AND vetorial de quatro bits. O teste `src/release/hdlAcceptanceContract.test.ts` compara o texto completo gerado por `exportVerilog` e `exportVhdl`, além de cobrir o contrato de relatório e sanitização.
+
+O novo `npm run beta:hdl` executa HDL-001 com `iverilog -g2005`, HDL-002 com `ghdl -a --std=08` e HDL-003 com a regressão determinística do exportador. Sem toolchains, o modo local fica explicitamente em `SKIP`; com `HDL_REQUIRE_TOOLCHAINS=1`, a ausência de qualquer compilador vira `FAIL`. A execução real no sandbox produziu `HDL-001 PASS`, `HDL-002 PASS` e `HDL-003 PASS` após a correção da flag do iverilog.
+
+O workflow `.github/workflows/quality.yml` agora instala `iverilog` e `ghdl` e executa o gate obrigatório em cada push/pull request. O agregador de evidências beta consome `BETA_HDL_REPORT` e só marca `gates.hdl` como `PASS` quando HDL-001 a HDL-003 possuem PASS explícito. A documentação operacional está em `docs/BETA-HDL-ACCEPTANCE.md`; ausência de evidência HDL continua mantendo `HDL-EVIDENCE-INCOMPLETE` e bloqueando a promoção beta.

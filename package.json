@@ -21,6 +21,7 @@
     "beta:rls": "node scripts/rls-acceptance.mjs",
     "beta:edge": "node scripts/edge-acceptance.mjs",
     "beta:realtime": "node scripts/realtime-acceptance.mjs",
+    "beta:hdl": "node scripts/hdl-acceptance.mjs",
     "beta:evidence": "node scripts/aggregate-beta-evidence.mjs",
     "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict"
   },

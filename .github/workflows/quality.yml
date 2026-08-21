@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install HDL toolchains
+        run: sudo apt-get update && sudo apt-get install -y iverilog ghdl
+
       - name: Unit and integration tests
         run: npm test -- --run
 
@@ -45,6 +48,11 @@ jobs:
 
       - name: Build MCP bundle
         run: npm run build:mcp
+
+      - name: HDL acceptance
+        env:
+          HDL_REQUIRE_TOOLCHAINS: '1'
+        run: npm run beta:hdl
 
       - name: Start production-like preview
         run: |

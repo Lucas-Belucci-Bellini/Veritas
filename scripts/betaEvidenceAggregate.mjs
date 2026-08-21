@@ -8,7 +8,7 @@ function isRecord(value) {
 }
 
 function parseStatusLine(line) {
-  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021|RT-\d{3})\s+(PASS|FAIL|SKIP|PENDING)\b/i)
+  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021|RT-\d{3}|HDL-\d{3})\s+(PASS|FAIL|SKIP|PENDING)\b/i)
   return match ? { id: match[1], status: match[2].toUpperCase() } : null
 }
 
@@ -41,6 +41,7 @@ export function aggregateBetaEvidence({
   rlsReport = '',
   edgeReport = '',
   realtimeReport = '',
+  hdlReport = '',
   structuralReport = null,
   structuralProjectId = '',
   evidencePaths = {},
@@ -48,6 +49,7 @@ export function aggregateBetaEvidence({
   const rlsStatuses = parseEvidenceReport(rlsReport)
   const edgeStatuses = parseEvidenceReport(edgeReport)
   const realtimeStatuses = parseEvidenceReport(realtimeReport)
+  const hdlStatuses = parseEvidenceReport(hdlReport)
   const openP0 = []
   const openP1 = []
   const gates = {}
@@ -65,6 +67,10 @@ export function aggregateBetaEvidence({
   const realtimeIds = ['RT-001', 'RT-002', 'RT-003', 'RT-004', 'RT-005']
   gates.realtime = gateFromStatuses(realtimeStatuses, realtimeIds, evidencePaths.realtime ?? '')
   addBlocker(openP1, 'REALTIME-EVIDENCE-INCOMPLETE', gates.realtime)
+
+  const hdlIds = ['HDL-001', 'HDL-002', 'HDL-003']
+  gates.hdl = gateFromStatuses(hdlStatuses, hdlIds, evidencePaths.hdl ?? '')
+  addBlocker(openP1, 'HDL-EVIDENCE-INCOMPLETE', gates.hdl)
 
   const structuralErrors = structuralReport
     ? validateSupabaseStructuralAudit(structuralReport, structuralProjectId)

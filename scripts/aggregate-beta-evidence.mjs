@@ -27,12 +27,14 @@ const manifest = aggregateBetaEvidence({
   rlsReport: readOptional(process.env.BETA_RLS_REPORT),
   edgeReport: readOptional(process.env.BETA_EDGE_REPORT),
   realtimeReport: readOptional(process.env.BETA_REALTIME_REPORT),
+  hdlReport: readOptional(process.env.BETA_HDL_REPORT),
   structuralReport: readJsonOptional(process.env.BETA_SUPABASE_STRUCTURAL_REPORT),
   structuralProjectId: process.env.BETA_SUPABASE_PROJECT_ID || '',
   evidencePaths: {
     rls: process.env.BETA_RLS_REPORT || '',
     edge: process.env.BETA_EDGE_REPORT || '',
     realtime: process.env.BETA_REALTIME_REPORT || '',
+    hdl: process.env.BETA_HDL_REPORT || '',
     supabaseStructural: process.env.BETA_SUPABASE_STRUCTURAL_REPORT || '',
   },
 })
