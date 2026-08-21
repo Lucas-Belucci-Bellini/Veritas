@@ -13,7 +13,17 @@ export const CIRCUIT_DOCUMENT_VERSION = 1 as const
 
 export type EditorComponentType = Extract<
   ComponentType,
-  'input' | 'output' | 'constant' | 'and' | 'or' | 'not' | 'xor'
+  | 'input'
+  | 'output'
+  | 'constant'
+  | 'and'
+  | 'or'
+  | 'not'
+  | 'xor'
+  | 'clock'
+  | 'dff'
+  | 'tff'
+  | 'delay'
 >
 
 export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
@@ -24,6 +34,10 @@ export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
   'or',
   'not',
   'xor',
+  'clock',
+  'dff',
+  'tff',
+  'delay',
 ]
 
 export interface CircuitPosition {
@@ -93,15 +107,23 @@ export function editorInputCount(type: EditorComponentType): number {
   switch (type) {
     case 'input':
     case 'constant':
+    case 'clock':
       return 0
     case 'not':
     case 'output':
+    case 'delay':
       return 1
     case 'and':
     case 'or':
     case 'xor':
+    case 'dff':
+    case 'tff':
       return 2
   }
+}
+
+function isStatefulEditorType(type: EditorComponentType): boolean {
+  return type === 'clock' || type === 'dff' || type === 'tff' || type === 'delay'
 }
 
 export function createCircuitDocument(name = 'Circuito sem título'): CircuitDocument {
@@ -131,7 +153,7 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
       issues.push({
         code: 'invalid-node',
         nodeId: node.id,
-        message: `O componente "${node.id}" usa um tipo que o editor combinacional não suporta.`,
+        message: `O componente "${node.id}" usa um tipo que o editor visual não suporta.`,
       })
       continue
     }
@@ -142,11 +164,13 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
         nodeId: node.id,
         message: `A largura do componente "${node.id}" precisa ser um inteiro entre 1 e ${MAX_BUS_WIDTH}.`,
       })
-    } else if (width !== 1 && !options.allowBuses) {
+    } else if (width !== 1 && (!options.allowBuses || isStatefulEditorType(node.type))) {
       issues.push({
         code: 'unsupported-width',
         nodeId: node.id,
-        message: `O componente "${node.id}" usa ${width} bits, mas a avaliação visual atual ainda aceita somente sinais escalares de 1 bit.`,
+        message: isStatefulEditorType(node.type)
+          ? `O componente sequencial "${node.id}" ainda aceita somente sinais escalares de 1 bit.`
+          : `O componente "${node.id}" usa ${width} bits, mas a avaliação visual atual ainda aceita somente sinais escalares de 1 bit.`,
       })
     }
     nodes.set(node.id, node)
@@ -207,7 +231,7 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
     }
     occupiedInputs.add(inputKey)
 
-    if (source.id === target.id) {
+    if (source.id === target.id && !isStatefulEditorType(target.type)) {
       issues.push({
         code: 'self-connection',
         nodeId: target.id,
@@ -234,20 +258,31 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
   }
 
   const visiting = new Set<string>()
+  const stack: string[] = []
   const visited = new Set<string>()
   const visit = (id: string): void => {
     if (visiting.has(id)) {
-      issues.push({
-        code: 'cycle',
-        nodeId: id,
-        message: `O circuito contém um ciclo combinacional envolvendo "${id}".`,
+      const cycleStart = stack.indexOf(id)
+      const cycleIds = cycleStart >= 0 ? stack.slice(cycleStart) : [id]
+      const hasSequentialState = cycleIds.some((cycleId) => {
+        const cycleNode = nodes.get(cycleId)
+        return cycleNode ? isStatefulEditorType(cycleNode.type) : false
       })
+      if (!hasSequentialState) {
+        issues.push({
+          code: 'cycle',
+          nodeId: id,
+          message: `O circuito contém um ciclo combinacional envolvendo "${id}".`,
+        })
+      }
       return
     }
     if (visited.has(id)) return
 
     visiting.add(id)
+    stack.push(id)
     for (const target of outgoing.get(id) ?? []) visit(target)
+    stack.pop()
     visiting.delete(id)
     visited.add(id)
   }

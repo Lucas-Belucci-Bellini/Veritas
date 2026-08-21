@@ -176,9 +176,9 @@ sequência curta, enviar pulsos manuais de clock e resetar o circuito.
 Cada demo mostra um Watch com os sinais relevantes (`D`, `T`, `CLK`, `Q`, `Q̄` e
 `OUT`) e uma linha do tempo limitada aos últimos 24 estados. A UI é somente uma
 camada de observação: o estado permanece no `Simulator`, o limite impede loops de
-interface e o caminho combinacional existente continua independente. A edição
-visual de componentes sequenciais, persistência do workspace e clock ajustável
-ficam para as próximas fatias do v0.9.0.
+interface e o caminho combinacional existente continua independente. O `CircuitEditor` também aceita `clock`, `dff`, `tff` e `delay` como componentes visuais de 1 bit. O feedback é permitido quando passa por um componente com estado, enquanto ciclos puramente combinacionais continuam sendo rejeitados. Os parâmetros padrão de clock e delay são preservados no documento local e na sincronização.
+
+A edição visual já prepara o documento para a simulação, mas a tabela verdade, a IA e a exportação HDL continuam bloqueadas em circuitos sequenciais. A próxima fatia conectará documentos arbitrários do canvas ao `Simulator`, com Step/Run/Reset e observação temporal.
 
 ### Plugin do Claude Code
 

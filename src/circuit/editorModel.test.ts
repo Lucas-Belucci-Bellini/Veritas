@@ -86,6 +86,51 @@ describe('editorModel', () => {
     expect(validateCircuit(andCircuit())).toEqual([])
   })
 
+  it('aceita clock e DFF com portas ordenadas e converte para netlist', () => {
+    const document: CircuitDocument = {
+      ...createCircuitDocument('DFF de teste'),
+      nodes: [
+        { id: 'd', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'clk', type: 'clock', position: { x: 0, y: 100 }, options: { period: 2 } },
+        { id: 'ff', type: 'dff', position: { x: 180, y: 50 } },
+        { id: 'out', type: 'output', position: { x: 360, y: 50 } },
+      ],
+      connections: [
+        { source: { node: 'd' }, target: { node: 'ff', port: 0 } },
+        { source: { node: 'clk' }, target: { node: 'ff', port: 1 } },
+        { source: { node: 'ff' }, target: { node: 'out', port: 0 } },
+      ],
+    }
+
+    expect(validateCircuit(document)).toEqual([])
+    expect(toNetlist(document).components).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'clk', type: 'clock', options: { period: 2 } }),
+      expect.objectContaining({ id: 'ff', type: 'dff', inputs: [{ node: 'd' }, { node: 'clk' }] }),
+    ]))
+  })
+
+  it('permite feedback quando o ciclo passa por um componente com estado', () => {
+    const document: CircuitDocument = {
+      ...createCircuitDocument('Contador de teste'),
+      nodes: [
+        { id: 'clk', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'ff', type: 'dff', position: { x: 180, y: 50 } },
+        { id: 'out', type: 'output', position: { x: 360, y: 50 } },
+      ],
+      connections: [
+        { source: { node: 'ff', port: 1 }, target: { node: 'ff', port: 0 } },
+        { source: { node: 'clk' }, target: { node: 'ff', port: 1 } },
+        { source: { node: 'ff' }, target: { node: 'out', port: 0 } },
+      ],
+    }
+
+    expect(validateCircuit(document)).toEqual([])
+    expect(toNetlist(document).components.find((component) => component.id === 'ff')?.inputs).toEqual([
+      { node: 'ff', port: 1 },
+      { node: 'clk' },
+    ])
+  })
+
   it('rejeita width inválido, largura ainda não suportada e conexão incompatível', () => {
     const document = andCircuit()
     document.nodes[0].options = { width: 4 }

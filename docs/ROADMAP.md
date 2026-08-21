@@ -212,3 +212,11 @@ Os exportadores agora aceitam widths válidos: Verilog usa `input [N-1:0]`, `out
 A aplicação agora inclui o `SequentialWorkspace`, uma camada React de observação e controle sobre o `Simulator` existente. A prévia apresenta quatro demos determinísticas: flip-flop D com clock automático, flip-flop T com clock automático, atraso de propagação e contador de 1 bit com feedback. A interface oferece seleção de demo, entradas controláveis, `Step`, `Run`/`Continue`, pulso manual de clock, `Reset`, Watch de sinais e linha do tempo limitada aos últimos 24 estados.
 
 O domínio permanece separado da UI em `src/simulation/workspace.ts`, com contratos para demos, snapshots, aplicação de entradas, pulsos e leitura de sinais. Os testes cobrem captura na borda de subida, alternância T, fila de atraso, contador por feedback e serialização de snapshots. Esta etapa não habilita edição visual de `clock`, `dff`, `tff` ou `delay` dentro do `CircuitEditor`, nem persistência do workspace; esses são os próximos incrementos do v0.9.0.
+
+## Atualização da implementação — componentes sequenciais no editor visual
+
+A segunda fatia do v0.9.0 amplia o `CircuitDocument` e o `CircuitEditor` para aceitar `clock`, `dff`, `tff` e `delay` como componentes visuais de 1 bit. A paleta agora cria esses nós com handles de entrada/saída nomeados, parâmetros padrão de período do clock e quantidade de tiques do atraso, além de preservar `period`, `ticks` e `initial` no formato local, no sync e na reabertura do documento.
+
+A validação continua rejeitando ciclos puramente combinacionais, mas permite feedback quando o ciclo passa por um componente com estado, como o Q̄ de um DFF ligado de volta ao D. Isso prepara contadores e latches sem transformar um ciclo combinacional em comportamento indefinido. Widths vetoriais em componentes sequenciais continuam rejeitados nesta etapa.
+
+Tabela verdade, avaliação por seleção de linha, análise de IA e exportação HDL permanecem explicitamente bloqueadas quando o documento contém estado sequencial. O próximo incremento deverá conectar um `CircuitDocument` sequencial ao `Simulator`, com controles de Step/Run/Reset e observação do timeline para circuitos arbitrários criados no canvas.

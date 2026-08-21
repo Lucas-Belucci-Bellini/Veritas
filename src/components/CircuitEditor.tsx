@@ -51,7 +51,7 @@ import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollabor
 import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realtime/circuitRooms'
 
 interface EditorNodeData extends Record<string, unknown> {
-  kind: 'input' | 'constant' | 'gate' | 'output'
+  kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential'
   componentType: EditorComponentType
   label: string
   inputs: number
@@ -59,6 +59,9 @@ interface EditorNodeData extends Record<string, unknown> {
   op?: GateOp
   value?: boolean
   busValue?: string
+  period?: number
+  ticks?: number
+  initial?: boolean
 }
 
 type EditorFlowNode = Node<EditorNodeData>
@@ -73,6 +76,10 @@ const PALETTE: readonly { type: EditorComponentType; label: string; description:
   { type: 'not', label: 'NOT', description: 'Inversor' },
   { type: 'xor', label: 'XOR', description: 'OU exclusivo' },
   { type: 'output', label: 'Saída', description: 'Pino observável' },
+  { type: 'clock', label: 'Clock', description: 'Relógio sequencial' },
+  { type: 'dff', label: 'DFF', description: 'Flip-flop D · D/CLK → Q' },
+  { type: 'tff', label: 'TFF', description: 'Flip-flop T · T/CLK → Q' },
+  { type: 'delay', label: 'Delay', description: 'Atraso de N tiques' },
 ]
 
 const NODE_LABELS: Record<EditorComponentType, string> = {
@@ -83,6 +90,10 @@ const NODE_LABELS: Record<EditorComponentType, string> = {
   not: 'NOT',
   xor: 'XOR',
   output: 'Saída',
+  clock: 'Clock',
+  dff: 'DFF',
+  tff: 'TFF',
+  delay: 'Delay',
 }
 
 export function CircuitEditor() {
@@ -108,6 +119,8 @@ export function CircuitEditor() {
   const [activeRoomId, setActiveRoomId] = useState('main')
   const [newRoomId, setNewRoomId] = useState('')
   const [nextSignalWidth, setNextSignalWidth] = useState(1)
+  const [nextClockPeriod, setNextClockPeriod] = useState(1)
+  const [nextDelayTicks, setNextDelayTicks] = useState(1)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
@@ -140,6 +153,10 @@ export function CircuitEditor() {
   }, [document])
 
   const hasBuses = useMemo(() => document.nodes.some((node) => (node.options?.width ?? 1) > 1), [document])
+  const hasSequential = useMemo(
+    () => document.nodes.some((node) => node.type === 'clock' || node.type === 'dff' || node.type === 'tff' || node.type === 'delay'),
+    [document],
+  )
   const issues = useMemo(() => validateCircuit(document, { allowBuses: true }), [document])
   const scalarIssues = useMemo(() => validateCircuit(document), [document])
   const outputNodes = useMemo(
@@ -194,24 +211,25 @@ export function CircuitEditor() {
   }, [hydrated, setEdges, setNodes, storage.projects, storage.ready])
 
   const truthTable = useMemo(() => {
-    if (scalarIssues.length > 0) return null
+    if (hasSequential || scalarIssues.length > 0) return null
     try {
       return buildCircuitTruthTable(document, { outputId: selectedOutputId })
     } catch {
       return null
     }
-  }, [document, scalarIssues, selectedOutputId])
+  }, [document, hasSequential, scalarIssues, selectedOutputId])
 
   const vectorTruthTable = useMemo(() => {
-    if (!hasBuses || issues.length > 0) return null
+    if (hasSequential || !hasBuses || issues.length > 0) return null
     try {
       return buildCircuitVectorTruthTable(document)
     } catch {
       return null
     }
-  }, [document, hasBuses, issues])
+  }, [document, hasBuses, hasSequential, issues])
 
   const selectedEvaluation = useMemo<CircuitEvaluation | CircuitVectorEvaluation | null>(() => {
+    if (hasSequential) return null
     if (hasBuses) {
       try {
         return evaluateCircuitVectors(document, vectorAssignmentFromRow(document, vectorTruthTable, selectedVectorRow))
@@ -225,7 +243,7 @@ export function CircuitEditor() {
     } catch {
       return null
     }
-  }, [document, hasBuses, selectedRow, selectedVectorRow, truthTable, vectorTruthTable])
+  }, [document, hasBuses, hasSequential, selectedRow, selectedVectorRow, truthTable, vectorTruthTable])
 
   const renderedNodes = useMemo(
     () =>
@@ -233,7 +251,11 @@ export function CircuitEditor() {
         ...node,
         data: {
           ...node.data,
-          value: selectedEvaluation ? evaluationIsLit(selectedEvaluation, node.id) : undefined,
+          value: selectedEvaluation
+            ? evaluationIsLit(selectedEvaluation, node.id)
+            : node.data.componentType === 'constant'
+              ? node.data.value
+              : node.data.initial,
           busValue: selectedEvaluation && hasBuses ? evaluationBinary(selectedEvaluation, node.id) : undefined,
         },
       })),
@@ -354,7 +376,12 @@ export function CircuitEditor() {
     }
     setNotice('')
     setSelectedRow(null)
-    setNodes((current) => [...current, createNode(type, current.length, nextNodeId(type, current), nextSignalWidth)])
+    setNodes((current) => {
+      const node = createNode(type, current.length, nextNodeId(type, current), nextSignalWidth)
+      if (type === 'clock') node.data.period = nextClockPeriod
+      if (type === 'delay') node.data.ticks = nextDelayTicks
+      return [...current, node]
+    })
   }
 
   const reset = () => {
@@ -440,6 +467,10 @@ export function CircuitEditor() {
   }
 
   const runAi = async (action: 'analyze' | 'optimize') => {
+    if (hasSequential) {
+      setNotice('A análise de IA do editor ainda está disponível somente para circuitos combinacionais.')
+      return
+    }
     if (!user) {
       setNotice('Entre na sua conta para usar a análise de IA.')
       return
@@ -584,7 +615,9 @@ export function CircuitEditor() {
 
   const validationMessage =
     issues[0]?.message ??
-    (hasBuses
+    (hasSequential
+      ? 'Circuito sequencial válido: use o workspace de simulação para observar os tiques.'
+      : hasBuses
       ? `Circuito vetorial válido: avaliação bitwise ativa para ${document.nodes.filter((node) => (node.options?.width ?? 1) > 1).length} componente(s).`
       : truthTable
         ? `Circuito válido: ${truthTable.variables.length} entrada(s), ${truthTable.totalRows} linha(s).`
@@ -595,13 +628,13 @@ export function CircuitEditor() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold tracking-wide text-brand-600 uppercase dark:text-brand-300">
-            v0.8.0 · prévia
+            v0.9.0 · prévia
           </p>
           <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
-            Editor visual combinacional
+            Editor visual combinacional e sequencial
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Monte um circuito no canvas, conecte as portas e valide a lógica sem precisar começar por uma expressão.
+            Monte portas, clocks e elementos de memória no canvas. Circuitos sequenciais são validados, salvos e preparados para simulação por tiques.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -609,6 +642,18 @@ export function CircuitEditor() {
             Largura
             <select id="circuit-signal-width" value={nextSignalWidth} onChange={(event) => setNextSignalWidth(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700">
               {[1, 2, 4, 8, 16, 32, 64].map((width) => <option key={width} value={width}>{width} bit{width === 1 ? '' : 's'}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="circuit-clock-period">
+            Clock
+            <select id="circuit-clock-period" value={nextClockPeriod} onChange={(event) => setNextClockPeriod(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700">
+              {[1, 2, 3, 4, 8].map((period) => <option key={period} value={period}>{period} tique{period === 1 ? '' : 's'}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="circuit-delay-ticks">
+            Delay
+            <select id="circuit-delay-ticks" value={nextDelayTicks} onChange={(event) => setNextDelayTicks(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700">
+              {[1, 2, 3, 4, 8].map((ticks) => <option key={ticks} value={ticks}>{ticks} tique{ticks === 1 ? '' : 's'}</option>)}
             </select>
           </label>
           <button type="button" className="key text-xs" onClick={reset}>
@@ -629,10 +674,10 @@ export function CircuitEditor() {
           <button type="button" className="key text-xs" onClick={exportLocal}>
             Exportar
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={scalarIssues.length > 0}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={hasSequential || scalarIssues.length > 0} title={hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
             Verilog
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={scalarIssues.length > 0}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={hasSequential || scalarIssues.length > 0} title={hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
             VHDL
           </button>
           <button type="button" className="key text-xs" onClick={() => fileInputRef.current?.click()}>
@@ -657,8 +702,9 @@ export function CircuitEditor() {
       </div>
 
       {showGuide && (
-        <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 dark:border-brand-900/70 dark:bg-brand-950/40 dark:text-brand-100">
-          <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, clique em uma linha da tabela para acender o circuito e use “Salvar local” para guardar o desenho no navegador.
+                  <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 dark:border-brand-900/70 dark:bg-brand-950/40 dark:text-brand-100">
+          <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, use Clock/DFF/TFF/Delay para circuitos com estado e salve o desenho no navegador. A tabela verdade permanece exclusiva para circuitos combinacionais.
+
         </div>
       )}
 
@@ -798,7 +844,7 @@ export function CircuitEditor() {
         />
       )}
 
-      {user && issues.length === 0 && (
+      {user && !hasSequential && issues.length === 0 && (
         <section className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900/70 dark:bg-violet-950/20">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -898,6 +944,28 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
   const lit = data.value === true
   const dot = `!h-1.5 !w-1.5 !border-0 ${lit ? '!bg-amber-500' : '!bg-slate-400 dark:!bg-slate-500'}`
 
+  if (data.kind === 'sequential') {
+    const isFlipFlop = data.componentType === 'dff' || data.componentType === 'tff'
+    const outputClass = `!h-1.5 !w-1.5 !border-0 ${lit ? '!bg-amber-500' : '!bg-slate-400 dark:!bg-slate-500'}`
+    return (
+      <div className="relative flex h-16 w-24 flex-col items-center justify-center rounded-lg border-2 border-brand-300 bg-white px-2 text-center shadow-sm dark:border-brand-700 dark:bg-slate-900" title={data.label}>
+        {data.inputs === 2 && (
+          <>
+            <Handle type="target" position={Position.Left} id="a" style={{ top: 22 }} className={dot} />
+            <Handle type="target" position={Position.Left} id="b" style={{ top: 42 }} className={dot} />
+          </>
+        )}
+        {data.inputs === 1 && <Handle type="target" position={Position.Left} id="a" className={dot} />}
+        <span className="font-mono text-sm font-black text-brand-700 dark:text-brand-300">{data.label}</span>
+        <span className="text-[10px] text-slate-500 dark:text-slate-400">
+          {data.componentType === 'clock' ? `período ${data.period ?? 1}` : data.componentType === 'delay' ? `${data.ticks ?? 1} tique(s)` : isFlipFlop ? 'Q · Q̄' : 'estado'}
+        </span>
+        <Handle type="source" position={Position.Right} id="q" style={isFlipFlop ? { top: 22 } : undefined} className={outputClass} />
+        {isFlipFlop && <Handle type="source" position={Position.Right} id="qbar" style={{ top: 42 }} className={outputClass} />}
+      </div>
+    )
+  }
+
   if (data.kind === 'input' || data.kind === 'constant') {
     return (
       <div className="flex items-center" style={{ height: 32 }} title={data.width > 1 ? `${data.label} · ${data.width} bits · ${data.busValue ?? 'sem avaliação'}` : data.label}>
@@ -937,15 +1005,25 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
   )
 }
 
+function buildNodeOptions(data: EditorNodeData): CircuitNode['options'] {
+  const options: NonNullable<CircuitNode['options']> = {}
+  if (data.componentType === 'constant') options.value = data.value ?? false
+  if (data.componentType === 'clock') options.period = Math.max(1, Math.floor(data.period ?? 1))
+  if (data.componentType === 'delay') options.ticks = Math.max(1, Math.floor(data.ticks ?? 1))
+  if (data.componentType === 'input' || data.componentType === 'clock' || data.componentType === 'dff' || data.componentType === 'tff') {
+    options.initial = data.initial ?? false
+  }
+  if (data.width !== 1) options.width = data.width
+  return Object.keys(options).length > 0 ? options : undefined
+}
+
 function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
   const editorNodes: CircuitNode[] = nodes.map((node) => ({
     id: node.id,
     type: node.data.componentType,
     position: node.position,
     label: node.data.label,
-    options: node.data.componentType === 'constant'
-      ? { value: node.data.value ?? false, ...(node.data.width !== 1 ? { width: node.data.width } : {}) }
-      : node.data.width !== 1 ? { width: node.data.width } : undefined,
+    options: buildNodeOptions(node.data),
   }))
 
   return {
@@ -957,7 +1035,7 @@ function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
       if (!edge.source || !edge.target) return []
       return [
         {
-          source: { node: edge.source },
+          source: { node: edge.source, ...(edge.sourceHandle === 'qbar' ? { port: 1 } : {}) },
           target: { node: edge.target, port: edge.targetHandle === 'b' ? 1 : 0 },
         },
       ]
@@ -966,7 +1044,13 @@ function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
 }
 
 function createNode(type: EditorComponentType, index: number, id = `${type}-${index + 1}`, width = 1): EditorFlowNode {
-  const kind = type === 'input' || type === 'constant' ? type : type === 'output' ? 'output' : 'gate'
+  const kind = type === 'input' || type === 'constant'
+    ? type
+    : type === 'output'
+      ? 'output'
+      : type === 'clock' || type === 'dff' || type === 'tff' || type === 'delay'
+        ? 'sequential'
+        : 'gate'
   const defaultValue = type === 'constant'
   const label = type === 'input' ? `I${index + 1}` : type === 'output' ? `O${index + 1}` : NODE_LABELS[type]
 
@@ -982,6 +1066,9 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       width,
       op: type === 'not' ? 'not' : type === 'and' || type === 'or' || type === 'xor' ? type : undefined,
       value: defaultValue,
+      initial: false,
+      period: type === 'clock' ? 1 : undefined,
+      ticks: type === 'delay' ? 1 : undefined,
     },
   }
 }
@@ -1027,16 +1114,24 @@ function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edg
           label: source.label ?? node.data.label,
           width: source.options?.width ?? 1,
           value: source.options?.value ?? source.options?.initial ?? node.data.value,
+          initial: source.options?.initial ?? false,
+          period: source.options?.period ?? 1,
+          ticks: source.options?.ticks ?? 1,
         },
       }
     }),
-    edges: document.connections.map((connection) => ({
-      id: `${connection.source.node}->${connection.target.node}:${connection.target.port === 1 ? 'b' : 'a'}`,
-      source: connection.source.node,
-      target: connection.target.node,
-      targetHandle: connection.target.port === 1 ? 'b' : 'a',
-      type: 'smoothstep',
-    })),
+    edges: document.connections.map((connection) => {
+      const sourceNode = document.nodes.find((node) => node.id === connection.source.node)
+      const hasNamedOutputs = sourceNode?.type === 'dff' || sourceNode?.type === 'tff'
+      return {
+        id: `${connection.source.node}->${connection.target.node}:${connection.source.port === 1 ? 'qbar' : 'q'}:${connection.target.port === 1 ? 'b' : 'a'}`,
+        source: connection.source.node,
+        ...(hasNamedOutputs ? { sourceHandle: connection.source.port === 1 ? 'qbar' : 'q' } : {}),
+        target: connection.target.node,
+        targetHandle: connection.target.port === 1 ? 'b' : 'a',
+        type: 'smoothstep',
+      }
+    }),
   }
 }
 
