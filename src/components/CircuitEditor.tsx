@@ -49,6 +49,7 @@ import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
 import { SequentialCircuitPanel } from './SequentialCircuitPanel'
 import type { DocumentRuntimeSnapshot, DocumentRuntimeState } from '../simulation/documentRuntime'
+import { runtimeFreshness } from '../realtime/runtimeFreshness'
 import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollaborator, type CircuitCollaborator, type CollaboratorRole } from '../realtime/circuitCollaborators'
 import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realtime/circuitRooms'
 
@@ -127,7 +128,7 @@ export function CircuitEditor() {
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [sequentialSnapshot, setSequentialSnapshot] = useState<DocumentRuntimeSnapshot | null>(null)
   const [remoteClockPeriods, setRemoteClockPeriods] = useState<Record<string, number> | null>(null)
-  const [remoteRuntimeState, setRemoteRuntimeState] = useState<DocumentRuntimeState | null>(null)
+  const [remoteRuntimeState, setRemoteRuntimeState] = useState<{ state: DocumentRuntimeState; sentAt: string; clientId: string; baseVersion: number } | null>(null)
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
   const [collaboratorUserId, setCollaboratorUserId] = useState('')
   const [collaboratorRole, setCollaboratorRole] = useState<CollaboratorRole>('editor')
@@ -144,13 +145,18 @@ export function CircuitEditor() {
     setNotice('Configuração temporal remota recebida; runtime reiniciado sem alterar o documento.')
   }, [cloud.versions])
 
-  const applyRemoteRuntimeState = useCallback((message: { state: DocumentRuntimeState; baseVersion: number }) => {
+  const applyRemoteRuntimeState = useCallback((message: { state: DocumentRuntimeState; baseVersion: number; sentAt: string; clientId: string }) => {
     const currentVersion = cloud.versions[0]?.versionNumber ?? 0
     if (message.baseVersion !== currentVersion) {
       setNotice(`Estado temporal remoto rejeitado: versão-base ${message.baseVersion} diverge da atual ${currentVersion}.`)
       return
     }
-    setRemoteRuntimeState(message.state)
+    const freshness = runtimeFreshness(message.sentAt)
+    if (!freshness) {
+      setNotice('Estado temporal remoto expirado e descartado.')
+      return
+    }
+    setRemoteRuntimeState({ state: message.state, sentAt: message.sentAt, clientId: message.clientId, baseVersion: message.baseVersion })
     setNotice('Estado temporal remoto recebido; confirme no painel para aplicá-lo localmente.')
   }, [cloud.versions])
 
@@ -371,6 +377,20 @@ export function CircuitEditor() {
       setRemoteRuntimeState(null)
     }
   }, [activeRoomId, cloudProjectId, user])
+
+  useEffect(() => {
+    if (!remoteRuntimeState) return
+    const freshness = runtimeFreshness(remoteRuntimeState.sentAt)
+    if (!freshness) {
+      setRemoteRuntimeState(null)
+      return
+    }
+    const timeout = window.setTimeout(() => {
+      setRemoteRuntimeState(null)
+      setNotice('A oferta de estado temporal expirou; execute novamente para receber um estado atual.')
+    }, freshness.expiresInMs)
+    return () => window.clearTimeout(timeout)
+  }, [remoteRuntimeState])
 
   useEffect(() => {
     if (collaborationStatus !== 'connected') return
@@ -831,7 +851,11 @@ export function CircuitEditor() {
         <SequentialCircuitPanel
           document={document}
           requestedClockPeriods={remoteClockPeriods ?? undefined}
-          requestedRuntimeState={remoteRuntimeState ?? undefined}
+          requestedRuntimeState={remoteRuntimeState?.state}
+          requestedRuntimeStateSentAt={remoteRuntimeState?.sentAt}
+          requestedRuntimeStateClientId={remoteRuntimeState?.clientId}
+          temporalPresenceCount={collaboration.participants.length}
+          temporalConnectionStatus={collaborationStatus}
           onSnapshot={setSequentialSnapshot}
           onClockPeriodsChange={publishClockPeriods}
           onRuntimeStateChange={publishRuntimeState}

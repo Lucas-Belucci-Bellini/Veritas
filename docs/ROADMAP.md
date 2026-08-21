@@ -252,3 +252,9 @@ O cliente valida projeto, room, versão-base, identificadores, faixa de 1–64 t
 A sétima fatia do v0.9.0 adiciona o evento privado `runtime_state`. Ele transmite, separadamente do documento, as entradas, períodos de clock, estado interno do `Simulator`, snapshot atual e os últimos 32 estados da timeline, protegidos por hash e `baseVersion`.
 
 O estado remoto nunca substitui automaticamente o runtime local. Ao receber uma mensagem válida da mesma room e versão-base, o editor exibe um aviso e oferece `Aplicar estado remoto`; somente essa ação restaura o estado no Simulator e no checkpoint local. Viewers não publicam estados. Assim, edição estrutural, configuração temporal e execução temporal continuam sendo fontes de verdade distintas e podem evoluir sem sobrescrita silenciosa.
+
+## Atualização da implementação — frescor, retenção e presença temporal
+
+A oitava fatia do v0.9.0 adiciona uma política de retenção para ofertas `runtime_state`: mensagens com mais de 30 segundos são descartadas antes da UI; timestamps até 5 segundos no futuro são tolerados para acomodar pequenas diferenças de relógio; timestamps inválidos ou muito futuros também são rejeitados.
+
+O painel exibe o status da colaboração temporal e a quantidade de participantes Presence online. Uma oferta válida mostra autor, tique e idade aproximada; após 30 segundos ela expira automaticamente e deixa de ser aplicável. A retenção é best-effort e em memória: o checkpoint local continua disponível para o usuário, mas uma oferta Realtime antiga nunca fica reutilizável indefinidamente.

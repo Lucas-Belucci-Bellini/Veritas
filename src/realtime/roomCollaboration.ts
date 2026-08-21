@@ -2,6 +2,7 @@ import type { RealtimeChannel, User } from '@supabase/supabase-js'
 import { MAX_BUS_WIDTH } from '../bus'
 import type { CircuitDocument } from '../circuit'
 import type { DocumentRuntimeState } from '../simulation/documentRuntime'
+import { isRuntimeStateFresh } from './runtimeFreshness'
 import { buildCircuitContext } from '../circuit'
 import { supabase } from '../lib/supabase'
 
@@ -296,6 +297,7 @@ function normalizeRuntimeState(value: unknown, room: RoomRef): RoomRuntimeState 
   if (!isRecord(value)) return null
   if (value.projectId !== room.projectId || value.roomId !== room.roomId) return null
   if (typeof value.clientId !== 'string' || typeof value.stateHash !== 'string' || typeof value.sentAt !== 'string') return null
+  if (!isRuntimeStateFresh(value.sentAt)) return null
   if (!isNonNegativeInteger(value.baseVersion) || !isRuntimeState(value.state)) return null
   if (hashRuntimeState(value.state) !== value.stateHash) return null
   return {
