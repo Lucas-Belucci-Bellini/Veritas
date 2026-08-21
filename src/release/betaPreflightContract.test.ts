@@ -8,6 +8,8 @@ describe('contrato de preflight beta', () => {
       strict: false,
       evidenceManifest: false,
       rls: false,
+      realtime: false,
+      edge: false,
       supabaseStructural: false,
       smoke: false,
     })
@@ -19,6 +21,8 @@ describe('contrato de preflight beta', () => {
       strict: true,
       evidenceManifest: true,
       rls: true,
+      realtime: true,
+      edge: true,
       supabaseStructural: true,
       smoke: true,
     })

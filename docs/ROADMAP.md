@@ -391,3 +391,9 @@ A aceitação prova interoperabilidade local do protocolo e das respostas, mas n
 O validador formal `betaEvidence` agora inclui o gate `mcp` na lista obrigatória. O `beta-preflight` ganhou um contrato puro que ativa modo estrito com `BETA_PREFLIGHT_STRICT=1`, com `BETA_PREFLIGHT_REQUIRE_EVIDENCE=1` ou automaticamente para versões `*-beta.N`.
 
 No modo estrito, a ausência de `BETA_EVIDENCE_MANIFEST`, `BETA_RLS_REPORT`, `BETA_SUPABASE_STRUCTURAL_REPORT` ou `SMOKE_URL` é FAIL, não SKIP. O manifesto também precisa declarar RLS, Realtime, HDL, acessibilidade, mobile, rollback, onboarding e MCP como PASS com evidência não vazia e nenhum P0/P1 aberto. O ensaio sem essas variáveis bloqueou a promoção como esperado, preservando a política de não promover sem contas descartáveis e evidências cross-user reais.
+
+## Atualização da implementação — proveniência anti-simulação das evidências — 2026-08-21
+
+Os runners RLS, Realtime e Edge agora escrevem marcadores de proveniência em seus relatórios. O preflight estrito valida esses marcadores, além dos IDs em PASS: quatro contas descartáveis e `RLS_RUNNER_ALLOW_REAL=1` para RLS; `REALTIME_RUNNER_ALLOW_REAL=1`, `RT_REQUIRE_REAL=1` e sessões autenticadas para Realtime; `RLS_EDGE_REQUIRE_AUTHENTICATED=1` e JWT descartável para Edge.
+
+Relatórios `SAFE`, `SKIP`, `ANONYMOUS_ONLY`, sem marcador, com cenário faltante ou com qualquer cenário não-PASS não são aceitos como evidência de promoção. A mudança não cria contas nem acessa credenciais; ela apenas torna o preflight incapaz de confundir smoke local com aceitação cross-user real.

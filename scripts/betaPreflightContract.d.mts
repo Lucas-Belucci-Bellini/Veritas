@@ -4,6 +4,8 @@ export declare function requiredEvidenceFlags(env?: Record<string, unknown>): {
   strict: boolean
   evidenceManifest: boolean
   rls: boolean
+  realtime: boolean
+  edge: boolean
   supabaseStructural: boolean
   smoke: boolean
 }

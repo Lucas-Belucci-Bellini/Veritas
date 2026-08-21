@@ -92,6 +92,9 @@ async function main() {
   const report = [
     `# Edge acceptance ${new Date().toISOString()}`,
     '',
+    'Execution mode: REAL',
+    `Authenticated mode: ${authenticatedRequired && accessToken ? 'REAL_REQUIRED' : 'ANONYMOUS_ONLY'}`,
+    `Authenticated disposable JWT: ${accessToken ? 'provided' : 'missing'}`,
     'Tokens não são gravados neste relatório.',
     '',
     ...results.map((item) => `${item.id} ${item.status} — ${item.operation}: ${item.message}`),

@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { validateBetaEvidenceManifest } from './betaEvidence.mjs'
 import { validateSupabaseStructuralAudit } from './supabaseStructuralAudit.mjs'
 import { requiredEvidenceFlags } from './betaPreflightContract.mjs'
+import { missingEvidenceMarkers, missingPassScenarios } from './betaEvidenceProvenance.mjs'
 
 const root = resolve(new URL('..', import.meta.url).pathname)
 const failures = []
@@ -196,11 +197,49 @@ function checkRlsReport() {
     return
   }
 
+  const missingMarkers = missingEvidenceMarkers(report, 'rls')
+  if (missingMarkers.length > 0) {
+    failures.push(`matriz RLS: proveniência ausente: ${missingMarkers.join(', ')}`)
+    console.error(`FAIL matriz RLS: proveniência ausente: ${missingMarkers.join(', ')}`)
+    return
+  }
   passes.push('matriz RLS real RLS-001…RLS-022')
   console.log('PASS matriz RLS real RLS-001…RLS-022')
 }
 
+function checkRealReport(name, envName, kind, required) {
+  const reportPath = process.env[envName]
+  if (!reportPath) {
+    if (required) {
+      failures.push(`${name}: ${envName} não foi definido`)
+      console.error(`FAIL ${name}: defina ${envName} com evidência real`)
+    } else {
+      recordSkip(name, `defina ${envName}; o modo estrito beta exige proveniência real`)
+    }
+    return
+  }
+  let report
+  try {
+    report = readFileSync(resolve(process.cwd(), reportPath), 'utf8')
+  } catch (error) {
+    failures.push(`${name}: não foi possível ler ${reportPath}`)
+    console.error(`FAIL ${name}: ${error instanceof Error ? error.message : String(error)}`)
+    return
+  }
+  const missingMarkers = missingEvidenceMarkers(report, kind)
+  const missingScenarios = missingPassScenarios(report, kind)
+  if (missingMarkers.length > 0 || missingScenarios.length > 0) {
+    if (missingMarkers.length > 0) failures.push(`${name}: proveniência ausente: ${missingMarkers.join(', ')}`)
+    if (missingScenarios.length > 0) failures.push(`${name}: cenários sem PASS explícito: ${missingScenarios.join(', ')}`)
+    console.error(`FAIL ${name}: evidência real incompleta`)
+    return
+  }
+  passes.push(`${name} real`)
+  console.log(`PASS ${name} real`)
+}
+
 console.log('Veritas beta preflight')
+
 console.log(`Diretório: ${root}`)
 console.log(`Versão no package.json: ${readPackageVersion()}`)
 console.log(`Modo estrito beta: ${evidenceFlags.strict ? 'ativo' : 'inativo'}`)
@@ -230,6 +269,8 @@ if (process.env.SMOKE_URL) {
 }
 
 checkRlsReport()
+checkRealReport('Realtime', 'BETA_REALTIME_REPORT', 'realtime', evidenceFlags.realtime)
+checkRealReport('Edge Function', 'BETA_EDGE_REPORT', 'edge', evidenceFlags.edge)
 checkEvidenceManifest()
 checkSupabaseStructuralAudit()
 

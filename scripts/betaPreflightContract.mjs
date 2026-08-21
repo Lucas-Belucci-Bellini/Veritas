@@ -15,6 +15,8 @@ export function requiredEvidenceFlags(env = {}) {
     strict,
     evidenceManifest: strict || isTruthyFlag(env.BETA_PREFLIGHT_REQUIRE_EVIDENCE),
     rls: strict || isTruthyFlag(env.BETA_PREFLIGHT_REQUIRE_RLS),
+    realtime: strict || isTruthyFlag(env.BETA_PREFLIGHT_REQUIRE_REALTIME),
+    edge: strict || isTruthyFlag(env.BETA_PREFLIGHT_REQUIRE_EDGE),
     supabaseStructural: strict || isTruthyFlag(env.BETA_PREFLIGHT_REQUIRE_SUPABASE_STRUCTURAL),
     smoke: strict || isTruthyFlag(env.BETA_PREFLIGHT_REQUIRE_SMOKE),
   }

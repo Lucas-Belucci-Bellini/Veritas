@@ -66,3 +66,15 @@ npm run beta:preflight
 ```
 
 A execução local sem essas variáveis continua útil para desenvolvimento e informa `SKIP`, mas não pode ser usada como prova de promoção. O ensaio de 2026-08-21 confirmou que o modo estrito bloqueia quando manifesto, RLS, auditoria Supabase ou smoke não estão disponíveis.
+
+## Proveniência anti-simulação
+
+O preflight estrito não aceita somente linhas `PASS`. Relatórios de RLS, Realtime e Edge precisam carregar marcadores de execução real emitidos pelos próprios runners:
+
+| Evidência | Marcadores obrigatórios | Condição adicional |
+| --- | --- | --- |
+| RLS | `Execution mode: REAL`, guard `RLS_RUNNER_ALLOW_REAL=1` e `Accounts: 4 disposable accounts`. | RLS-001 a RLS-022 em PASS. |
+| Realtime | `Execution mode: REAL_REQUIRED`, guard `REALTIME_RUNNER_ALLOW_REAL=1`, `RT_REQUIRE_REAL=1` e sessões autenticadas descartáveis. | RT-001 a RT-005 em PASS. |
+| Edge | `Execution mode: REAL`, `Authenticated mode: REAL_REQUIRED` e `Authenticated disposable JWT: provided`. | RLS-019, RLS-020 e RLS-021 em PASS. |
+
+O runner seguro local pode gerar relatórios úteis para desenvolvimento, mas seus marcadores `SAFE`, `SKIP` ou `ANONYMOUS_ONLY` não são aceitos como evidência de promoção. Isso evita que um relatório manualmente editado ou uma execução sem contas reais mascare um bloqueador P0/P1.
