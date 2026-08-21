@@ -42,30 +42,39 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
   const documentKey = useMemo(() => runtimeDocumentKey(document), [document])
   const [inputs, setInputs] = useState<Record<string, boolean>>({})
+  const [clockPeriods, setClockPeriods] = useState<Record<string, number>>({})
   const [timeline, setTimeline] = useState<DocumentRuntimeSnapshot[]>([])
   const [error, setError] = useState('')
   const [persistenceStatus, setPersistenceStatus] = useState('inicializando')
   const inputIds = useMemo(() => documentInputIds(document), [document])
+  const clockIds = useMemo(() => document.nodes.filter((node) => node.type === 'clock').map((node) => node.id), [document])
   const watches = useMemo(() => documentWatches(document), [document])
   const current = timeline[timeline.length - 1]
 
-  function persist(simulator: Simulator, nextInputs: Record<string, boolean>, nextTimeline: readonly DocumentRuntimeSnapshot[]): void {
+  function persist(
+    simulator: Simulator,
+    nextInputs: Record<string, boolean>,
+    nextClockPeriods: Record<string, number>,
+    nextTimeline: readonly DocumentRuntimeSnapshot[],
+  ): void {
     const saved = writeRuntimeCheckpoint({
       version: 1,
       documentKey,
       savedAt: new Date().toISOString(),
       inputs: nextInputs,
+      clockPeriods: nextClockPeriods,
       simulator: simulator.exportState(),
       timeline: [...nextTimeline],
     }, storage)
     setPersistenceStatus(saved ? 'salvo localmente' : 'somente memória')
   }
 
-  function initializeRuntime(clearSaved: boolean): void {
+  function initializeRuntime(clearSaved: boolean, overrideClockPeriods?: Record<string, number>): void {
     if (clearSaved) clearRuntimeCheckpoint(documentKey, storage)
     try {
-      const simulator = createDocumentRuntime(document)
       const saved = clearSaved ? null : readRuntimeCheckpoint(documentKey, storage)
+      const nextClockPeriods = overrideClockPeriods ?? saved?.clockPeriods ?? Object.fromEntries(clockIds.map((id) => [id, document.nodes.find((node) => node.id === id)?.options?.period ?? 1]))
+      const simulator = createDocumentRuntime(document, { clockPeriods: nextClockPeriods })
       let restored = false
       if (saved) {
         try {
@@ -82,6 +91,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
       const snapshot = snapshotDocumentRuntime(simulator)
       const nextTimeline = restored && saved?.timeline.length ? saved.timeline : [snapshot]
       setInputs(nextInputs)
+      setClockPeriods(nextClockPeriods)
       setTimeline(nextTimeline)
       setError('')
       setPersistenceStatus(restored ? 'checkpoint restaurado' : storage ? 'pronto para salvar localmente' : 'somente memória')
@@ -115,7 +125,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
       const snapshot = snapshotDocumentRuntime(simulator)
       const nextTimeline = appendTimeline(timeline, [snapshot])
       setTimeline(nextTimeline)
-      persist(simulator, inputs, nextTimeline)
+      persist(simulator, inputs, clockPeriods, nextTimeline)
       onSnapshot?.(snapshot)
       setError('')
     } catch (cause) {
@@ -135,7 +145,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
       }
       const nextTimeline = appendTimeline(timeline, next)
       setTimeline(nextTimeline)
-      persist(simulator, inputs, nextTimeline)
+      persist(simulator, inputs, clockPeriods, nextTimeline)
       onSnapshot?.(next[next.length - 1])
       setError('')
     } catch (cause) {
@@ -153,11 +163,17 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
       const nextTimeline = timeline.length ? [...timeline.slice(0, -1), snapshot] : [snapshot]
       setInputs(nextInputs)
       setTimeline(nextTimeline)
-      persist(simulator, nextInputs, nextTimeline)
+      persist(simulator, nextInputs, clockPeriods, nextTimeline)
       onSnapshot?.(snapshot)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível alterar a entrada.')
     }
+  }
+
+  function changeClockPeriod(id: string, period: number): void {
+    const nextClockPeriods = { ...clockPeriods, [id]: Math.max(1, Math.min(64, Math.floor(period))) }
+    setClockPeriods(nextClockPeriods)
+    initializeRuntime(true, nextClockPeriods)
   }
 
   const statusText = error ? 'erro' : current ? `tique ${current.tick}` : 'preparando'
@@ -176,6 +192,20 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
           <button type="button" className="key text-xs" onClick={() => initializeRuntime(true)}>Reset</button>
         </div>
       </div>
+
+      {clockIds.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Período do clock:</span>
+          {clockIds.map((id) => (
+            <label key={id} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 dark:border-emerald-900 dark:bg-slate-900 dark:text-slate-200">
+              {id}
+              <select value={clockPeriods[id] ?? 1} onChange={(event) => changeClockPeriod(id, Number(event.target.value))} className="rounded border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700" aria-label={`Período do clock ${id}`}>
+                {[1, 2, 3, 4, 8, 16, 32, 64].map((period) => <option key={period} value={period}>{period} tique{period === 1 ? '' : 's'}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+      )}
 
       {inputIds.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">

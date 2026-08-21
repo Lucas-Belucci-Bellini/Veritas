@@ -6,6 +6,7 @@ export interface RuntimeCheckpoint {
   documentKey: string
   savedAt: string
   inputs: Record<string, boolean>
+  clockPeriods: Record<string, number>
   simulator: SimulatorState
   timeline: DocumentRuntimeSnapshot[]
 }
@@ -47,6 +48,7 @@ export function readRuntimeCheckpoint(
       documentKey,
       savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : new Date(0).toISOString(),
       inputs: normalizeInputs(parsed.inputs),
+      clockPeriods: normalizeClockPeriods(parsed.clockPeriods),
       simulator: parsed.simulator,
       timeline: parsed.timeline.slice(-RUNTIME_CHECKPOINT_TIMELINE_LIMIT),
     }
@@ -97,6 +99,16 @@ function isSnapshot(value: unknown): value is DocumentRuntimeSnapshot {
 
 function normalizeInputs(value: Record<string, unknown>): Record<string, boolean> {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => typeof item === 'boolean')) as Record<string, boolean>
+}
+
+function normalizeClockPeriods(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([id, period]) => {
+      if (typeof period !== 'number' || !Number.isInteger(period) || period < 1 || period > 64) return []
+      return [[id, period]]
+    }),
+  )
 }
 
 function hashString(value: string): string {

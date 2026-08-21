@@ -12,14 +12,34 @@ export interface DocumentRuntimeWatch {
   port?: number
 }
 
-export function createDocumentRuntime(document: CircuitDocument): Simulator {
-  const simulator = new Simulator(toNetlist(document))
-  for (const node of document.nodes) {
+export interface DocumentRuntimeOptions {
+  clockPeriods?: Readonly<Record<string, number>>
+}
+
+export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
+  const runtimeDocument = applyClockPeriods(document, options.clockPeriods)
+  const simulator = new Simulator(toNetlist(runtimeDocument))
+  for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {
       simulator.setInput(node.id, node.options.initial)
     }
   }
   return simulator
+}
+
+function applyClockPeriods(
+  document: CircuitDocument,
+  clockPeriods: Readonly<Record<string, number>> | undefined,
+): CircuitDocument {
+  if (!clockPeriods) return document
+  return {
+    ...document,
+    nodes: document.nodes.map((node) => {
+      const period = clockPeriods[node.id]
+      if (node.type !== 'clock' || period === undefined) return node
+      return { ...node, options: { ...node.options, period: Math.max(1, Math.min(64, Math.floor(period))) } }
+    }),
+  }
 }
 
 export function snapshotDocumentRuntime(simulator: Simulator): DocumentRuntimeSnapshot {

@@ -234,3 +234,9 @@ O runtime mantém a propagação síncrona do simulador e falha de forma visíve
 A quarta fatia do v0.9.0 adiciona `exportState()` e `restoreState()` ao `Simulator` e persiste o checkpoint do documento sequencial no `localStorage` quando disponível. A chave é derivada do conteúdo estrutural do documento, sem usar nome ou credenciais, e o payload guarda o estado interno necessário para continuar clock, flip-flops e delays no mesmo tique.
 
 O checkpoint inclui entradas, snapshot do simulador e os últimos 32 estados da timeline. Ao reabrir o mesmo documento, o painel restaura automaticamente o estado; `Reset` remove o checkpoint e começa novamente pelos valores iniciais. Ausência, quota excedida ou corrupção do armazenamento degradam para execução somente em memória e nunca interrompem a funcionalidade principal.
+
+## Atualização da implementação — período de clock configurável no runtime
+
+A quinta fatia do v0.9.0 permite alterar o período de cada componente `clock` diretamente no painel temporal, com opções de 1 a 64 tiques. A mudança não muta o documento visual: ela cria um runtime derivado, reinicia a execução e limpa a timeline anterior para que estados produzidos por cadências diferentes não sejam misturados.
+
+A configuração escolhida é persistida junto ao checkpoint do documento e restaurada na próxima abertura. Períodos inválidos são descartados pelo parser local; valores efetivos permanecem limitados ao intervalo seguro de 1 a 64 tiques. O próximo passo é levar essa configuração temporal para a colaboração opcional, preservando o documento canônico e tratando mudanças concorrentes explicitamente.

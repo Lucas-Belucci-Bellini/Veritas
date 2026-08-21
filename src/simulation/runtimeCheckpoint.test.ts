@@ -77,6 +77,7 @@ describe('runtimeCheckpoint', () => {
       documentKey: key,
       savedAt: new Date(0).toISOString(),
       inputs: { d: true },
+      clockPeriods: {},
       simulator: simulator.exportState(),
       timeline: [snapshot],
     }, storage)).toBe(true)
@@ -88,6 +89,24 @@ describe('runtimeCheckpoint', () => {
 
     clearRuntimeCheckpoint(key, storage)
     expect(readRuntimeCheckpoint(key, storage)).toBeNull()
+  })
+
+  it('normaliza períodos inválidos e mantém somente configurações seguras', () => {
+    const storage = new MemoryStorage()
+    const document = { format: 'veritas-circuit', version: 1, nodes: [], connections: [] }
+    const key = runtimeDocumentKey(document)
+    const simulator = new Simulator({ components: [] })
+    writeRuntimeCheckpoint({
+      version: 1,
+      documentKey: key,
+      savedAt: new Date(0).toISOString(),
+      inputs: {},
+      clockPeriods: { clk: 2, invalid: 0 },
+      simulator: simulator.exportState(),
+      timeline: [{ tick: 0, values: {} }],
+    }, storage)
+
+    expect(readRuntimeCheckpoint(key, storage)?.clockPeriods).toEqual({ clk: 2 })
   })
 
   it('ignora payload corrompido sem interromper o fluxo local', () => {
