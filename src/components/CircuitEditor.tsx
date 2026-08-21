@@ -123,6 +123,7 @@ export function CircuitEditor() {
   const { user } = useAuth()
   const cloud = useCloudCircuitProjects()
   const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
+  const [lastAppliedRemoteVersion, setLastAppliedRemoteVersion] = useState<number | null>(null)
   const [pendingRemoteSnapshot, setPendingRemoteSnapshot] = useState<CircuitBroadcast | null>(null)
   const lastSyncedDocumentRef = useRef<CircuitDocument | null>(null)
   const [rooms, setRooms] = useState<CircuitRoom[]>([])
@@ -177,6 +178,7 @@ export function CircuitEditor() {
   const applyRemoteSnapshot = useCallback((message: CircuitBroadcast): boolean => {
     if (validateCircuit(message.document).length > 0) return false
     lastSyncedDocumentRef.current = message.document
+    setLastAppliedRemoteVersion(message.baseVersion)
     setPendingRemoteSnapshot(null)
     historyRef.current?.replace(message.document)
     setHistoryRevision((current) => current + 1)
@@ -542,6 +544,7 @@ export function CircuitEditor() {
     loadProject(project, setNodes, setEdges, setProjectName, setActiveProjectId)
     setCloudProjectId(null)
     lastSyncedDocumentRef.current = null
+    setLastAppliedRemoteVersion(null)
     setPendingRemoteSnapshot(null)
     setActiveRoomId('main')
     setSelectedRow(null)
@@ -641,6 +644,7 @@ export function CircuitEditor() {
       const result = await cloud.sync(name, { ...document, name }, cloudProjectId ?? undefined)
       setCloudProjectId(result.project.id)
       lastSyncedDocumentRef.current = result.version.document
+      setLastAppliedRemoteVersion(null)
       setPendingRemoteSnapshot(null)
       setActiveRoomId('main')
       setProjectName(result.project.name)
@@ -659,6 +663,7 @@ export function CircuitEditor() {
     setProjectName(project.name)
     setCloudProjectId(project.id)
     lastSyncedDocumentRef.current = project.document
+    setLastAppliedRemoteVersion(null)
     setPendingRemoteSnapshot(null)
     setActiveRoomId('main')
     setActiveProjectId(null)
@@ -1007,7 +1012,7 @@ export function CircuitEditor() {
               </div>
             </div>
           )}
-          {collaboration.lastRemoteVersion !== null && <p className="mt-1 opacity-80" role="status" aria-live="polite">Última atualização remota aplicada: versão {collaboration.lastRemoteVersion}</p>}
+          {lastAppliedRemoteVersion !== null && <p className="mt-1 opacity-80" role="status" aria-live="polite">Última atualização remota aplicada: versão {lastAppliedRemoteVersion}</p>}
           {collaboration.participants.length > 0 && <p className="mt-1 opacity-80">{collaboration.participants.map((participant) => participant.label).join(' · ')}</p>}
         </div>
       )}

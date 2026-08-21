@@ -471,3 +471,7 @@ A mudança não altera a política de autorização nem aplica documentos fora d
 O CircuitEditor agora compara o documento local com o último baseline sincronizado antes de aplicar um snapshot Realtime. Se o local estiver limpo, a atualização remota é aplicada; se já estiver refletida, é ignorada; se houver alterações locais não sincronizadas, o snapshot fica pendente e o usuário escolhe entre `Aplicar alteração remota` e `Manter alterações locais`.
 
 O baseline é atualizado ao abrir ou sincronizar um projeto cloud e é limpo ao abrir um projeto local. O callback de colaboração informa ao hook se o snapshot foi realmente aplicado, evitando que a versão remota exibida no painel represente uma mensagem apenas adiada. O contrato puro `src/circuit/remoteConflict.ts` e seus testes cobrem as três decisões.
+
+## Atualização da implementação — versão remota aplicada com precisão — 2026-08-21
+
+A indicação `Última atualização remota aplicada` passou a ser um estado local do CircuitEditor, atualizado dentro de `applyRemoteSnapshot`. Assim, um snapshot adiado por conflito ou ignorado por já estar refletido não aparece como aplicado; ao clicar em `Aplicar alteração remota`, a versão passa a ser registrada corretamente. A troca para projeto local e a sincronização de um novo projeto limpam esse indicador.
