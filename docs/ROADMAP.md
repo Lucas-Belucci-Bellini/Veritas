@@ -465,3 +465,9 @@ A validação estrutural agora rejeita timestamps inválidos, e os eventos locai
 O hook `useCircuitCollaboration` passou a encaminhar o envelope completo do snapshot remoto, preservando `baseVersion` para a camada de UI. O CircuitEditor agora informa quando uma alteração remota foi aplicada e exibe a última versão remota aplicada em uma região acessível com `role="status"` e `aria-live="polite"`, junto da sala ativa, conexão e participantes.
 
 A mudança não altera a política de autorização nem aplica documentos fora do fluxo já validado. Quando a colaboração está desativada ou desconectada, o editor continua funcionando localmente. O gate A11Y mantém a regressão estrutural do novo status.
+
+## Atualização da implementação — proteção contra sobrescrita remota — 2026-08-21
+
+O CircuitEditor agora compara o documento local com o último baseline sincronizado antes de aplicar um snapshot Realtime. Se o local estiver limpo, a atualização remota é aplicada; se já estiver refletida, é ignorada; se houver alterações locais não sincronizadas, o snapshot fica pendente e o usuário escolhe entre `Aplicar alteração remota` e `Manter alterações locais`.
+
+O baseline é atualizado ao abrir ou sincronizar um projeto cloud e é limpo ao abrir um projeto local. O callback de colaboração informa ao hook se o snapshot foi realmente aplicado, evitando que a versão remota exibida no painel represente uma mensagem apenas adiada. O contrato puro `src/circuit/remoteConflict.ts` e seus testes cobrem as três decisões.

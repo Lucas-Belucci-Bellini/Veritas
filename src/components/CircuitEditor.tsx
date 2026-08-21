@@ -25,6 +25,7 @@ import {
   evaluateCircuitVectors,
   exportCircuit,
   validateCircuit,
+  decideRemoteCircuitUpdate,
   type CircuitDocument,
   type CircuitEvaluation,
   type CircuitNode,
@@ -122,6 +123,8 @@ export function CircuitEditor() {
   const { user } = useAuth()
   const cloud = useCloudCircuitProjects()
   const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
+  const [pendingRemoteSnapshot, setPendingRemoteSnapshot] = useState<CircuitBroadcast | null>(null)
+  const lastSyncedDocumentRef = useRef<CircuitDocument | null>(null)
   const [rooms, setRooms] = useState<CircuitRoom[]>([])
   const [activeRoomId, setActiveRoomId] = useState('main')
   const [newRoomId, setNewRoomId] = useState('')
@@ -171,8 +174,10 @@ export function CircuitEditor() {
     setNotice('Estado temporal remoto recebido; confirme no painel para aplicá-lo localmente.')
   }, [cloud.versions, recordRuntimeEvent])
 
-  const applyRemoteDocument = useCallback((message: CircuitBroadcast) => {
-    if (validateCircuit(message.document).length > 0) return
+  const applyRemoteSnapshot = useCallback((message: CircuitBroadcast): boolean => {
+    if (validateCircuit(message.document).length > 0) return false
+    lastSyncedDocumentRef.current = message.document
+    setPendingRemoteSnapshot(null)
     historyRef.current?.replace(message.document)
     setHistoryRevision((current) => current + 1)
     const flow = fromDocument(message.document)
@@ -181,7 +186,22 @@ export function CircuitEditor() {
     setProjectName(message.document.name)
     setSelectedRow(null)
     setNotice(`Alteração remota v${message.baseVersion} aplicada de outro colaborador.`)
+    return true
   }, [setEdges, setNodes])
+  const applyRemoteDocument = useCallback((message: CircuitBroadcast): boolean => {
+    const decision = decideRemoteCircuitUpdate(document, lastSyncedDocumentRef.current, message.document)
+    if (decision.action === 'ignore') return false
+    if (decision.action === 'defer') {
+      setPendingRemoteSnapshot(message)
+      setNotice(`Alteração remota v${message.baseVersion} aguardando sua decisão; alterações locais não foram sobrescritas.`)
+      return false
+    }
+    return applyRemoteSnapshot(message)
+  }, [applyRemoteSnapshot, document])
+  const keepLocalChanges = useCallback(() => {
+    setPendingRemoteSnapshot(null)
+    setNotice('Alteração remota mantida em espera; suas alterações locais continuam no editor.')
+  }, [])
   const collaborationBaseVersion = cloud.versions[0]?.versionNumber ?? 0
   const collaboration = useCircuitCollaboration({
     projectId: cloudProjectId,
@@ -520,6 +540,10 @@ export function CircuitEditor() {
     historyRef.current?.replace(project.document)
     setHistoryRevision((current) => current + 1)
     loadProject(project, setNodes, setEdges, setProjectName, setActiveProjectId)
+    setCloudProjectId(null)
+    lastSyncedDocumentRef.current = null
+    setPendingRemoteSnapshot(null)
+    setActiveRoomId('main')
     setSelectedRow(null)
     setNotice(`Circuito local "${project.name}" aberto.`)
   }
@@ -616,6 +640,8 @@ export function CircuitEditor() {
       const name = projectName.trim() || document.name
       const result = await cloud.sync(name, { ...document, name }, cloudProjectId ?? undefined)
       setCloudProjectId(result.project.id)
+      lastSyncedDocumentRef.current = result.version.document
+      setPendingRemoteSnapshot(null)
       setActiveRoomId('main')
       setProjectName(result.project.name)
       setNotice(`Circuito "${result.project.name}" sincronizado na nuvem na versão ${result.version.versionNumber}.`)
@@ -632,6 +658,8 @@ export function CircuitEditor() {
     setEdges(flow.edges)
     setProjectName(project.name)
     setCloudProjectId(project.id)
+    lastSyncedDocumentRef.current = project.document
+    setPendingRemoteSnapshot(null)
     setActiveRoomId('main')
     setActiveProjectId(null)
     setSelectedRow(null)
@@ -970,6 +998,15 @@ export function CircuitEditor() {
             <button type="button" className="key text-xs" onClick={() => void createRoom()} disabled={!newRoomId.trim()}>Criar sala</button>
           </div>
           {collaboration.error && <p className="mt-1">{collaboration.error}</p>}
+          {pendingRemoteSnapshot && (
+            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-100/60 p-2 dark:border-amber-800 dark:bg-amber-950/30" role="alert" aria-live="assertive">
+              <p>Alteração remota versão {pendingRemoteSnapshot.baseVersion} aguardando decisão. Suas alterações locais não foram sobrescritas.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className="key text-xs" onClick={() => applyRemoteSnapshot(pendingRemoteSnapshot)}>Aplicar alteração remota</button>
+                <button type="button" className="key text-xs" onClick={keepLocalChanges}>Manter alterações locais</button>
+              </div>
+            </div>
+          )}
           {collaboration.lastRemoteVersion !== null && <p className="mt-1 opacity-80" role="status" aria-live="polite">Última atualização remota aplicada: versão {collaboration.lastRemoteVersion}</p>}
           {collaboration.participants.length > 0 && <p className="mt-1 opacity-80">{collaboration.participants.map((participant) => participant.label).join(' · ')}</p>}
         </div>

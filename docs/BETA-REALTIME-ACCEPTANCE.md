@@ -7,7 +7,7 @@
 
 ## 1. Contrato autorizado
 
-O cliente abre canais privados no formato `veritas:project:{projectId}:room:{roomId}`. O contrato de Broadcast permite somente os três eventos abaixo; qualquer outro nome fica fora da allowlist e não pode ser usado como evidência de colaboração temporal. No editor, a sala ativa, o estado da conexão, os participantes e a última versão remota aplicada são exibidos em português; quando a colaboração está desativada ou desconectada, o modo local-first continua sendo o caminho principal.
+O cliente abre canais privados no formato `veritas:project:{projectId}:room:{roomId}`. O contrato de Broadcast permite somente os três eventos abaixo; qualquer outro nome fica fora da allowlist e não pode ser usado como evidência de colaboração temporal. No editor, a sala ativa, o estado da conexão, os participantes e a última versão remota aplicada são exibidos em português; quando a colaboração está desativada ou desconectada, o modo local-first continua sendo o caminho principal. Se houver alterações locais desde a última sincronização, um snapshot remoto fica pendente e o editor oferece `Aplicar alteração remota` ou `Manter alterações locais`, sem sobrescrita silenciosa.
 
 | Evento | Finalidade | Leitura | Publicação |
 |---|---|---|---|
