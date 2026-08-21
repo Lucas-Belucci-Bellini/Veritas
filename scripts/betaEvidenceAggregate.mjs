@@ -8,7 +8,7 @@ function isRecord(value) {
 }
 
 function parseStatusLine(line) {
-  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021|RT-\d{3}|HDL-\d{3}|A11Y-\d{3})\s+(PASS|FAIL|SKIP|PENDING)\b/i)
+  const match = line.match(/^(RLS-\d{3}|RLS-EDGE-\d{3}|RLS-019|RLS-020|RLS-021|RT-\d{3}|HDL-\d{3}|A11Y-\d{3}|RB-\d{3})\s+(PASS|FAIL|SKIP|PENDING)\b/i)
   return match ? { id: match[1], status: match[2].toUpperCase() } : null
 }
 
@@ -43,6 +43,7 @@ export function aggregateBetaEvidence({
   realtimeReport = '',
   hdlReport = '',
   accessibilityReport = '',
+  rollbackReport = '',
   structuralReport = null,
   structuralProjectId = '',
   evidencePaths = {},
@@ -52,6 +53,7 @@ export function aggregateBetaEvidence({
   const realtimeStatuses = parseEvidenceReport(realtimeReport)
   const hdlStatuses = parseEvidenceReport(hdlReport)
   const accessibilityStatuses = parseEvidenceReport(accessibilityReport)
+  const rollbackStatuses = parseEvidenceReport(rollbackReport)
   const openP0 = []
   const openP1 = []
   const gates = {}
@@ -77,6 +79,10 @@ export function aggregateBetaEvidence({
   const accessibilityIds = ['A11Y-001', 'A11Y-002', 'A11Y-003', 'A11Y-004', 'A11Y-005']
   gates.accessibility = gateFromStatuses(accessibilityStatuses, accessibilityIds, evidencePaths.accessibility ?? '')
   addBlocker(openP1, 'ACCESSIBILITY-EVIDENCE-INCOMPLETE', gates.accessibility)
+
+  const rollbackIds = ['RB-001', 'RB-002', 'RB-003', 'RB-004', 'RB-005']
+  gates.rollback = gateFromStatuses(rollbackStatuses, rollbackIds, evidencePaths.rollback ?? '')
+  addBlocker(openP1, 'ROLLBACK-EVIDENCE-INCOMPLETE', gates.rollback)
 
   const structuralErrors = structuralReport
     ? validateSupabaseStructuralAudit(structuralReport, structuralProjectId)

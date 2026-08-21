@@ -361,3 +361,11 @@ A fatia de acessibilidade adiciona um contrato executável A11Y-001 a A11Y-005 e
 No produto, o `main` recebeu identificação e foco programático, o shell ganhou “Pular para o conteúdo principal”, as linhas interativas da tabela verdade respondem a Enter/Espaço e exibem `aria-selected`, e o foco visível global passou a ser consistente. O PWA anuncia atualização/conectividade com `aria-live="polite"`; o editor nomeia paleta, canvas, status e UUID de colaborador, respeitando `prefers-reduced-motion` e uma altura responsiva mínima para telas pequenas.
 
 O workflow de qualidade executa o gate A11Y em cada push/pull request. O agregador beta consome `BETA_ACCESSIBILITY_REPORT` e só marca `gates.accessibility` como `PASS` quando os cinco IDs possuem PASS explícito. O relatório operacional está em `docs/BETA-ACCESSIBILITY-ACCEPTANCE.md`. A evidência estrutural não substitui inspeção manual em Chromium, Firefox, WebKit/iOS, viewport móvel, leitor de tela, zoom e instalação PWA; a promoção beta continua bloqueada até esses testes e os demais gates externos.
+
+## Atualização da implementação — rollback ensaiável e recuperação operacional — 2026-08-21
+
+Foi criado `npm run beta:rollback` com os cenários RB-001 a RB-005. O runner confirma que `v0.9.0-rc.1` resolve para um commit estável, que existe parent e release anterior recuperável, que o runbook contém salvaguardas P0/P1, que IndexedDB e histórico de versões passam os testes de recuperação e que o workflow de release valida refs sem reescrever tags existentes.
+
+O ensaio é deliberadamente não destrutivo: não move tags, não apaga releases, não reescreve migrations, não altera Supabase, não executa rollback de deployment e não limpa IndexedDB. A recuperação real de produção continua sendo uma ação operacional no provedor de deployment, seguida de `smoke:release`, abertura de circuito local, leitura de versão remota autorizada e registro do incidente. O runbook completo está em `docs/ROLLBACK-RUNBOOK.md`.
+
+O workflow de qualidade agora executa o runner de rollback. O agregador beta consome `BETA_ROLLBACK_REPORT` e só marca `gates.rollback` como `PASS` quando RB-001 a RB-005 possuem PASS explícito. Sem o ensaio e sem o registro operacional, `ROLLBACK-EVIDENCE-INCOMPLETE` permanece em `openP1` e a promoção beta continua bloqueada.

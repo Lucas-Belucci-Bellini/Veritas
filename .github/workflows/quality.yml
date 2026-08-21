@@ -57,6 +57,11 @@ jobs:
       - name: Accessibility and mobile acceptance
         run: npm run beta:accessibility
 
+      - name: Rollback acceptance
+        env:
+          ROLLBACK_CURRENT_TAG: v0.9.0-rc.1
+        run: npm run beta:rollback
+
       - name: Start production-like preview
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/veritas-preview.log" 2>&1 &

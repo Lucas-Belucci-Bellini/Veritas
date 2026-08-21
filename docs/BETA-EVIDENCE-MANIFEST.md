@@ -9,6 +9,7 @@ BETA_EDGE_REPORT=artifacts/edge-acceptance.md \
 BETA_REALTIME_REPORT=artifacts/realtime-acceptance.md \
 BETA_HDL_REPORT=artifacts/hdl-acceptance.md \
 BETA_ACCESSIBILITY_REPORT=artifacts/accessibility-acceptance.md \
+BETA_ROLLBACK_REPORT=artifacts/rollback-acceptance.md \
 BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural.json \
 BETA_SUPABASE_PROJECT_ID=hcwzsxdcvmswebunznak \
 BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
@@ -35,6 +36,7 @@ BETA_RLS_REPORT=artifacts/rls-acceptance.md \
 BETA_REALTIME_REPORT=artifacts/realtime-acceptance.md \
 BETA_HDL_REPORT=artifacts/hdl-acceptance.md \
 BETA_ACCESSIBILITY_REPORT=artifacts/accessibility-acceptance.md \
+BETA_ROLLBACK_REPORT=artifacts/rollback-acceptance.md \
 BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural.json \
 SMOKE_URL=https://veritas-opal-seven.vercel.app \
 npm run beta:preflight
