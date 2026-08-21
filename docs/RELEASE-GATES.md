@@ -47,10 +47,15 @@ BETA_PREFLIGHT_REQUIRE_RLS=1 \
 BETA_RLS_REPORT=artifacts/rls-acceptance.md \
 BETA_PREFLIGHT_REQUIRE_EVIDENCE=1 \
 BETA_EVIDENCE_MANIFEST=artifacts/beta-evidence.json \
+BETA_PREFLIGHT_REQUIRE_SUPABASE_STRUCTURAL=1 \
+BETA_SUPABASE_PROJECT_ID=hcwzsxdcvmswebunznak \
+BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural-audit.json \
 npm run beta:preflight
 ```
 
 O manifesto JSON de evidências deve declarar a mesma versão candidata, `generatedAt`, listas vazias `openP0` e `openP1` e os gates `rls`, `realtime`, `hdl`, `accessibility`, `mobile`, `rollback` e `onboarding`. Cada gate precisa ter `status: "PASS"` e uma referência não vazia em `evidence`. O preflight valida o contrato, mas não inventa nem substitui as evidências externas.
+
+A auditoria estrutural Supabase é um gate separado. O arquivo indicado por `BETA_SUPABASE_STRUCTURAL_REPORT` deve listar o `projectId`, as seis tabelas Veritas com `rlsEnabled: true` e `policyCount` positivo, além das quatro policies Realtime ROOM-001. Ela confirma schema e policies implantados, mas não pode ser usada sozinha como aprovação RLS cross-user.
 
 Exemplo mínimo de estrutura, a ser preenchido somente com resultados reais:
 

@@ -164,7 +164,7 @@ drop policy if exists veritas_circuit_projects_update_own on public.veritas_circ
 create policy veritas_circuit_projects_update_editor
   on public.veritas_circuit_projects for update to authenticated
   using (public.veritas_can_edit_project(id))
-  with check (user_id = (select p.user_id from public.veritas_circuit_projects p where p.id = id));
+  with check (user_id = (select p.user_id from public.veritas_circuit_projects as p where p.id = public.veritas_circuit_projects.id));
 
 drop function if exists public.veritas_sync_circuit_project(uuid, text, jsonb, text, jsonb);
 create or replace function public.veritas_sync_circuit_project(

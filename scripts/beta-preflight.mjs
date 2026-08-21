@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { validateBetaEvidenceManifest } from './betaEvidence.mjs'
+import { validateSupabaseStructuralAudit } from './supabaseStructuralAudit.mjs'
 
 const root = resolve(new URL('..', import.meta.url).pathname)
 const failures = []
@@ -126,6 +127,39 @@ function checkEvidenceManifest() {
   console.log(`PASS manifesto beta ${expectedVersion}`)
 }
 
+function checkSupabaseStructuralAudit() {
+  const reportPath = process.env.BETA_SUPABASE_STRUCTURAL_REPORT
+  const required = envFlag('BETA_PREFLIGHT_REQUIRE_SUPABASE_STRUCTURAL')
+  if (!reportPath) {
+    if (required) {
+      failures.push('auditoria estrutural Supabase: BETA_SUPABASE_STRUCTURAL_REPORT não foi definido')
+      console.error('FAIL auditoria estrutural Supabase: defina BETA_SUPABASE_STRUCTURAL_REPORT')
+    } else {
+      recordSkip('auditoria estrutural Supabase', 'defina BETA_SUPABASE_STRUCTURAL_REPORT; use BETA_PREFLIGHT_REQUIRE_SUPABASE_STRUCTURAL=1 para torná-la obrigatória')
+    }
+    return
+  }
+
+  let report
+  try {
+    report = JSON.parse(readFileSync(resolve(process.cwd(), reportPath), 'utf8'))
+  } catch (error) {
+    failures.push(`auditoria estrutural Supabase: não foi possível ler ou interpretar ${reportPath}`)
+    console.error(`FAIL auditoria estrutural Supabase: ${error instanceof Error ? error.message : String(error)}`)
+    return
+  }
+
+  const errors = validateSupabaseStructuralAudit(report, process.env.BETA_SUPABASE_PROJECT_ID)
+  if (errors.length > 0) {
+    failures.push(`auditoria estrutural Supabase: ${errors.join('; ')}`)
+    console.error(`FAIL auditoria estrutural Supabase: ${errors.join('; ')}`)
+    return
+  }
+
+  passes.push('auditoria estrutural Supabase')
+  console.log('PASS auditoria estrutural Supabase')
+}
+
 function checkRlsReport() {
   const reportPath = process.env.BETA_RLS_REPORT
   const required = envFlag('BETA_PREFLIGHT_REQUIRE_RLS')
@@ -194,6 +228,7 @@ if (process.env.SMOKE_URL) {
 
 checkRlsReport()
 checkEvidenceManifest()
+checkSupabaseStructuralAudit()
 
 console.log('\nResumo do preflight')
 console.log(`PASS: ${passes.length}`)

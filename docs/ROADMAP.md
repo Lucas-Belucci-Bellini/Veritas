@@ -286,3 +286,11 @@ Após a publicação da `v0.9.0-rc.1`, o beta preflight foi ampliado sem alterar
 A checagem é opcional para desenvolvimento local e torna-se obrigatória com `BETA_PREFLIGHT_REQUIRE_EVIDENCE=1` e `BETA_EVIDENCE_MANIFEST=...`. O preflight continua sem criar sessões Supabase ou inventar resultados: ele apenas rejeita manifestos incompletos, versões divergentes, gates pendentes e bloqueadores abertos. Foram adicionados testes para manifesto válido, versão divergente, P1 aberto, gate pendente, evidência vazia e gate ausente.
 
 Os documentos `docs/RELEASE-GATES.md`, `docs/BETA-RLS-ACCEPTANCE.md` e `docs/RELEASE-PLAN.md` agora apontam para a `v0.9.0-rc.1` e explicitam que nenhuma `v0.9.0-beta.1` deve ser criada sem evidências externas reais e zero P0/P1.
+
+## Atualização da implementação — auditoria estrutural Supabase e correção de policy — 2026-08-21
+
+A validação beta agora possui uma auditoria estrutural separada em `docs/BETA-SUPABASE-STRUCTURAL-AUDIT.md`. No projeto Supabase existente `hcwzsxdcvmswebunznak`, as seis tabelas Veritas foram encontradas com RLS habilitado e policies registradas; as quatro policies Realtime ROOM-001 também foram encontradas no catálogo implantado. Essa captura confirma schema e configuração, mas não é uma aprovação cross-user.
+
+Durante a auditoria foi detectada uma expressão ambígua na policy `veritas_circuit_projects_update_editor`: o subselect materializado usava `p.id = p.id`. A migration `20260821030000_fix_veritas_project_update_policy.sql` foi aplicada no Supabase existente e a policy foi reconsultada com referência explícita a `public.veritas_circuit_projects.id`. As migrations ROOM-001 original e de hardening foram alinhadas para preservar a reprodutibilidade em novos ambientes.
+
+O beta preflight agora aceita `BETA_SUPABASE_STRUCTURAL_REPORT` e, quando `BETA_PREFLIGHT_REQUIRE_SUPABASE_STRUCTURAL=1`, rejeita project_id divergente, tabelas sem RLS/policy e policies Realtime obrigatórias ausentes. Os Security Advisors ainda reportam avisos de funções `SECURITY DEFINER` executáveis por usuários autenticados, proteção contra senhas vazadas desabilitada e uma tabela externa sem policy; esses avisos permanecem documentados como bloqueadores de revisão e não foram mascarados como PASS.
