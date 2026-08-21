@@ -302,3 +302,11 @@ A migration `20260821033000_harden_veritas_authorization_surface.sql` foi aplica
 As RPCs públicas de colaboradores preservaram nomes e argumentos, mas passaram a `SECURITY INVOKER` com policies RLS de owner para insert/update/delete. As RPCs de room e sincronização continuaram invoker. A consulta pós-migration confirmou que os três helpers existem somente em `private`, que os quatro endpoints públicos do Veritas estão invoker e que `anon` não executa nenhum deles. Os Security Advisors deixaram de reportar os helpers/RPCs do Veritas.
 
 Continuam bloqueadores externos à fatia: funções legadas `bump_view`, `bump_visits`, `buscar_juris` e `current_tenant_role`, proteção contra senhas vazadas desabilitada e `subscription_events` sem policy. O beta ainda exige a execução real de RLS-001 a RLS-022 com owner, outro usuário e papéis editor/viewer; catálogo, grants e advisors não substituem isolamento cross-user.
+
+## Atualização da implementação — runner real da matriz RLS-001 a RLS-022 — 2026-08-21
+
+O Veritas agora possui o comando `npm run beta:rls`, implementado em `scripts/rls-acceptance.mjs`. O runner exige `RLS_RUNNER_ALLOW_REAL=1`, usa somente `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` com quatro contas descartáveis (`owner`, `other`, `editor` e `viewer`), cria uma fixture prefixada, executa os cenários de dados, RPC, conflito, Realtime e Edge Function, tenta limpar as linhas no `finally` e escreve um relatório sanitizado fora do frontend.
+
+O contrato puro em `scripts/rlsAcceptanceContract.mjs` garante os IDs RLS-001 a RLS-022 e remove Bearer tokens/passwords do relatório. Foram adicionados testes determinísticos para ordem dos IDs e redaction. A documentação de aceitação agora inclui o comando, as variáveis e os limites: casos Realtime/Edge sem configuração ficam `SKIP` e não liberam beta; o relatório real só entra no manifesto após revisão da limpeza e dos resultados.
+
+A execução foi validada com `node --check` e o guard de segurança bloqueou corretamente a chamada sem `RLS_RUNNER_ALLOW_REAL=1`. Nenhuma sessão real foi criada nesta etapa, portanto a matriz continua pendente e a promoção beta permanece bloqueada até o runner ser executado com contas descartáveis reais.

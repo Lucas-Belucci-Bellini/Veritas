@@ -145,7 +145,20 @@ BETA_RLS_REPORT=artifacts/rls-acceptance-20260815.md \
 npm run beta:preflight
 ```
 
-O preflight verifica os gates locais, o smoke público e a presença de `PASS` para todos os IDs. Ele não cria sessões Supabase automaticamente e não substitui a execução humana/controlada da matriz.
+O runner versionado pode executar a matriz com o fluxo abaixo, sempre usando somente a publishable key e credenciais de quatro contas descartáveis em variáveis de ambiente:
+
+```bash
+RLS_RUNNER_ALLOW_REAL=1 \
+RLS_REQUIRE_REALTIME=1 \
+RLS_REQUIRE_EDGE=1 \
+RLS_EDGE_FUNCTION_URL="https://<project-ref>.supabase.co/functions/v1/veritas-circuit-ai" \
+RLS_REPORT_PATH=artifacts/rls-acceptance-$(date +%Y%m%d-%H%M%S).md \
+npm run beta:rls
+```
+
+O runner cria uma fixture com prefixo único, executa RLS-001 a RLS-022, tenta limpar a fixture no `finally` e grava somente IDs lógicos, status, operações e mensagens truncadas/sanitizadas. Ele nunca imprime passwords, access tokens ou headers. Sem `RLS_RUNNER_ALLOW_REAL=1`, ele aborta antes de ler qualquer credencial; sem Realtime/Edge habilitados, os casos ficam `SKIP` e não podem ser usados para liberar beta.
+
+O preflight verifica os gates locais, o smoke público e a presença de `PASS` para todos os IDs. Ele não cria sessões Supabase automaticamente e não substitui a execução humana/controlada da matriz. O relatório gerado pelo runner deve ser revisado e anexado ao manifesto beta somente depois de confirmar a limpeza da fixture e os resultados reais.
 
 ## Referências
 
