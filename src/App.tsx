@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from 'react'
 import { Code2, Moon, Sun } from 'lucide-react'
 import {
   assignmentForRow,
@@ -56,6 +56,37 @@ function WorkspaceLoading({ label }: { label: string }) {
       Carregando {label}…
     </div>
   )
+}
+
+interface WorkspaceBoundaryProps {
+  label: string
+  children: ReactNode
+}
+
+interface WorkspaceBoundaryState {
+  failed: boolean
+}
+
+class WorkspaceBoundary extends Component<WorkspaceBoundaryProps, WorkspaceBoundaryState> {
+  state: WorkspaceBoundaryState = { failed: false }
+
+  static getDerivedStateFromError(): WorkspaceBoundaryState {
+    return { failed: true }
+  }
+
+  componentDidCatch(_error: Error, _info: ErrorInfo) {
+    // O fallback é deliberadamente silencioso: detalhes de chunks não ajudam o usuário.
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div role="alert" aria-live="assertive" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-5 text-sm text-rose-800 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
+        <p>Não foi possível carregar {this.props.label} agora.</p>
+        <button type="button" className="key mt-3 text-xs" onClick={() => window.location.reload()}>Tentar novamente</button>
+      </div>
+    )
+  }
 }
 
 const EXAMPLES = [
@@ -382,42 +413,52 @@ function AppContent() {
               O mesmo raciocínio dos exercícios didáticos aparece como entrada, branch, Watch e trace.
             </p>
           </div>
-          <Suspense fallback={<WorkspaceLoading label="workspace de lógica" />}>
-            <AlgorithmWorkspace document={algorithmExample} />
-            <LogicCaseLab />
-          </Suspense>
+          <WorkspaceBoundary label="o workspace de lógica">
+            <Suspense fallback={<WorkspaceLoading label="workspace de lógica" />}>
+              <AlgorithmWorkspace document={algorithmExample} />
+              <LogicCaseLab />
+            </Suspense>
+          </WorkspaceBoundary>
         </section>
 
         <section className="card space-y-5 p-4 sm:p-6">
-          <Suspense fallback={<WorkspaceLoading label="workspace sequencial" />}>
-            <SequentialWorkspace />
-          </Suspense>
+          <WorkspaceBoundary label="o workspace sequencial">
+            <Suspense fallback={<WorkspaceLoading label="workspace sequencial" />}>
+              <SequentialWorkspace />
+            </Suspense>
+          </WorkspaceBoundary>
         </section>
 
-        <Suspense
-          fallback={
-            <section className="card p-8 text-center text-sm text-slate-400 dark:text-slate-500">
-              Carregando editor visual…
-            </section>
-          }
-        >
-          <CircuitEditor />
-        </Suspense>
+        <WorkspaceBoundary label="o editor visual">
+          <Suspense
+            fallback={
+              <section className="card p-8 text-center text-sm text-slate-400 dark:text-slate-500">
+                Carregando editor visual…
+              </section>
+            }
+          >
+            <CircuitEditor />
+          </Suspense>
+        </WorkspaceBoundary>
 
-        <Suspense fallback={<WorkspaceLoading label="projetos salvos" />}>
-          <ProjectsPanel
-            expression={expression}
-            notation={notation}
-            onOpen={(saved, savedNotation) => {
-              setNotation(savedNotation)
-              setExpression(saved)
-            }}
-          />
-        </Suspense>
+        <WorkspaceBoundary label="os projetos salvos">
+          <Suspense fallback={<WorkspaceLoading label="projetos salvos" />}>
+            <ProjectsPanel
+              expression={expression}
+              notation={notation}
+              onOpen={(saved, savedNotation) => {
+                setNotation(savedNotation)
+                setExpression(saved)
+              }}
+            />
+          </Suspense>
+        </WorkspaceBoundary>
 
-        <Suspense fallback={<WorkspaceLoading label="biblioteca de chips" />}>
-          <ChipLibrary onUseExpression={setExpression} />
-        </Suspense>
+        <WorkspaceBoundary label="a biblioteca de chips">
+          <Suspense fallback={<WorkspaceLoading label="biblioteca de chips" />}>
+            <ChipLibrary onUseExpression={setExpression} />
+          </Suspense>
+        </WorkspaceBoundary>
       </main>
 
       <PwaStatus />

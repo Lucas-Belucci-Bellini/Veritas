@@ -61,7 +61,7 @@ function main() {
     checkIncludes('A11Y-003', 'anúncios de status', 'src/components/PwaStatus.tsx', ['aria-live="polite"', 'aria-atomic="true"']),
     checkIncludesAcross('A11Y-004', 'viewport, canvas e feedback acessível', [
       ['index.html', ['lang="pt-BR"', 'name="viewport"', 'width=device-width']],
-      ['src/App.tsx', ['function WorkspaceLoading', 'role="status"', 'aria-live="polite"']],
+      ['src/App.tsx', ['function WorkspaceLoading', 'class WorkspaceBoundary', 'role="status"', 'role="alert"', 'aria-live="polite"', 'aria-live="assertive"', 'Tentar novamente']],
       ['src/components/CircuitEditor.tsx', [
         'h-[min(420px,70vh)]',
         'aria-label="Canvas de edição do circuito"',

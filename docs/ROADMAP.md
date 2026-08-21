@@ -481,3 +481,9 @@ A indicação `Última atualização remota aplicada` passou a ser um estado loc
 Os workspaces ALGO-002, LogicCaseLab, SequentialWorkspace, ProjectsPanel e ChipLibrary passaram a ser carregados sob demanda com `React.lazy` e `Suspense`. A calculadora principal permanece no carregamento inicial, enquanto cada bloco avançado possui fallback `role="status"` com anúncio em português.
 
 O chunk inicial caiu de aproximadamente 565 kB para 456 kB após a primeira separação, ficando abaixo do limite de aviso de 500 kB. O build PWA passou a gerar os chunks independentes dos workspaces e preserva o funcionamento local-first; o gate A11Y protege o fallback acessível.
+
+## Atualização da implementação — recuperação de chunks lazy — 2026-08-21
+
+Foi adicionado `WorkspaceBoundary` ao App para capturar falhas de carregamento dos módulos sob demanda. O usuário recebe uma mensagem em português, sem detalhes internos do bundle, e o botão `Tentar novamente` recarrega a aplicação para buscar os chunks novamente. O fallback usa `role="alert"` e `aria-live="assertive"`; o estado de carregamento continua em `role="status"`/`aria-live="polite"`.
+
+O boundary cobre ALGO-002, LogicCaseLab, SequentialWorkspace, CircuitEditor, ProjectsPanel e ChipLibrary. A calculadora principal continua fora dessa fronteira, e o modo local-first não depende do carregamento dos workspaces avançados.
