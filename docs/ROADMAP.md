@@ -228,3 +228,9 @@ A terceira fatia do v0.9.0 conecta documentos sequenciais arbitrários do `Circu
 O `SequentialCircuitPanel` adiciona `Step` de um tique, `Run` de oito tiques, `Reset`, alternância manual das entradas, Watch de `input`, `clock`, `dff`, `tff`, `delay` e `output`, além de uma timeline limitada aos últimos 32 estados. O canvas reflete o snapshot temporal: nós e fios ativos são iluminados sem reutilizar a tabela verdade combinacional.
 
 O runtime mantém a propagação síncrona do simulador e falha de forma visível quando o documento é inválido. Nesta etapa, a execução é local e em memória; persistência da timeline, clock editável durante a execução e colaboração do estado temporal permanecem para incrementos posteriores.
+
+## Atualização da implementação — checkpoint local do runtime sequencial
+
+A quarta fatia do v0.9.0 adiciona `exportState()` e `restoreState()` ao `Simulator` e persiste o checkpoint do documento sequencial no `localStorage` quando disponível. A chave é derivada do conteúdo estrutural do documento, sem usar nome ou credenciais, e o payload guarda o estado interno necessário para continuar clock, flip-flops e delays no mesmo tique.
+
+O checkpoint inclui entradas, snapshot do simulador e os últimos 32 estados da timeline. Ao reabrir o mesmo documento, o painel restaura automaticamente o estado; `Reset` remove o checkpoint e começa novamente pelos valores iniciais. Ausência, quota excedida ou corrupção do armazenamento degradam para execução somente em memória e nunca interrompem a funcionalidade principal.

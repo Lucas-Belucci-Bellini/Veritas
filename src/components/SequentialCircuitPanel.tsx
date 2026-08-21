@@ -9,15 +9,23 @@ import {
   type DocumentRuntimeSnapshot,
 } from '../simulation/documentRuntime'
 import { Simulator } from '../simulation/simulator'
+import {
+  clearRuntimeCheckpoint,
+  createRuntimeStorage,
+  readRuntimeCheckpoint,
+  runtimeDocumentKey,
+  RUNTIME_CHECKPOINT_TIMELINE_LIMIT,
+  writeRuntimeCheckpoint,
+  type CheckpointStorage,
+} from '../simulation/runtimeCheckpoint'
 
-const MAX_TIMELINE_ROWS = 32
 const RUN_TICKS = 8
 
 function appendTimeline(
   timeline: readonly DocumentRuntimeSnapshot[],
   next: readonly DocumentRuntimeSnapshot[],
 ): DocumentRuntimeSnapshot[] {
-  return [...timeline, ...next].slice(-MAX_TIMELINE_ROWS)
+  return [...timeline, ...next].slice(-RUNTIME_CHECKPOINT_TIMELINE_LIMIT)
 }
 
 function signal(value: boolean): string {
@@ -31,41 +39,70 @@ interface SequentialCircuitPanelProps {
 
 export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
+  const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
+  const documentKey = useMemo(() => runtimeDocumentKey(document), [document])
   const [inputs, setInputs] = useState<Record<string, boolean>>({})
   const [timeline, setTimeline] = useState<DocumentRuntimeSnapshot[]>([])
   const [error, setError] = useState('')
+  const [persistenceStatus, setPersistenceStatus] = useState('inicializando')
   const inputIds = useMemo(() => documentInputIds(document), [document])
   const watches = useMemo(() => documentWatches(document), [document])
   const current = timeline[timeline.length - 1]
 
-  function resetRuntime() {
+  function persist(simulator: Simulator, nextInputs: Record<string, boolean>, nextTimeline: readonly DocumentRuntimeSnapshot[]): void {
+    const saved = writeRuntimeCheckpoint({
+      version: 1,
+      documentKey,
+      savedAt: new Date().toISOString(),
+      inputs: nextInputs,
+      simulator: simulator.exportState(),
+      timeline: [...nextTimeline],
+    }, storage)
+    setPersistenceStatus(saved ? 'salvo localmente' : 'somente memória')
+  }
+
+  function initializeRuntime(clearSaved: boolean): void {
+    if (clearSaved) clearRuntimeCheckpoint(documentKey, storage)
     try {
       const simulator = createDocumentRuntime(document)
+      const saved = clearSaved ? null : readRuntimeCheckpoint(documentKey, storage)
+      let restored = false
+      if (saved) {
+        try {
+          simulator.restoreState(saved.simulator)
+          restored = true
+        } catch {
+          clearRuntimeCheckpoint(documentKey, storage)
+        }
+      }
       simulatorRef.current = simulator
-      const initialInputs = Object.fromEntries(
-        inputIds.map((id) => [id, document.nodes.find((node) => node.id === id)?.options?.initial ?? false]),
+      const nextInputs = Object.fromEntries(
+        inputIds.map((id) => [id, saved?.inputs[id] ?? document.nodes.find((node) => node.id === id)?.options?.initial ?? false]),
       )
-      setInputs(initialInputs)
       const snapshot = snapshotDocumentRuntime(simulator)
-      setTimeline([snapshot])
+      const nextTimeline = restored && saved?.timeline.length ? saved.timeline : [snapshot]
+      setInputs(nextInputs)
+      setTimeline(nextTimeline)
       setError('')
+      setPersistenceStatus(restored ? 'checkpoint restaurado' : storage ? 'pronto para salvar localmente' : 'somente memória')
       onSnapshot?.(snapshot)
     } catch (cause) {
       simulatorRef.current = null
       setTimeline([])
       setError(cause instanceof Error ? cause.message : 'Não foi possível preparar a simulação.')
+      setPersistenceStatus('não disponível')
     }
   }
 
   useEffect(() => {
-    resetRuntime()
+    initializeRuntime(false)
     // O runtime deve reiniciar quando o documento visual mudar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [document])
+  }, [documentKey])
 
   function ensureSimulator(): Simulator | null {
     if (simulatorRef.current) return simulatorRef.current
-    resetRuntime()
+    initializeRuntime(false)
     return simulatorRef.current
   }
 
@@ -76,7 +113,9 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
       for (const [id, value] of Object.entries(inputs)) simulator.setInput(id, value)
       simulator.tick()
       const snapshot = snapshotDocumentRuntime(simulator)
-      setTimeline((currentTimeline) => appendTimeline(currentTimeline, [snapshot]))
+      const nextTimeline = appendTimeline(timeline, [snapshot])
+      setTimeline(nextTimeline)
+      persist(simulator, inputs, nextTimeline)
       onSnapshot?.(snapshot)
       setError('')
     } catch (cause) {
@@ -94,11 +133,30 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
         simulator.tick()
         next.push(snapshotDocumentRuntime(simulator))
       }
-      setTimeline((currentTimeline) => appendTimeline(currentTimeline, next))
+      const nextTimeline = appendTimeline(timeline, next)
+      setTimeline(nextTimeline)
+      persist(simulator, inputs, nextTimeline)
       onSnapshot?.(next[next.length - 1])
       setError('')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível executar a simulação.')
+    }
+  }
+
+  function changeInput(id: string, value: boolean): void {
+    const simulator = ensureSimulator()
+    if (!simulator) return
+    try {
+      simulator.setInput(id, value)
+      const nextInputs = { ...inputs, [id]: value }
+      const snapshot = snapshotDocumentRuntime(simulator)
+      const nextTimeline = timeline.length ? [...timeline.slice(0, -1), snapshot] : [snapshot]
+      setInputs(nextInputs)
+      setTimeline(nextTimeline)
+      persist(simulator, nextInputs, nextTimeline)
+      onSnapshot?.(snapshot)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível alterar a entrada.')
     }
   }
 
@@ -110,12 +168,12 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
         <div>
           <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase dark:text-emerald-300">Simulação temporal</p>
           <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">Circuito do canvas conectado ao Simulator</h3>
-          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{statusText} · o estado é publicado em duas fases para suportar feedback sem laço infinito.</p>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{statusText} · {persistenceStatus} · duas fases preservam feedback sem laço infinito.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error)}>Step · 1 tique</button>
           <button type="button" className="key text-xs" onClick={run} disabled={Boolean(error)}>Run · {RUN_TICKS} tiques</button>
-          <button type="button" className="key text-xs" onClick={resetRuntime}>Reset</button>
+          <button type="button" className="key text-xs" onClick={() => initializeRuntime(true)}>Reset</button>
         </div>
       </div>
 
@@ -126,7 +184,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
               <input
                 type="checkbox"
                 checked={inputs[id] ?? false}
-                onChange={(event) => setInputs((currentInputs) => ({ ...currentInputs, [id]: event.target.checked }))}
+                onChange={(event) => changeInput(id, event.target.checked)}
                 aria-label={`Alternar ${id}`}
                 disabled={Boolean(error)}
               />
@@ -154,7 +212,7 @@ export function SequentialCircuitPanel({ document, onSnapshot }: SequentialCircu
           <div>
             <div className="flex items-center justify-between gap-2">
               <h4 className="text-xs font-bold tracking-wide text-slate-600 uppercase dark:text-slate-300">Timeline</h4>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">últimos {MAX_TIMELINE_ROWS} estados</span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">últimos {RUNTIME_CHECKPOINT_TIMELINE_LIMIT} estados</span>
             </div>
             <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-emerald-100 bg-white dark:border-emerald-900/70 dark:bg-slate-900">
               <table className="w-full border-collapse text-left text-[11px]">

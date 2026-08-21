@@ -28,6 +28,22 @@ export interface SimulatorOptions {
   maxSettleTicks?: number
 }
 
+export interface SimulatorNodeState {
+  outputs: boolean[]
+  next: boolean[]
+  lastClock: boolean
+  nextLastClock: boolean
+  queue: boolean[]
+  nextQueue: boolean[]
+  counter: number
+  nextCounter: number
+}
+
+export interface SimulatorState {
+  tickCount: number
+  nodes: Record<string, SimulatorNodeState>
+}
+
 export const DEFAULT_MAX_SETTLE_TICKS = 200
 
 /**
@@ -99,6 +115,53 @@ export class Simulator {
     const result: Record<string, boolean[]> = {}
     for (const [id, node] of this.nodes) result[id] = [...node.outputs]
     return result
+  }
+
+  exportState(): SimulatorState {
+    const nodes: Record<string, SimulatorNodeState> = {}
+    for (const [id, node] of this.nodes) {
+      nodes[id] = {
+        outputs: [...node.outputs],
+        next: [...node.next],
+        lastClock: node.lastClock,
+        nextLastClock: node.nextLastClock,
+        queue: [...node.queue],
+        nextQueue: [...node.nextQueue],
+        counter: node.counter,
+        nextCounter: node.nextCounter,
+      }
+    }
+    return { tickCount: this.ticks, nodes }
+  }
+
+  restoreState(state: SimulatorState): void {
+    if (!Number.isInteger(state.tickCount) || state.tickCount < 0) {
+      throw new Error('O estado do simulador possui um contador de tiques inválido.')
+    }
+    const stateIds = Object.keys(state.nodes).sort()
+    const nodeIds = [...this.nodes.keys()].sort()
+    if (stateIds.join('|') !== nodeIds.join('|')) {
+      throw new Error('O estado do simulador não corresponde ao netlist atual.')
+    }
+
+    for (const [id, node] of this.nodes) {
+      const saved = state.nodes[id]
+      if (!saved || saved.outputs.length !== node.outputs.length || saved.next.length !== node.next.length) {
+        throw new Error(`O estado do componente "${id}" é incompatível com o netlist atual.`)
+      }
+      if (!isBooleanArray(saved.outputs) || !isBooleanArray(saved.next) || !isBooleanArray(saved.queue) || !isBooleanArray(saved.nextQueue)) {
+        throw new Error(`O estado do componente "${id}" contém valores inválidos.`)
+      }
+      node.outputs = [...saved.outputs]
+      node.next = [...saved.next]
+      node.lastClock = saved.lastClock
+      node.nextLastClock = saved.nextLastClock
+      node.queue = [...saved.queue]
+      node.nextQueue = [...saved.nextQueue]
+      node.counter = saved.counter
+      node.nextCounter = saved.nextCounter
+    }
+    this.ticks = state.tickCount
   }
 
   tick(count = 1): void {
@@ -256,6 +319,10 @@ export class Simulator {
     }
     return result
   }
+}
+
+function isBooleanArray(values: readonly unknown[]): values is boolean[] {
+  return values.every((value) => typeof value === 'boolean')
 }
 
 function createState(spec: ComponentSpec): NodeState {
