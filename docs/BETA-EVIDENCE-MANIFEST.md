@@ -21,6 +21,8 @@ npm run beta:evidence
 
 O agregador considera `PASS` somente quando todos os IDs esperados do relatório correspondente estão em `PASS`. Um caso `SKIP`, `PENDING`, `FAIL`, ausente ou um relatório estrutural inválido deixa o gate em `PENDING` e adiciona um bloqueador `openP1`. Uma falha explícita RLS adiciona `RLS-FAILURE` a `openP0`; um bypass de JWT em RLS-019 adiciona `EDGE-JWT-BYPASS` a `openP0`.
 
+O workflow de qualidade preserva o conjunto `artifacts/*.md` como artefato `veritas-acceptance-reports-{run_id}` por 14 dias. São enviados somente relatórios Markdown sanitizados; manifests JSON, arquivos de ambiente, tokens e logs de preview não fazem parte desse pacote. A retenção facilita auditoria e diagnóstico, mas não converte `SKIP`, mocks ou execução anônima em evidência beta.
+
 ## Contrato produzido
 
 O manifesto contém `version`, `generatedAt`, listas `openP0` e `openP1` e os gates `rls`, `edge`, `supabaseStructural`, `realtime`, `hdl`, `accessibility`, `mobile`, `rollback` e `onboarding`. Cada gate possui ao menos `status` e `evidence`; os gates de relatório também conservam uma lista sanitizada de status por ID.

@@ -441,3 +441,9 @@ Foi criado `npm run beta:mobile` com os cenários MOBILE-001 a MOBILE-004. Sem `
 O agregador beta agora consome `BETA_MOBILE_REPORT`, o preflight estrito exige essa fonte e valida seus marcadores de proveniência, e o readiness doctor passou a considerar `artifacts/mobile-acceptance.md` no conjunto de artefatos. O workflow de qualidade executa o runner no modo seguro; assim, a CI continua determinística, mas o manifesto mantém `MOBILE-EVIDENCE-INCOMPLETE` enquanto a inspeção humana não for anexada.
 
 A documentação operacional está em `docs/BETA-MOBILE-ACCEPTANCE.md`; `docs/BETA-EVIDENCE-MANIFEST.md`, `docs/BETA-READINESS-DOCTOR.md` e `docs/RELEASE-GATES.md` foram alinhados. O relatório estrutural de teste passa apenas no ensaio local e não representa aprovação mobile real.
+
+## Atualização da implementação — retenção de evidências sanitizadas no CI — 2026-08-21
+
+O workflow `quality.yml` agora preserva, sempre que a execução termina, somente `artifacts/*.md` no artefato `veritas-acceptance-reports-{run_id}` com retenção de 14 dias. O pacote não inclui manifests JSON, arquivos de ambiente, tokens ou logs de preview. A medida melhora a auditoria dos gates A11Y, mobile, HDL, rollback, onboarding e MCP sem transformar `SKIP`, mocks ou relatórios anônimos em aprovação.
+
+A política foi documentada em `docs/BETA-EVIDENCE-MANIFEST.md`. A permissão do workflow continua limitada a `contents: read`; o upload não publica releases, não cria tags e não acessa o Supabase.

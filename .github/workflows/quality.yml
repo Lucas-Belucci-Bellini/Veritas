@@ -92,6 +92,15 @@ jobs:
           SMOKE_URL: http://127.0.0.1:4173
         run: npm run smoke:release
 
+      - name: Upload sanitized acceptance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veritas-acceptance-reports-${{ github.run_id }}
+          path: artifacts/*.md
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload preview log on failure
         if: failure()
         uses: actions/upload-artifact@v4
