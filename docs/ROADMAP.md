@@ -321,3 +321,11 @@ A consulta real confirmou documento válido com `[]` e documento com referência
 O helper privado possui grants restritos e a RPC continua `SECURITY INVOKER`.
 
 O runner RLS também foi corrigido para criar fixtures com `connections`, o campo canônico do `CircuitDocument`. O cenário RLS-022 passa a ter uma barreira server-side contra clientes adulterados; a matriz cross-user completa continua pendente e ainda bloqueia a promoção beta.
+
+## Atualização da implementação — smoke da Edge Function e RLS-019 — 2026-08-21
+
+A Edge Function `veritas-circuit-ai` foi auditada no projeto Supabase existente e está `ACTIVE`, com `verify_jwt=true` e versão 4. O endpoint confirmado é `https://hcwzsxdcvmswebunznak.supabase.co/functions/v1/veritas-circuit-ai`. Um POST descartável sem `Authorization` respondeu HTTP `401`, produzindo o primeiro resultado real `RLS-019 PASS` sem criar sessão ou registrar chaves.
+
+Foi criado o comando `npm run beta:edge`, com contrato puro testável para classificação de status, montagem de endpoint e redaction. O runner executa RLS-019 sempre; RLS-020 e RLS-021 exigem explicitamente `RLS_EDGE_REQUIRE_AUTHENTICATED=1` e um token de conta descartável fornecido por variável de ambiente. Sem isso, ficam `SKIP`, nunca `PASS`.
+
+A documentação registra o contrato implantado, o limite de payload, o fallback heurístico e o procedimento sanitizado. A promoção beta continua bloqueada até a análise autenticada e a tentativa de elevação RLS-021 serem executadas com uma conta descartável e UUIDs de outro usuário/projeto, além da matriz restante.
