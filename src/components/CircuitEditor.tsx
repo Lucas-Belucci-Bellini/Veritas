@@ -50,6 +50,7 @@ import { AiMetricsPanel } from './AiMetricsPanel'
 import { SequentialCircuitPanel } from './SequentialCircuitPanel'
 import type { DocumentRuntimeSnapshot, DocumentRuntimeState } from '../simulation/documentRuntime'
 import { runtimeFreshness } from '../realtime/runtimeFreshness'
+import { EMPTY_RUNTIME_METRICS, recordRuntimeMetric, type RuntimeMetricEvent, type RuntimeMetrics } from '../realtime/runtimeMetrics'
 import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollaborator, type CircuitCollaborator, type CollaboratorRole } from '../realtime/circuitCollaborators'
 import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realtime/circuitRooms'
 
@@ -129,11 +130,15 @@ export function CircuitEditor() {
   const [sequentialSnapshot, setSequentialSnapshot] = useState<DocumentRuntimeSnapshot | null>(null)
   const [remoteClockPeriods, setRemoteClockPeriods] = useState<Record<string, number> | null>(null)
   const [remoteRuntimeState, setRemoteRuntimeState] = useState<{ state: DocumentRuntimeState; sentAt: string; clientId: string; baseVersion: number } | null>(null)
+  const [runtimeMetrics, setRuntimeMetrics] = useState<RuntimeMetrics>(() => ({ ...EMPTY_RUNTIME_METRICS }))
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
   const [collaboratorUserId, setCollaboratorUserId] = useState('')
   const [collaboratorRole, setCollaboratorRole] = useState<CollaboratorRole>('editor')
 
   const document = useMemo(() => ({ ...toDocument(nodes, edges), name: projectName.trim() || 'Circuito visual' }), [nodes, edges, projectName])
+  const recordRuntimeEvent = useCallback((event: RuntimeMetricEvent) => {
+    setRuntimeMetrics((current) => recordRuntimeMetric(current, event))
+  }, [])
   if (!historyRef.current) historyRef.current = new CircuitHistory(document)
   const applyRemoteRuntimeConfig = useCallback((message: { clockPeriods: Record<string, number>; baseVersion: number }) => {
     const currentVersion = cloud.versions[0]?.versionNumber ?? 0
@@ -148,17 +153,20 @@ export function CircuitEditor() {
   const applyRemoteRuntimeState = useCallback((message: { state: DocumentRuntimeState; baseVersion: number; sentAt: string; clientId: string }) => {
     const currentVersion = cloud.versions[0]?.versionNumber ?? 0
     if (message.baseVersion !== currentVersion) {
+      recordRuntimeEvent('version-conflict')
       setNotice(`Estado temporal remoto rejeitado: versão-base ${message.baseVersion} diverge da atual ${currentVersion}.`)
       return
     }
     const freshness = runtimeFreshness(message.sentAt)
     if (!freshness) {
+      recordRuntimeEvent('invalid-or-stale')
       setNotice('Estado temporal remoto expirado e descartado.')
       return
     }
+    recordRuntimeEvent('received')
     setRemoteRuntimeState({ state: message.state, sentAt: message.sentAt, clientId: message.clientId, baseVersion: message.baseVersion })
     setNotice('Estado temporal remoto recebido; confirme no painel para aplicá-lo localmente.')
-  }, [cloud.versions])
+  }, [cloud.versions, recordRuntimeEvent])
 
   const applyRemoteDocument = useCallback((remoteDocument: CircuitDocument) => {
     if (validateCircuit(remoteDocument).length > 0) return
@@ -303,17 +311,21 @@ export function CircuitEditor() {
   const canRedo = historyRevision >= 0 && (historyRef.current?.canRedo() ?? false)
   const publishRuntimeState = useCallback((state: DocumentRuntimeState) => {
     if (!user || !cloudProjectId || readOnlyCollaboration || collaborationStatus !== 'connected') return
+    recordRuntimeEvent('published')
     void broadcastRuntimeState(state, collaborationBaseVersion).catch(() => {
+      recordRuntimeEvent('publish-failure')
       setNotice('Não foi possível transmitir o estado temporal para a room atual.')
     })
-  }, [broadcastRuntimeState, collaborationBaseVersion, collaborationStatus, cloudProjectId, readOnlyCollaboration, user])
+  }, [broadcastRuntimeState, collaborationBaseVersion, collaborationStatus, cloudProjectId, readOnlyCollaboration, recordRuntimeEvent, user])
 
   const publishClockPeriods = useCallback((clockPeriods: Readonly<Record<string, number>>) => {
     if (!user || !cloudProjectId || readOnlyCollaboration || collaborationStatus !== 'connected') return
+    recordRuntimeEvent('published')
     void broadcastRuntimeConfig(clockPeriods, collaborationBaseVersion).catch(() => {
+      recordRuntimeEvent('publish-failure')
       setNotice('Não foi possível transmitir a configuração temporal para a room atual.')
     })
-  }, [broadcastRuntimeConfig, collaborationBaseVersion, collaborationStatus, cloudProjectId, readOnlyCollaboration, user])
+  }, [broadcastRuntimeConfig, collaborationBaseVersion, collaborationStatus, cloudProjectId, readOnlyCollaboration, recordRuntimeEvent, user])
 
   const restoreHistoryDocument = useCallback((nextDocument: CircuitDocument) => {
     const flow = fromDocument(nextDocument)
@@ -382,15 +394,17 @@ export function CircuitEditor() {
     if (!remoteRuntimeState) return
     const freshness = runtimeFreshness(remoteRuntimeState.sentAt)
     if (!freshness) {
+      recordRuntimeEvent('invalid-or-stale')
       setRemoteRuntimeState(null)
       return
     }
     const timeout = window.setTimeout(() => {
+      recordRuntimeEvent('expired')
       setRemoteRuntimeState(null)
       setNotice('A oferta de estado temporal expirou; execute novamente para receber um estado atual.')
     }, freshness.expiresInMs)
     return () => window.clearTimeout(timeout)
-  }, [remoteRuntimeState])
+  }, [recordRuntimeEvent, remoteRuntimeState])
 
   useEffect(() => {
     if (collaborationStatus !== 'connected') return
@@ -856,10 +870,14 @@ export function CircuitEditor() {
           requestedRuntimeStateClientId={remoteRuntimeState?.clientId}
           temporalPresenceCount={collaboration.participants.length}
           temporalConnectionStatus={collaborationStatus}
+          runtimeMetrics={runtimeMetrics}
           onSnapshot={setSequentialSnapshot}
           onClockPeriodsChange={publishClockPeriods}
           onRuntimeStateChange={publishRuntimeState}
-          onRuntimeStateApplied={() => setRemoteRuntimeState(null)}
+          onRuntimeStateApplied={() => {
+            recordRuntimeEvent('applied')
+            setRemoteRuntimeState(null)
+          }}
           readOnly={readOnlyCollaboration}
         />
       )}

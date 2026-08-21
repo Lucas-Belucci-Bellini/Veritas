@@ -258,3 +258,9 @@ O estado remoto nunca substitui automaticamente o runtime local. Ao receber uma 
 A oitava fatia do v0.9.0 adiciona uma política de retenção para ofertas `runtime_state`: mensagens com mais de 30 segundos são descartadas antes da UI; timestamps até 5 segundos no futuro são tolerados para acomodar pequenas diferenças de relógio; timestamps inválidos ou muito futuros também são rejeitados.
 
 O painel exibe o status da colaboração temporal e a quantidade de participantes Presence online. Uma oferta válida mostra autor, tique e idade aproximada; após 30 segundos ela expira automaticamente e deixa de ser aplicável. A retenção é best-effort e em memória: o checkpoint local continua disponível para o usuário, mas uma oferta Realtime antiga nunca fica reutilizável indefinidamente.
+
+## Atualização da implementação — métricas locais de execução temporal
+
+A nona fatia do v0.9.0 adiciona um reducer local para contar estados temporais recebidos, aplicados, publicados, conflitos de versão, ofertas expiradas/rejeitadas e falhas de publicação. O painel mostra esses contadores junto da presença temporal e do status de conexão.
+
+As métricas são somente de sessão e não enviam documento, inputs, estado interno, timeline, IDs de projeto ou conteúdo de circuito para telemetria. Elas existem para feedback operacional imediato e são reiniciadas quando o documento/room muda; falhas de colaboração continuam best-effort e não interrompem o runtime local.

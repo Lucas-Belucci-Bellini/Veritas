@@ -11,6 +11,7 @@ import {
 } from '../simulation/documentRuntime'
 import { Simulator } from '../simulation/simulator'
 import { runtimeFreshness } from '../realtime/runtimeFreshness'
+import type { RuntimeMetrics } from '../realtime/runtimeMetrics'
 import {
   clearRuntimeCheckpoint,
   createRuntimeStorage,
@@ -58,6 +59,7 @@ interface SequentialCircuitPanelProps {
   requestedRuntimeStateClientId?: string
   temporalPresenceCount?: number
   temporalConnectionStatus?: string
+  runtimeMetrics?: RuntimeMetrics
   readOnly?: boolean
   onSnapshot?: (snapshot: DocumentRuntimeSnapshot) => void
   onClockPeriodsChange?: (clockPeriods: Readonly<Record<string, number>>) => void
@@ -65,7 +67,7 @@ interface SequentialCircuitPanelProps {
   onRuntimeStateApplied?: () => void
 }
 
-export function SequentialCircuitPanel({ document, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied }: SequentialCircuitPanelProps) {
+export function SequentialCircuitPanel({ document, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
@@ -256,6 +258,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
           <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase dark:text-emerald-300">Simulação temporal</p>
           <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">Circuito do canvas conectado ao Simulator</h3>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{statusText} · {persistenceStatus} · {presenceText} · duas fases preservam feedback sem laço infinito.</p>
+          {runtimeMetrics && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">local: {runtimeMetrics.received} recebidos · {runtimeMetrics.applied} aplicados · {runtimeMetrics.versionConflicts} conflitos · {runtimeMetrics.expired + runtimeMetrics.invalidOrStale} expirados/rejeitados · {runtimeMetrics.publishFailures} falhas</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error)}>Step · 1 tique</button>
