@@ -47,6 +47,7 @@ import { requestCircuitAi, type CircuitAiResult } from '../ai/circuitAi'
 import { CircuitVersionHistory } from './CircuitVersionHistory'
 import { AccessibleTooltip } from './AccessibleTooltip'
 import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
+import type { CircuitBroadcast } from '../realtime/circuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
 import { SequentialCircuitPanel } from './SequentialCircuitPanel'
 import type { DocumentRuntimeSnapshot, DocumentRuntimeState } from '../simulation/documentRuntime'
@@ -170,16 +171,16 @@ export function CircuitEditor() {
     setNotice('Estado temporal remoto recebido; confirme no painel para aplicá-lo localmente.')
   }, [cloud.versions, recordRuntimeEvent])
 
-  const applyRemoteDocument = useCallback((remoteDocument: CircuitDocument) => {
-    if (validateCircuit(remoteDocument).length > 0) return
-    historyRef.current?.replace(remoteDocument)
+  const applyRemoteDocument = useCallback((message: CircuitBroadcast) => {
+    if (validateCircuit(message.document).length > 0) return
+    historyRef.current?.replace(message.document)
     setHistoryRevision((current) => current + 1)
-    const flow = fromDocument(remoteDocument)
+    const flow = fromDocument(message.document)
     setNodes(flow.nodes)
     setEdges(flow.edges)
-    setProjectName(remoteDocument.name)
+    setProjectName(message.document.name)
     setSelectedRow(null)
-    setNotice('Alteração remota recebida de outro colaborador.')
+    setNotice(`Alteração remota v${message.baseVersion} aplicada de outro colaborador.`)
   }, [setEdges, setNodes])
   const collaborationBaseVersion = cloud.versions[0]?.versionNumber ?? 0
   const collaboration = useCircuitCollaboration({
@@ -969,6 +970,7 @@ export function CircuitEditor() {
             <button type="button" className="key text-xs" onClick={() => void createRoom()} disabled={!newRoomId.trim()}>Criar sala</button>
           </div>
           {collaboration.error && <p className="mt-1">{collaboration.error}</p>}
+          {collaboration.lastRemoteVersion !== null && <p className="mt-1 opacity-80" role="status" aria-live="polite">Última atualização remota aplicada: versão {collaboration.lastRemoteVersion}</p>}
           {collaboration.participants.length > 0 && <p className="mt-1 opacity-80">{collaboration.participants.map((participant) => participant.label).join(' · ')}</p>}
         </div>
       )}

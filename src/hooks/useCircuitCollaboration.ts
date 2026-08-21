@@ -12,7 +12,7 @@ interface UseCircuitCollaborationOptions {
   role?: RoomRole
   baseVersion?: number
   enabled: boolean
-  onRemoteDocument: (document: CircuitDocument) => void
+  onRemoteDocument: (message: CircuitBroadcast) => void
   onRemoteRuntimeConfig?: (message: CircuitRuntimeConfig) => void
   onRemoteRuntimeState?: (message: CircuitRuntimeState) => void
 }
@@ -61,7 +61,7 @@ export function useCircuitCollaboration({
     const removeDocumentListener = collaboration.onRemoteDocument((message: CircuitBroadcast) => {
       if (!active) return
       setLastRemoteVersion(message.baseVersion)
-      listenerRef.current(message.document)
+      listenerRef.current(message)
     })
     const removeRuntimeListener = collaboration.onRemoteRuntimeConfig((message) => {
       if (active) runtimeListenerRef.current?.(message)

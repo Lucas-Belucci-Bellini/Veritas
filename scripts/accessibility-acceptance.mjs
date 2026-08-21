@@ -68,6 +68,7 @@ function main() {
         'aria-live="polite"',
         'aria-atomic="false"',
         'Validação do circuito',
+        'Última atualização remota aplicada',
         'aria-label="Orientações para corrigir o circuito"',
       ]],
       ['src/components/ExpressionInput.tsx', [

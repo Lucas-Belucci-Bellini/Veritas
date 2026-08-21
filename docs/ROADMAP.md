@@ -459,3 +459,9 @@ O `ExpressionInput` associa o feedback ao campo com `aria-describedby`, mantém 
 A colaboração Realtime passou a usar o contrato puro `src/realtime/eventOrdering.ts`. Cada sala mantém um último evento por tipo (`snapshot`, `runtime_config` e `runtime_state`) e aceita somente a ordem lexicográfica por `baseVersion`, timestamp ISO, `clientId` e hash. Duplicatas, eventos atrasados e desempates perdedores são descartados antes de notificar a UI; a ordenação é reiniciada ao desconectar.
 
 A validação estrutural agora rejeita timestamps inválidos, e os eventos locais entram no mesmo redutor antes do envio. Foram adicionados testes unitários para a ordem determinística e teste de integração com snapshots fora de ordem. O runbook `docs/BETA-REALTIME-ACCEPTANCE.md` registra o comportamento e sua limitação: isso protege convergência local, mas não substitui RLS/Realtime cross-user real nem prova autorização do Supabase.
+
+## Atualização da implementação — feedback de colaboração no editor — 2026-08-21
+
+O hook `useCircuitCollaboration` passou a encaminhar o envelope completo do snapshot remoto, preservando `baseVersion` para a camada de UI. O CircuitEditor agora informa quando uma alteração remota foi aplicada e exibe a última versão remota aplicada em uma região acessível com `role="status"` e `aria-live="polite"`, junto da sala ativa, conexão e participantes.
+
+A mudança não altera a política de autorização nem aplica documentos fora do fluxo já validado. Quando a colaboração está desativada ou desconectada, o editor continua funcionando localmente. O gate A11Y mantém a regressão estrutural do novo status.
