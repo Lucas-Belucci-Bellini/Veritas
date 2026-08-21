@@ -42,13 +42,13 @@ function checkIncludesAcross(id, operation, checks) {
 
 function runRegression() {
   try {
-    execFileSync('npm', ['test', '--', '--run', 'src/release/accessibilityAcceptanceContract.test.ts', 'src/circuit/validationFeedback.test.ts'], {
+    execFileSync('npm', ['test', '--', '--run', 'src/release/accessibilityAcceptanceContract.test.ts', 'src/circuit/validationFeedback.test.ts', 'src/engine/expressionErrorPresentation.test.ts'], {
       cwd: process.cwd(),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: Number(process.env.ACCESSIBILITY_TEST_TIMEOUT_MS || 30000),
     })
-    return result('A11Y-005', 'PASS', 'regressão dos contratos acessíveis', 'accessibilityAcceptanceContract.test.ts e validationFeedback.test.ts aprovados')
+    return result('A11Y-005', 'PASS', 'regressão dos contratos acessíveis', 'accessibilityAcceptanceContract.test.ts, validationFeedback.test.ts e expressionErrorPresentation.test.ts aprovados')
   } catch (error) {
     return result('A11Y-005', 'FAIL', 'regressão dos contratos acessíveis', [error?.stdout, error?.stderr, error?.message].filter(Boolean).join('\n'))
   }
@@ -70,10 +70,15 @@ function main() {
         'Validação do circuito',
         'aria-label="Orientações para corrigir o circuito"',
       ]],
+      ['src/components/ExpressionInput.tsx', [
+        'aria-invalid={showError}',
+        'aria-describedby={showError ? feedbackId : undefined}',
+        'role="alert"',
+        'formatExpressionError',
+      ]],
       ['src/components/AccessibleTooltip.tsx', [
         'tabIndex={0}',
         'aria-describedby={tooltipId}',
-        'role="tooltip"',
         'group-focus-within:opacity-100',
       ]],
     ]),

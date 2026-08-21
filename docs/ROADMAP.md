@@ -447,3 +447,9 @@ A documentação operacional está em `docs/BETA-MOBILE-ACCEPTANCE.md`; `docs/BE
 O workflow `quality.yml` agora preserva, sempre que a execução termina, somente `artifacts/*.md` no artefato `veritas-acceptance-reports-{run_id}` com retenção de 14 dias. O pacote não inclui manifests JSON, arquivos de ambiente, tokens ou logs de preview. A medida melhora a auditoria dos gates A11Y, mobile, HDL, rollback, onboarding e MCP sem transformar `SKIP`, mocks ou relatórios anônimos em aprovação.
 
 A política foi documentada em `docs/BETA-EVIDENCE-MANIFEST.md`. A permissão do workflow continua limitada a `contents: read`; o upload não publica releases, não cria tags e não acessa o Supabase.
+
+## Atualização da implementação — feedback de sintaxe localizado — 2026-08-21
+
+A calculadora agora aproveita os offsets já fornecidos por `VeritasError` para exibir posição linha/coluna, trecho afetado e um marcador visual no campo de expressão. O formatter puro `src/engine/expressionErrorPresentation.ts` mantém a semântica do parser intacta, trata erros no fim da entrada e continua funcionando no modo local-first.
+
+O `ExpressionInput` associa o feedback ao campo com `aria-describedby`, mantém `aria-invalid` e anuncia o erro em uma região `role="alert"`. A mensagem original e a sugestão do parser continuam preservadas; o novo contexto não depende apenas de cor ou de hover. Foram adicionados testes para primeira linha, quebra de linha e EOF.

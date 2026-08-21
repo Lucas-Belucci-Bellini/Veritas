@@ -1,5 +1,6 @@
 export * from './ast'
 export * from './errors'
+export * from './expressionErrorPresentation'
 export * from './evaluator'
 export * from './format'
 export * from './karnaugh'

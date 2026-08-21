@@ -13,8 +13,8 @@ O gate é executado por `npm run beta:accessibility` e produz um relatório sani
 | A11Y-001 | Landmarks | Existe skip link visível no foco, `main#main-content`, título `h1#app-title` e relação `aria-labelledby`. |
 | A11Y-002 | Teclado | Linhas da tabela verdade possuem foco, `aria-selected`, nome de linha e seleção por Enter/Espaço. |
 | A11Y-003 | Feedback PWA | Avisos offline/PWA usam `aria-live="polite"` e `aria-atomic="true"`. |
-| A11Y-004 | Editor responsivo e feedback acessível | O documento declara `lang="pt-BR"`, viewport responsivo, o canvas usa altura limitada por viewport e `min-height`, o status de validação é anunciado e as orientações de correção são expostas em lista acessível. Os tooltips do editor têm gatilho focável, `aria-describedby`, `role="tooltip"` e visibilidade por foco. |
-| A11Y-005 | Regressão | Os contratos A11Y e `validationFeedback` passam em Vitest e mantêm IDs, sanitização, resumo e orientações determinísticos. |
+| A11Y-004 | Editor e calculadora acessíveis | O documento declara `lang="pt-BR"`, viewport responsivo, o canvas usa altura limitada por viewport e `min-height`, o status de validação é anunciado e as orientações de correção são expostas em lista acessível. Os tooltips do editor têm gatilho focável, `aria-describedby`, `role="tooltip"` e visibilidade por foco. O campo de expressão preserva `aria-invalid`, associa o alerta por `aria-describedby` e mostra posição/trecho do erro. |
+| A11Y-005 | Regressão | Os contratos A11Y, `validationFeedback` e `expressionErrorPresentation` passam em Vitest e mantêm IDs, sanitização, resumo, localização e orientações determinísticos. |
 
 ## 2. Melhorias implementadas
 
@@ -25,6 +25,8 @@ As linhas selecionáveis da tabela verdade continuam funcionando por clique e ta
 O CircuitEditor recebeu landmark para a paleta de componentes, nome para o canvas, status vivo e label explícito no UUID do colaborador. A altura do canvas usa `min-height` e limite relativo à viewport para evitar que o editor ocupe uma área desproporcional em telas móveis. O bloco de validação agora anuncia o total de problemas, mostra ações de correção e identifica o componente afetado sem depender apenas de cor ou `title`.
 
 Os controles de largura, Clock e Delay usam `AccessibleTooltip`: o gatilho pode receber foco por teclado, possui nome acessível e referencia o texto explicativo com `aria-describedby`. A visibilidade por `group-focus-within` permite consultar a orientação sem mouse.
+
+O `ExpressionInput` aproveita os offsets tipados de `VeritasError` para apresentar posição linha/coluna, trecho afetado e marcador visual. O alerta é associado ao campo com `aria-describedby`; o parser continua sendo a fonte da mensagem e da sugestão original.
 
 ## 3. Execução local
 
@@ -74,4 +76,8 @@ A promoção beta continua condicionada aos demais gates: matriz RLS cross-user 
 
 [6]: ../src/circuit/validationFeedback.ts "Veritas — orientações acionáveis de validação"
 
-[7]: https://www.w3.org/WAI/standards-guidelines/wcag/ "W3C — Web Content Accessibility Guidelines"
+[7]: ../src/components/ExpressionInput.tsx "Veritas — feedback localizado de erro"
+
+[8]: ../src/engine/expressionErrorPresentation.ts "Veritas — formatter de posição de erro"
+
+[9]: https://www.w3.org/WAI/standards-guidelines/wcag/ "W3C — Web Content Accessibility Guidelines"
