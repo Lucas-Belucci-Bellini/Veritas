@@ -259,6 +259,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
           <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">Circuito do canvas conectado ao Simulator</h3>
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{statusText} · {persistenceStatus} · {presenceText} · duas fases preservam feedback sem laço infinito.</p>
           {runtimeMetrics && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">local: {runtimeMetrics.received} recebidos · {runtimeMetrics.applied} aplicados · {runtimeMetrics.versionConflicts} conflitos · {runtimeMetrics.expired + runtimeMetrics.invalidOrStale} expirados/rejeitados · {runtimeMetrics.publishFailures} falhas</p>}
+          {runtimeMetrics && runtimeMetrics.events.length > 0 && <details className="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><summary className="cursor-pointer">histórico local ({runtimeMetrics.events.length})</summary><div className="mt-1 max-h-24 overflow-auto space-y-0.5">{[...runtimeMetrics.events].reverse().map((event) => <div key={event.id}><span className="font-mono">{new Date(event.at).toLocaleTimeString('pt-BR')}</span> · {event.message}</div>)}</div></details>}
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error)}>Step · 1 tique</button>

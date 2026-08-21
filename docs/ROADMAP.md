@@ -264,3 +264,9 @@ O painel exibe o status da colaboração temporal e a quantidade de participante
 A nona fatia do v0.9.0 adiciona um reducer local para contar estados temporais recebidos, aplicados, publicados, conflitos de versão, ofertas expiradas/rejeitadas e falhas de publicação. O painel mostra esses contadores junto da presença temporal e do status de conexão.
 
 As métricas são somente de sessão e não enviam documento, inputs, estado interno, timeline, IDs de projeto ou conteúdo de circuito para telemetria. Elas existem para feedback operacional imediato e são reiniciadas quando o documento/room muda; falhas de colaboração continuam best-effort e não interrompem o runtime local.
+
+## Atualização da implementação — histórico local de eventos temporais
+
+A décima fatia do v0.9.0 transforma os contadores temporais em um histórico local dos últimos 12 eventos. Cada registro contém apenas horário, tipo e mensagem genérica: recebimento, aplicação, conflito, expiração/rejeição, publicação ou falha. O histórico é imutável por reducer, limitado em memória e reiniciado ao trocar documento ou room.
+
+A UI oferece uma lista recolhível junto dos contadores, permitindo diagnosticar o fluxo sem enviar conteúdo de circuito, inputs, timeline, IDs de projeto ou estado interno para telemetria. O histórico é informativo e nunca se torna requisito para executar, salvar ou colaborar localmente.

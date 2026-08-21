@@ -381,9 +381,11 @@ export function CircuitEditor() {
     setSequentialSnapshot(null)
     setRemoteClockPeriods(null)
     setRemoteRuntimeState(null)
+    setRuntimeMetrics({ ...EMPTY_RUNTIME_METRICS })
   }, [document])
 
   useEffect(() => {
+    setRuntimeMetrics({ ...EMPTY_RUNTIME_METRICS })
     if (!user || !cloudProjectId) {
       setRemoteClockPeriods(null)
       setRemoteRuntimeState(null)
