@@ -40,12 +40,36 @@ SMOKE_URL=https://veritas-opal-seven.vercel.app npm run smoke:release
 O comando [`npm run beta:preflight`](../scripts/beta-preflight.mjs) consolida versão candidata, árvore Git, suíte, typecheck, lint, build frontend, build MCP, smoke e a presença de um relatório RLS. Para uma promoção beta, execute-o com os gates externos obrigatórios:
 
 ```bash
-BETA_EXPECTED_VERSION=0.8.0-rc.1 \
+BETA_EXPECTED_VERSION=0.9.0-rc.1 \
 SMOKE_URL=https://veritas-opal-seven.vercel.app \
 BETA_PREFLIGHT_REQUIRE_SMOKE=1 \
 BETA_PREFLIGHT_REQUIRE_RLS=1 \
 BETA_RLS_REPORT=artifacts/rls-acceptance.md \
+BETA_PREFLIGHT_REQUIRE_EVIDENCE=1 \
+BETA_EVIDENCE_MANIFEST=artifacts/beta-evidence.json \
 npm run beta:preflight
+```
+
+O manifesto JSON de evidências deve declarar a mesma versão candidata, `generatedAt`, listas vazias `openP0` e `openP1` e os gates `rls`, `realtime`, `hdl`, `accessibility`, `mobile`, `rollback` e `onboarding`. Cada gate precisa ter `status: "PASS"` e uma referência não vazia em `evidence`. O preflight valida o contrato, mas não inventa nem substitui as evidências externas.
+
+Exemplo mínimo de estrutura, a ser preenchido somente com resultados reais:
+
+```json
+{
+  "version": "0.9.0-rc.1",
+  "generatedAt": "2026-08-21T02:00:00.000Z",
+  "openP0": [],
+  "openP1": [],
+  "gates": {
+    "rls": { "status": "PASS", "evidence": "artifacts/rls-acceptance.md" },
+    "realtime": { "status": "PASS", "evidence": "artifacts/realtime-isolation.md" },
+    "hdl": { "status": "PASS", "evidence": "artifacts/hdl-toolchains.md" },
+    "accessibility": { "status": "PASS", "evidence": "artifacts/accessibility.md" },
+    "mobile": { "status": "PASS", "evidence": "artifacts/mobile-pwa.md" },
+    "rollback": { "status": "PASS", "evidence": "artifacts/rollback.md" },
+    "onboarding": { "status": "PASS", "evidence": "artifacts/onboarding.md" }
+  }
+}
 ```
 
 O preflight não cria sessões Supabase nem substitui a prova de RLS. Siga [`docs/BETA-RLS-ACCEPTANCE.md`](BETA-RLS-ACCEPTANCE.md) para executar RLS-001 a RLS-022 com usuários reais e produzir o relatório sanitizado.
@@ -91,7 +115,7 @@ Os mesmos JSON de entrada devem ser executados pelo pacote MCP diretamente e por
 
 O workflow [`quality.yml`](../.github/workflows/quality.yml) roda em pull requests e pushes para `main`. Ele executa a suíte, constrói a aplicação e o MCP, inicia o preview Vite e executa `npm run smoke:release` contra `http://127.0.0.1:4173`.
 
-O workflow [`release.yml`](../.github/workflows/release.yml) aceita dois modos. No modo automático, o push de uma tag SemVer como `v0.8.0-rc.1` ou `v1.0.0` inicia validação, smoke e publicação; tags com hífen são marcadas como pre-release. No modo manual, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.8.0-rc.1` e marque `prerelease=true`. Em ambos os modos, o job de validação roda antes do job de publicação e `gh release create` gera as notas automaticamente. O workflow não cria tags automaticamente a partir de qualquer commit: a tag continua sendo o ponto explícito de promoção e rastreabilidade.
+O workflow [`release.yml`](../.github/workflows/release.yml) aceita dois modos. No modo automático, o push de uma tag SemVer como `v0.9.0-rc.1` ou `v1.0.0` inicia validação, smoke e publicação; tags com hífen são marcadas como pre-release. No modo manual, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.9.0-rc.1` e marque `prerelease=true`. Em ambos os modos, o job de validação roda antes do job de publicação e `gh release create` gera as notas automaticamente. O workflow não cria tags automaticamente a partir de qualquer commit: a tag continua sendo o ponto explícito de promoção e rastreabilidade.
 
 O arquivo [`release.yml`](../.github/release.yml) organiza as notas por labels `breaking-change`, `feature`, `bug`, `security`, `documentation` e `education`. PRs sem categoria caem em `Other changes`.
 

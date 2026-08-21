@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
+import { validateBetaEvidenceManifest } from './betaEvidence.mjs'
 
 const root = resolve(new URL('..', import.meta.url).pathname)
 const failures = []
@@ -91,6 +92,40 @@ function checkCleanTree() {
   console.log('PASS árvore Git limpa')
 }
 
+function checkEvidenceManifest() {
+  const manifestPath = process.env.BETA_EVIDENCE_MANIFEST
+  const required = envFlag('BETA_PREFLIGHT_REQUIRE_EVIDENCE')
+  if (!manifestPath) {
+    if (required) {
+      failures.push('manifesto beta: BETA_EVIDENCE_MANIFEST não foi definido')
+      console.error('FAIL manifesto beta: defina BETA_EVIDENCE_MANIFEST com as evidências externas')
+    } else {
+      recordSkip('manifesto beta', 'defina BETA_EVIDENCE_MANIFEST; use BETA_PREFLIGHT_REQUIRE_EVIDENCE=1 para torná-lo obrigatório')
+    }
+    return
+  }
+
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(resolve(process.cwd(), manifestPath), 'utf8'))
+  } catch (error) {
+    failures.push(`manifesto beta: não foi possível ler ou interpretar ${manifestPath}`)
+    console.error(`FAIL manifesto beta: ${error instanceof Error ? error.message : String(error)}`)
+    return
+  }
+
+  const expectedVersion = process.env.BETA_EXPECTED_VERSION ?? readPackageVersion()
+  const errors = validateBetaEvidenceManifest(manifest, expectedVersion)
+  if (errors.length > 0) {
+    failures.push(`manifesto beta: ${errors.join('; ')}`)
+    console.error(`FAIL manifesto beta: ${errors.join('; ')}`)
+    return
+  }
+
+  passes.push(`manifesto beta ${expectedVersion}`)
+  console.log(`PASS manifesto beta ${expectedVersion}`)
+}
+
 function checkRlsReport() {
   const reportPath = process.env.BETA_RLS_REPORT
   const required = envFlag('BETA_PREFLIGHT_REQUIRE_RLS')
@@ -158,6 +193,7 @@ if (process.env.SMOKE_URL) {
 }
 
 checkRlsReport()
+checkEvidenceManifest()
 
 console.log('\nResumo do preflight')
 console.log(`PASS: ${passes.length}`)

@@ -278,3 +278,11 @@ A décima-primeira fatia do v0.9.0 fecha o fluxo de aplicação manual do `runti
 Quando a restauração do `Simulator`, do snapshot e do checkpoint local termina, a interface mostra confirmação explícita de sucesso e limpa a oferta pendente. Exceções durante a restauração produzem uma mensagem de erro sem interromper o runtime local. O reducer de métricas diferencia aplicação concluída, conflito de versão e falha de aplicação; nenhuma dessas métricas envia conteúdo do circuito ou estado temporal para telemetria.
 
 A decisão de versão foi isolada em `src/realtime/runtimeOffer.ts` e coberta por teste unitário. A suíte completa passou com 31 arquivos e 256 testes, seguida por typecheck, lint, build do frontend, build do MCP, `git diff --check` e smoke público do PWA.
+
+## Atualização da implementação — contrato de evidências para beta — 2026-08-21
+
+Após a publicação da `v0.9.0-rc.1`, o beta preflight foi ampliado sem alterar o caminho local-first. O módulo puro `scripts/betaEvidence.mjs` valida um manifesto externo com a versão candidata, timestamp, listas vazias de P0/P1 e evidências `PASS` para RLS, Realtime, HDL, acessibilidade, mobile, rollback e onboarding.
+
+A checagem é opcional para desenvolvimento local e torna-se obrigatória com `BETA_PREFLIGHT_REQUIRE_EVIDENCE=1` e `BETA_EVIDENCE_MANIFEST=...`. O preflight continua sem criar sessões Supabase ou inventar resultados: ele apenas rejeita manifestos incompletos, versões divergentes, gates pendentes e bloqueadores abertos. Foram adicionados testes para manifesto válido, versão divergente, P1 aberto, gate pendente, evidência vazia e gate ausente.
+
+Os documentos `docs/RELEASE-GATES.md`, `docs/BETA-RLS-ACCEPTANCE.md` e `docs/RELEASE-PLAN.md` agora apontam para a `v0.9.0-rc.1` e explicitam que nenhuma `v0.9.0-beta.1` deve ser criada sem evidências externas reais e zero P0/P1.

@@ -4,7 +4,7 @@
 **Produto:** Veritas — editor e simulador didático de lógica digital
 **Repositório:** https://github.com/Lucas-Belucci-Bellini/Veritas
 **Preview/produção atual:** https://veritas-opal-seven.vercel.app
-**Versão declarada no `package.json`:** `0.8.0-rc.1`
+**Versão declarada no `package.json`:** `0.9.0-rc.1`
 
 ## 1. Decisão de posicionamento
 
@@ -16,13 +16,13 @@ O público inicial é composto por estudantes de lógica digital, professores, a
 
 ## 2. Diagnóstico atual
 
-O projeto já possui uma base forte para uma prévia pública: editor visual combinacional, tabela verdade, persistência IndexedDB, autenticação e nuvem Supabase, histórico remoto, colaboração Realtime, exportação Verilog/VHDL, monitoramento da IA, workspace ALGO-001/002/003 e ferramentas MCP locais. A suíte atual registra 226 testes aprovados, além de typecheck, lint, build frontend, build MCP e smoke PWA limpos.
+O projeto já possui uma base forte para uma prévia pública: editor visual combinacional, tabela verdade, persistência IndexedDB, autenticação e nuvem Supabase, histórico remoto, colaboração Realtime, exportação Verilog/VHDL, monitoramento da IA, workspace ALGO-001/002/003, runtime sequencial visual e ferramentas MCP locais. A suíte atual registra 256 testes aprovados, além de typecheck, lint, build frontend, build MCP e smoke PWA limpos.
 
 Há, porém, quatro fatos que impedem chamar o estado atual de `1.0.0` sem uma rodada de endurecimento:
 
 | Área | Estado atual | Consequência para o lançamento |
 | --- | --- | --- |
-| Versionamento | `package.json` está em `0.8.0-rc.1`; o GitHub ainda não possui releases/tags estáveis publicados. | Executar a candidata manualmente e manter a sequência de pré-releases antes do estável. |
+| Versionamento | `package.json` está em `0.9.0-rc.1`, com tag e release candidata publicadas; ainda não há release estável. | Executar os gates externos de beta e manter a sequência de pré-releases antes do estável. |
 | Distribuição | Existe deployment Vercel público, mas o fluxo de Preview/Production, domínio, headers e rollback ainda precisa ser formalizado. | Tratar o deployment atual como preview até concluir o checklist. |
 | MCP | Ferramentas determinísticas estão disponíveis por `stdio`; transporte HTTP remoto autenticado ainda é roadmap. | Não prometer integração web remota no lançamento inicial. |
 | Colaboração | Broadcast de snapshots e Presence funcionam, mas não são CRDT nem merge campo a campo. | Rotular como colaboração beta/preview e documentar o risco de sobrescrita concorrente. |
@@ -35,7 +35,9 @@ A recomendação é usar SemVer e manter os artefatos publicados imutáveis: cor
 | --- | --- | --- | --- |
 | `v0.8.0-alpha.1` | Alpha técnico multi-bit | Usuário interno e colaboradores próximos | Produto abre, salva localmente, avalia circuitos escalares e vetoriais limitados, sem blocker P0. |
 | `v0.8.0-beta.1` | Beta pedagógico | 5–10 estudantes/professores convidados | Tutorial concluído, tabela vetorial limitada reproduzida e exportação HDL validada por fixtures. |
-| `v0.8.0-rc.1` | Release candidate | Testadores convidados e mantenedores | Quality gates verdes, RLS auditado, smoke externo aprovado e nenhum P0/P1 aberto. |
+| `v0.8.0-rc.1` | Release candidate multi-bit | Testadores convidados e mantenedores | Quality gates verdes, RLS auditado, smoke externo aprovado e nenhum P0/P1 aberto. |
+| `v0.9.0-rc.1` | Release candidate sequencial | Testadores convidados e mantenedores | Runtime temporal validado, smoke externo aprovado, contrato MCP alinhado e nenhum P0/P1 aberto. |
+| `v0.9.0-beta.1` | Beta público sequencial | Estudantes/professores convidados | Manifesto de evidências completo, RLS/Realtime/HDL/mobile/acessibilidade/rollback aprovados e zero P0/P1. |
 | `v0.8.x` | Correções de beta/RC | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
 | `v1.0.0` | Lançamento estável | Público geral | API/documento público estável, política de dados, suporte básico e critérios P0/P1 encerrados. |
 
@@ -125,7 +127,7 @@ O cronograma abaixo é uma sequência operacional para uma equipe pequena; os pr
 | 2 | `v0.8.0-alpha.1` e teste interno com circuitos escalares/vetoriais limitados. | Tag, GitHub prerelease, release notes e feedback registrado. |
 | 3 | Correções e tutorial; alpha convidado com 5–10 pessoas. | Relatório de onboarding e lista P1/P2. |
 | 4 | `v0.8.0-beta.1`, Preview/Production formalizados, monitoramento e rollback ensaiados. | Beta público com limitações visíveis. |
-| 5 | Correções beta, testes HDL com toolchains, acessibilidade e compatibilidade móvel. | `v0.8.0-rc.1` sem P0/P1 aberto. |
+| 5 | Gates externos da v0.9.0: RLS, Realtime, HDL, acessibilidade, mobile, onboarding e rollback, usando manifesto de evidências. | `v0.9.0-beta.1` somente se não houver P0/P1 aberto. |
 | 6 | `v1.0.0`, anúncio, documentação, exemplos e canal de suporte. | Release estável e postmortem de lançamento agendado. |
 
 ## 10. Critério objetivo para dizer “lançamos”
