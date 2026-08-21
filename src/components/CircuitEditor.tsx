@@ -719,13 +719,13 @@ export function CircuitEditor() {
         : 'Adicione componentes e conecte as entradas para começar.')
 
   return (
-    <section className="card p-4 sm:p-6">
+    <section className="card p-4 sm:p-6" aria-labelledby="circuit-editor-title">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold tracking-wide text-brand-600 uppercase dark:text-brand-300">
             v0.9.0 · prévia
           </p>
-          <h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
+          <h2 id="circuit-editor-title" className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
             Editor visual combinacional e sequencial
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
@@ -804,8 +804,8 @@ export function CircuitEditor() {
       )}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-          <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
+        <aside className="rounded-xl border border-slate-200 p-3 dark:border-slate-800" aria-labelledby="circuit-components-title">
+          <h3 id="circuit-components-title" className="mb-2 text-xs font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500">
             Componentes
           </h3>
           <div className="grid gap-2">
@@ -828,7 +828,7 @@ export function CircuitEditor() {
         </aside>
 
         <div>
-          <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
+          <div className="h-[min(420px,70vh)] min-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60" role="group" aria-label="Canvas de edição do circuito">
             <ReactFlow
               nodes={renderedNodes}
               edges={renderedEdges}
@@ -857,6 +857,8 @@ export function CircuitEditor() {
                 : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200'
             }`}
             role="status"
+            aria-live="polite"
+            aria-atomic="true"
           >
             {notice || validationMessage}
           </div>
@@ -955,7 +957,7 @@ export function CircuitEditor() {
             <span className="text-[11px] text-slate-400">Compartilhe usando o UUID do usuário</span>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            <input value={collaboratorUserId} onChange={(event) => setCollaboratorUserId(event.target.value)} className="min-w-64 flex-1 rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-xs dark:border-slate-700" placeholder="UUID do usuário" />
+            <input value={collaboratorUserId} onChange={(event) => setCollaboratorUserId(event.target.value)} className="min-w-64 flex-1 rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-xs dark:border-slate-700" placeholder="UUID do usuário" aria-label="UUID do usuário colaborador" />
             <select value={collaboratorRole} onChange={(event) => setCollaboratorRole(event.target.value as CollaboratorRole)} className="rounded-lg border border-slate-200 bg-transparent px-2 py-2 text-xs dark:border-slate-700"><option value="editor">Editor</option><option value="viewer">Visualizador</option></select>
             <button type="button" className="key text-xs" onClick={() => void inviteCollaborator()} disabled={!collaboratorUserId.trim()}>Adicionar</button>
           </div>

@@ -89,7 +89,16 @@ export function TruthTableView({
               <tr
                 key={rowIndex}
                 style={{ height: ROW_HEIGHT }}
+                tabIndex={0}
+                aria-selected={selectedRow === rowIndex}
+                aria-label={`Selecionar linha ${rowIndex + 1}`}
                 onClick={() => onSelectRow(selectedRow === rowIndex ? null : rowIndex)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onSelectRow(selectedRow === rowIndex ? null : rowIndex)
+                  }
+                }}
                 className={`cursor-pointer transition-colors ${
                   selectedRow === rowIndex
                     ? 'bg-amber-100 dark:bg-amber-500/15'

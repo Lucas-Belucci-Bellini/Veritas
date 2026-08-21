@@ -28,6 +28,7 @@ const manifest = aggregateBetaEvidence({
   edgeReport: readOptional(process.env.BETA_EDGE_REPORT),
   realtimeReport: readOptional(process.env.BETA_REALTIME_REPORT),
   hdlReport: readOptional(process.env.BETA_HDL_REPORT),
+  accessibilityReport: readOptional(process.env.BETA_ACCESSIBILITY_REPORT),
   structuralReport: readJsonOptional(process.env.BETA_SUPABASE_STRUCTURAL_REPORT),
   structuralProjectId: process.env.BETA_SUPABASE_PROJECT_ID || '',
   evidencePaths: {
@@ -35,6 +36,7 @@ const manifest = aggregateBetaEvidence({
     edge: process.env.BETA_EDGE_REPORT || '',
     realtime: process.env.BETA_REALTIME_REPORT || '',
     hdl: process.env.BETA_HDL_REPORT || '',
+    accessibility: process.env.BETA_ACCESSIBILITY_REPORT || '',
     supabaseStructural: process.env.BETA_SUPABASE_STRUCTURAL_REPORT || '',
   },
 })

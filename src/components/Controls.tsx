@@ -61,6 +61,8 @@ export function Toggle({ label, description, checked, onChange }: ToggleProps) {
       <button
         type="button"
         role="switch"
+        aria-label={label}
+        aria-describedby={description ? `${label.toLowerCase().replace(/\s+/g, '-')}-description` : undefined}
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`mt-0.5 h-6 w-11 shrink-0 rounded-full p-0.5 transition-colors ${
@@ -76,7 +78,7 @@ export function Toggle({ label, description, checked, onChange }: ToggleProps) {
       <span>
         <span className="block text-sm font-medium">{label}</span>
         {description && (
-          <span className="block text-xs text-slate-500 dark:text-slate-400">
+          <span id={description ? `${label.toLowerCase().replace(/\s+/g, '-')}-description` : undefined} className="block text-xs text-slate-500 dark:text-slate-400">
             {description}
           </span>
         )}

@@ -54,6 +54,9 @@ jobs:
           HDL_REQUIRE_TOOLCHAINS: '1'
         run: npm run beta:hdl
 
+      - name: Accessibility and mobile acceptance
+        run: npm run beta:accessibility
+
       - name: Start production-like preview
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/veritas-preview.log" 2>&1 &

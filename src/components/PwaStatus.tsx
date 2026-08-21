@@ -91,6 +91,8 @@ function Toast({
   return (
     <div
       role="status"
+      aria-live="polite"
+      aria-atomic="true"
       className={`pointer-events-auto flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm shadow-lg ${TONES[tone]}`}
     >
       <span className="shrink-0">{icon}</span>

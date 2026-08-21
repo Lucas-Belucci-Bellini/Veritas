@@ -148,6 +148,12 @@ function AppContent() {
 
   return (
     <div className="min-h-dvh bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Pular para o conteúdo principal
+      </a>
       <header className="border-b border-slate-200 bg-white/70 backdrop-blur dark:border-slate-800 dark:bg-slate-950/70">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
@@ -155,7 +161,7 @@ function AppContent() {
               V
             </span>
             <div>
-              <h1 className="text-lg leading-tight font-bold">Veritas</h1>
+              <h1 id="app-title" className="text-lg leading-tight font-bold">Veritas</h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Tabelas verdade e circuitos lógicos, direto no navegador
               </p>
@@ -184,7 +190,7 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
+      <main id="main-content" tabIndex={-1} aria-labelledby="app-title" className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
         <section className="card p-4 sm:p-6">
           <ExpressionInput
             value={expression}

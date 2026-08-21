@@ -353,3 +353,11 @@ A próxima fatia do roadmap fortalece o gate de exportação industrial sem alte
 O novo `npm run beta:hdl` executa HDL-001 com `iverilog -g2005`, HDL-002 com `ghdl -a --std=08` e HDL-003 com a regressão determinística do exportador. Sem toolchains, o modo local fica explicitamente em `SKIP`; com `HDL_REQUIRE_TOOLCHAINS=1`, a ausência de qualquer compilador vira `FAIL`. A execução real no sandbox produziu `HDL-001 PASS`, `HDL-002 PASS` e `HDL-003 PASS` após a correção da flag do iverilog.
 
 O workflow `.github/workflows/quality.yml` agora instala `iverilog` e `ghdl` e executa o gate obrigatório em cada push/pull request. O agregador de evidências beta consome `BETA_HDL_REPORT` e só marca `gates.hdl` como `PASS` quando HDL-001 a HDL-003 possuem PASS explícito. A documentação operacional está em `docs/BETA-HDL-ACCEPTANCE.md`; ausência de evidência HDL continua mantendo `HDL-EVIDENCE-INCOMPLETE` e bloqueando a promoção beta.
+
+## Atualização da implementação — acessibilidade, teclado e mobile/PWA — 2026-08-21
+
+A fatia de acessibilidade adiciona um contrato executável A11Y-001 a A11Y-005 e o comando `npm run beta:accessibility`. O runner verifica skip link e landmarks do shell, navegação por teclado na tabela verdade, regiões `aria-live` para status offline/PWA e CircuitEditor, viewport `pt-BR` e canvas limitado pela viewport, além de uma regressão Vitest do contrato.
+
+No produto, o `main` recebeu identificação e foco programático, o shell ganhou “Pular para o conteúdo principal”, as linhas interativas da tabela verdade respondem a Enter/Espaço e exibem `aria-selected`, e o foco visível global passou a ser consistente. O PWA anuncia atualização/conectividade com `aria-live="polite"`; o editor nomeia paleta, canvas, status e UUID de colaborador, respeitando `prefers-reduced-motion` e uma altura responsiva mínima para telas pequenas.
+
+O workflow de qualidade executa o gate A11Y em cada push/pull request. O agregador beta consome `BETA_ACCESSIBILITY_REPORT` e só marca `gates.accessibility` como `PASS` quando os cinco IDs possuem PASS explícito. O relatório operacional está em `docs/BETA-ACCESSIBILITY-ACCEPTANCE.md`. A evidência estrutural não substitui inspeção manual em Chromium, Firefox, WebKit/iOS, viewport móvel, leitor de tela, zoom e instalação PWA; a promoção beta continua bloqueada até esses testes e os demais gates externos.
