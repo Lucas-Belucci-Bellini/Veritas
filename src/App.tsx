@@ -191,6 +191,26 @@ function AppContent() {
       </header>
 
       <main id="main-content" tabIndex={-1} aria-labelledby="app-title" className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6">
+        <section id="quick-start" className="card border-brand-200 bg-brand-50/60 p-4 sm:p-6 dark:border-brand-900/70 dark:bg-brand-950/20" aria-labelledby="quick-start-title">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase dark:text-brand-300">Primeiros passos</p>
+              <h2 id="quick-start-title" className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">Aprenda o fluxo básico em menos de um minuto</h2>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">Você pode começar sem conta e sem enviar expressões para a nuvem. A conta só é necessária para sincronizar um circuito visual.</p>
+            </div>
+            <a className="key text-xs" href="#onboarding-guide">Guia completo</a>
+          </div>
+          <ol className="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 dark:text-slate-200">
+            <li className="rounded-lg border border-brand-200 bg-white/70 p-3 dark:border-brand-900/70 dark:bg-slate-900/50"><strong>1. Escreva:</strong> digite uma expressão como <code className="expr">(A AND B) OR NOT C</code> ou use o teclado virtual.</li>
+            <li className="rounded-lg border border-brand-200 bg-white/70 p-3 dark:border-brand-900/70 dark:bg-slate-900/50"><strong>2. Observe:</strong> leia a tabela verdade, selecione uma linha e veja o caminho correspondente no circuito.</li>
+            <li className="rounded-lg border border-brand-200 bg-white/70 p-3 dark:border-brand-900/70 dark:bg-slate-900/50"><strong>3. Preserve:</strong> use os projetos salvos para guardar no navegador; exporte um arquivo antes de trocar de dispositivo.</li>
+            <li className="rounded-lg border border-brand-200 bg-white/70 p-3 dark:border-brand-900/70 dark:bg-slate-900/50"><strong>4. Colabore:</strong> entre na conta somente quando quiser sincronizar, versionar ou compartilhar um circuito visual.</li>
+          </ol>
+          <details id="onboarding-guide" className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+            <summary className="cursor-pointer font-semibold">O que funciona offline?</summary>
+            <p className="mt-2">A calculadora, a tabela verdade, os exemplos e os projetos locais continuam funcionando no navegador após o primeiro carregamento. IA, autenticação, nuvem e colaboração dependem de conexão e configuração, mas não bloqueiam o modo local.</p>
+          </details>
+        </section>
         <section className="card p-4 sm:p-6">
           <ExpressionInput
             value={expression}

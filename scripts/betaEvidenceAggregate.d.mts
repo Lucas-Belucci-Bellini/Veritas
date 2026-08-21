@@ -22,6 +22,7 @@ export declare function aggregateBetaEvidence(options?: {
   hdlReport?: string
   accessibilityReport?: string
   rollbackReport?: string
+  onboardingReport?: string
   structuralReport?: unknown
   structuralProjectId?: string
   evidencePaths?: Record<string, string>

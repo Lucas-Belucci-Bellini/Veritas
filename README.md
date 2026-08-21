@@ -13,6 +13,10 @@ O registro completo de ideias está em [`issue.md`](./issue.md). O plano execut�
 o backlog priorizado e os critérios de aceite estão em [`docs/ROADMAP.md`](./docs/ROADMAP.md),
 com um resumo executivo em [`plano.md`](./plano.md).
 
+## Comece aqui
+
+O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca abriu o Veritas. Ele mostra como escrever uma expressão, ler a tabela verdade, salvar no navegador, exportar uma cópia e decidir quando usar autenticação e sincronização. O primeiro uso não exige conta.
+
 ## O que já está pronto
 
 | Versão | Entrega |

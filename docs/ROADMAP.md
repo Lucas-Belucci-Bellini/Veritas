@@ -369,3 +369,11 @@ Foi criado `npm run beta:rollback` com os cenários RB-001 a RB-005. O runner co
 O ensaio é deliberadamente não destrutivo: não move tags, não apaga releases, não reescreve migrations, não altera Supabase, não executa rollback de deployment e não limpa IndexedDB. A recuperação real de produção continua sendo uma ação operacional no provedor de deployment, seguida de `smoke:release`, abertura de circuito local, leitura de versão remota autorizada e registro do incidente. O runbook completo está em `docs/ROLLBACK-RUNBOOK.md`.
 
 O workflow de qualidade agora executa o runner de rollback. O agregador beta consome `BETA_ROLLBACK_REPORT` e só marca `gates.rollback` como `PASS` quando RB-001 a RB-005 possuem PASS explícito. Sem o ensaio e sem o registro operacional, `ROLLBACK-EVIDENCE-INCOMPLETE` permanece em `openP1` e a promoção beta continua bloqueada.
+
+## Atualização da implementação — onboarding externo e primeiros passos — 2026-08-21
+
+O Veritas agora apresenta um guia de primeiros passos no App, em português, com quatro ações visíveis: escrever uma expressão, observar tabela/circuito, preservar o trabalho local e decidir quando usar colaboração em nuvem. O guia explica que o primeiro uso não exige conta e inclui uma seção sobre o que continua funcionando offline.
+
+Foi criado `docs/ONBOARDING.md` com o fluxo externo completo, checklist de conclusão, solução de problemas, limites beta e orientações para não compartilhar tokens ou dados privados. O README aponta para esse guia. O modo local-first continua sendo o caminho de entrada; autenticação, IA, sincronização e colaboração são explicitamente opcionais.
+
+O novo `npm run beta:onboarding` executa ONB-001 (tutorial no app), ONB-002 (link no README), ONB-003 (guia cobre IndexedDB/rollback/limites) e ONB-004 (confirmação externa). Os três primeiros passaram; ONB-004 permanece `SKIP` por padrão e só pode virar PASS quando uma pessoa externa concluir o checklist com `ONBOARDING_EXTERNAL_PASS=1`. O agregador beta consome `BETA_ONBOARDING_REPORT`, mantendo `ONBOARDING-EVIDENCE-INCOMPLETE` em `openP1` enquanto a confirmação humana não existir.
