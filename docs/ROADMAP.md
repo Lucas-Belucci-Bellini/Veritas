@@ -411,3 +411,9 @@ Foi criado o contrato puro `scripts/releasePromotionContract.mjs`, com classific
 O workflow `.github/workflows/release.yml` executa o guard automaticamente quando a versão contém `-beta.`. No CI, `VERITAS_BETA_EVIDENCE_STATUS=PASS` e `VERITAS_BETA_APPROVED=true` são variáveis protegidas; sem elas a promoção beta falha antes dos passos de publicação. RC, alpha e estável continuam no fluxo geral de testes, typecheck, lint, builds e smoke.
 
 A documentação operacional está em `docs/RELEASE-PROMOTION-GUARD.md`, incluindo uso local, integração CI, validação opcional direta de `beta-evidence-manifest.json` e limites anti-simulação. Os testes determinísticos cobrem classificação SemVer, bloqueio de beta incompleto, autorização completa e ausência de bloqueio beta para RC/estável. A promoção beta continua bloqueada até RLS-001 a RLS-022, RT-001 a RT-005, RLS-020/RLS-021 e ONB-004 possuírem evidências reais, revisadas e sem P0/P1.
+
+## Atualização do processo de entrega — habilidade reutilizável — 2026-08-21
+
+A habilidade reutilizável `veritas-feature-delivery` foi atualizada no ambiente de trabalho do agente para refletir o estado atual do projeto. O fluxo agora inclui `beta:readiness` como diagnóstico não destrutivo, `beta:preflight` estrito, proveniência anti-simulação para RLS/Realtime/Edge, o agregador de evidências e `release:guard` antes de qualquer tag. A referência RLS também passou a documentar os eventos temporais `runtime_config` e `runtime_state`, além do isolamento por projeto e room.
+
+A habilidade foi validada com `quick_validate.py` e permanece abaixo do limite de 500 linhas no arquivo principal. O artefato reutilizável continua separado do código de produto; esta entrada registra apenas a atualização do processo para que futuras fatias sigam os mesmos gates e sejam publicadas na `main`.
