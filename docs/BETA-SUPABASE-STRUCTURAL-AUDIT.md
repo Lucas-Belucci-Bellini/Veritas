@@ -27,11 +27,15 @@ A policy `veritas_circuit_projects_update_editor` estava materializada com a exp
 
 A mesma correção foi refletida nas migrations ROOM-001 originais e no hardening, para que uma instalação nova não recrie o contrato anterior. A migration não altera dados, não desabilita RLS e não concede permissões novas.
 
+## Resultado do hardening
+
+Após a aplicação da migration `20260821033000_harden_veritas_authorization_surface`, a consulta `pg_proc` confirmou os três helpers somente em `private`, com `anon_execute=false`; os quatro endpoints públicos do Veritas ficaram `SECURITY INVOKER`, também sem execução por `anon`. Os Security Advisors deixaram de listar os helpers e RPCs do Veritas.
+
 ## Avisos que continuam bloqueando o beta
 
-Os Security Advisors retornaram avisos sobre funções `SECURITY DEFINER` executáveis por `authenticated` — incluindo helpers de autorização do Veritas —, proteção contra senhas vazadas desabilitada no Auth e uma tabela não relacionada com RLS sem policy. Os helpers do Veritas usam `SECURITY DEFINER` com `search_path` controlado porque são chamados pelas policies para evitar recursão de RLS; isso é uma decisão de desenho que ainda precisa de revisão de segurança e teste cross-user, não um passe automático. As superfícies não relacionadas não foram alteradas nesta etapa.
+Permanecem avisos fora do escopo desta fatia: `subscription_events` sem policy, funções legadas `bump_view`, `bump_visits`, `buscar_juris` e `current_tenant_role` como `SECURITY DEFINER` expostas e proteção contra senhas vazadas desabilitada no Auth. Essas superfícies não foram alteradas porque pertencem a outros domínios do projeto e exigem revisão própria.
 
-Até que esses avisos sejam classificados com evidência e a matriz real seja executada, este documento **não** pode ser usado como `rls` ou `security` `PASS` no manifesto beta. O preflight continua bloqueando a promoção quando `openP0` ou `openP1` não estiver vazio.
+Este documento ainda **não** pode ser usado como `rls` ou `security` `PASS` no manifesto beta: a auditoria estrutural confirma catálogo e grants, mas não executa RLS-001 a RLS-022 com dois usuários. O preflight continua bloqueando a promoção quando `openP0` ou `openP1` não estiver vazio.
 
 ## Próximo teste obrigatório
 
