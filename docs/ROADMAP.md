@@ -403,3 +403,11 @@ Relatórios `SAFE`, `SKIP`, `ANONYMOUS_ONLY`, sem marcador, com cenário faltant
 Foi criado `npm run beta:readiness`, um diagnóstico local e não destrutivo que verifica seis áreas: Supabase público, quatro contas RLS, Realtime cross-user, Edge autenticada, artefatos de evidência e janela de versão beta. O comando não abre sessões, não faz requests, não lê valores de credenciais e não executa runners reais.
 
 O relatório usa `READY`, `BLOCKED` e `SKIP`. No estado atual `v0.9.0-rc.1`, o ensaio local resultou em 0 READY, 5 BLOCKED e 1 SKIP, sem expor segredos. Isso é esperado: as credenciais descartáveis, tokens Realtime, JWT da Edge e artefatos reais ainda não foram fornecidos. O runbook está em `docs/BETA-READINESS-DOCTOR.md`; `READY` confirma apenas presença de configuração, nunca isolamento ou autorização.
+
+## Atualização da implementação — guard de promoção SemVer — 2026-08-21
+
+Foi criado o contrato puro `scripts/releasePromotionContract.mjs`, com classificação explícita de canais `alpha`, `beta`, `rc` e estável. O novo comando `npm run release:guard` rejeita versões inválidas e mantém o fail-closed para beta: o preflight deve estar estrito, o manifesto de evidências deve estar em `PASS` e uma aprovação explícita deve existir. O guard não cria tags, não publica releases e não substitui os runners reais.
+
+O workflow `.github/workflows/release.yml` executa o guard automaticamente quando a versão contém `-beta.`. No CI, `VERITAS_BETA_EVIDENCE_STATUS=PASS` e `VERITAS_BETA_APPROVED=true` são variáveis protegidas; sem elas a promoção beta falha antes dos passos de publicação. RC, alpha e estável continuam no fluxo geral de testes, typecheck, lint, builds e smoke.
+
+A documentação operacional está em `docs/RELEASE-PROMOTION-GUARD.md`, incluindo uso local, integração CI, validação opcional direta de `beta-evidence-manifest.json` e limites anti-simulação. Os testes determinísticos cobrem classificação SemVer, bloqueio de beta incompleto, autorização completa e ausência de bloqueio beta para RC/estável. A promoção beta continua bloqueada até RLS-001 a RLS-022, RT-001 a RT-005, RLS-020/RLS-021 e ONB-004 possuírem evidências reais, revisadas e sem P0/P1.
