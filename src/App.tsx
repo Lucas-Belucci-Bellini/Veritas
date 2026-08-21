@@ -12,12 +12,10 @@ import {
   type Notation,
   type TruthTable,
 } from './engine'
-import { ChipLibrary } from './components/ChipLibrary'
 import { SegmentedControl, Toggle } from './components/Controls'
 import { ExportBar } from './components/ExportBar'
 import { ExpressionInput } from './components/ExpressionInput'
 import { KarnaughMapView } from './components/KarnaughMapView'
-import { ProjectsPanel } from './components/ProjectsPanel'
 import { NormalFormsPanel } from './components/NormalFormsPanel'
 import { PwaStatus } from './components/PwaStatus'
 import { TruthTableView } from './components/TruthTableView'
@@ -25,11 +23,7 @@ import { VirtualKeyboard } from './components/VirtualKeyboard'
 import { useTheme } from './hooks/useTheme'
 import { AuthProvider } from './auth/AuthProvider'
 import { AuthPanel } from './components/AuthPanel'
-import { AlgorithmWorkspace } from './components/AlgorithmWorkspace'
-import { LogicCaseLab } from './components/LogicCaseLab'
-import { SequentialWorkspace } from './components/SequentialWorkspace'
 import { createImplicationExample } from './algorithms'
-
 // O React Flow e o Dagre pesam mais que todo o resto do aplicativo somado, e
 // só fazem falta quando já existe uma expressão válida na tela.
 const CircuitView = lazy(() =>
@@ -38,8 +32,31 @@ const CircuitView = lazy(() =>
 const CircuitEditor = lazy(() =>
   import('./components/CircuitEditor').then((module) => ({ default: module.CircuitEditor })),
 )
+const AlgorithmWorkspace = lazy(() =>
+  import('./components/AlgorithmWorkspace').then((module) => ({ default: module.AlgorithmWorkspace })),
+)
+const LogicCaseLab = lazy(() =>
+  import('./components/LogicCaseLab').then((module) => ({ default: module.LogicCaseLab })),
+)
+const SequentialWorkspace = lazy(() =>
+  import('./components/SequentialWorkspace').then((module) => ({ default: module.SequentialWorkspace })),
+)
+const ProjectsPanel = lazy(() =>
+  import('./components/ProjectsPanel').then((module) => ({ default: module.ProjectsPanel })),
+)
+const ChipLibrary = lazy(() =>
+  import('./components/ChipLibrary').then((module) => ({ default: module.ChipLibrary })),
+)
 import { expressionFromUrl, syncUrl } from './lib/url'
 import type { ValueStyle } from './lib/values'
+
+function WorkspaceLoading({ label }: { label: string }) {
+  return (
+    <div role="status" aria-live="polite" className="rounded-lg border border-slate-200 px-4 py-5 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      Carregando {label}…
+    </div>
+  )
+}
 
 const EXAMPLES = [
   '(A AND B) OR NOT C',
@@ -365,12 +382,16 @@ function AppContent() {
               O mesmo raciocínio dos exercícios didáticos aparece como entrada, branch, Watch e trace.
             </p>
           </div>
-          <AlgorithmWorkspace document={algorithmExample} />
-          <LogicCaseLab />
+          <Suspense fallback={<WorkspaceLoading label="workspace de lógica" />}>
+            <AlgorithmWorkspace document={algorithmExample} />
+            <LogicCaseLab />
+          </Suspense>
         </section>
 
         <section className="card space-y-5 p-4 sm:p-6">
-          <SequentialWorkspace />
+          <Suspense fallback={<WorkspaceLoading label="workspace sequencial" />}>
+            <SequentialWorkspace />
+          </Suspense>
         </section>
 
         <Suspense
@@ -383,16 +404,20 @@ function AppContent() {
           <CircuitEditor />
         </Suspense>
 
-        <ProjectsPanel
-          expression={expression}
-          notation={notation}
-          onOpen={(saved, savedNotation) => {
-            setNotation(savedNotation)
-            setExpression(saved)
-          }}
-        />
+        <Suspense fallback={<WorkspaceLoading label="projetos salvos" />}>
+          <ProjectsPanel
+            expression={expression}
+            notation={notation}
+            onOpen={(saved, savedNotation) => {
+              setNotation(savedNotation)
+              setExpression(saved)
+            }}
+          />
+        </Suspense>
 
-        <ChipLibrary onUseExpression={setExpression} />
+        <Suspense fallback={<WorkspaceLoading label="biblioteca de chips" />}>
+          <ChipLibrary onUseExpression={setExpression} />
+        </Suspense>
       </main>
 
       <PwaStatus />

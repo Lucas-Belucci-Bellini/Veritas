@@ -475,3 +475,9 @@ O baseline é atualizado ao abrir ou sincronizar um projeto cloud e é limpo ao 
 ## Atualização da implementação — versão remota aplicada com precisão — 2026-08-21
 
 A indicação `Última atualização remota aplicada` passou a ser um estado local do CircuitEditor, atualizado dentro de `applyRemoteSnapshot`. Assim, um snapshot adiado por conflito ou ignorado por já estar refletido não aparece como aplicado; ao clicar em `Aplicar alteração remota`, a versão passa a ser registrada corretamente. A troca para projeto local e a sincronização de um novo projeto limpam esse indicador.
+
+## Atualização da implementação — code splitting dos workspaces — 2026-08-21
+
+Os workspaces ALGO-002, LogicCaseLab, SequentialWorkspace, ProjectsPanel e ChipLibrary passaram a ser carregados sob demanda com `React.lazy` e `Suspense`. A calculadora principal permanece no carregamento inicial, enquanto cada bloco avançado possui fallback `role="status"` com anúncio em português.
+
+O chunk inicial caiu de aproximadamente 565 kB para 456 kB após a primeira separação, ficando abaixo do limite de aviso de 500 kB. O build PWA passou a gerar os chunks independentes dos workspaces e preserva o funcionamento local-first; o gate A11Y protege o fallback acessível.
