@@ -178,7 +178,7 @@ Cada demo mostra um Watch com os sinais relevantes (`D`, `T`, `CLK`, `Q`, `Q̄` 
 camada de observação: o estado permanece no `Simulator`, o limite impede loops de
 interface e o caminho combinacional existente continua independente. O `CircuitEditor` também aceita `clock`, `dff`, `tff` e `delay` como componentes visuais de 1 bit. O feedback é permitido quando passa por um componente com estado, enquanto ciclos puramente combinacionais continuam sendo rejeitados. Os parâmetros padrão de clock e delay são preservados no documento local e na sincronização.
 
-A edição visual já prepara o documento para a simulação, mas a tabela verdade, a IA e a exportação HDL continuam bloqueadas em circuitos sequenciais. A próxima fatia conectará documentos arbitrários do canvas ao `Simulator`, com Step/Run/Reset e observação temporal.
+Documentos sequenciais desenhados no canvas agora são conectados ao `Simulator` por um painel temporal local. A interface oferece Step, Run, Reset, entradas manuais, Watch e timeline dos últimos 32 estados, enquanto o canvas ilumina os nós e fios do snapshot atual. A tabela verdade, a IA e a exportação HDL continuam bloqueadas em circuitos sequenciais até que seus contratos temporais sejam definidos.
 
 ### Plugin do Claude Code
 

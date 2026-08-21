@@ -47,6 +47,8 @@ import { requestCircuitAi, type CircuitAiResult } from '../ai/circuitAi'
 import { CircuitVersionHistory } from './CircuitVersionHistory'
 import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
+import { SequentialCircuitPanel } from './SequentialCircuitPanel'
+import type { DocumentRuntimeSnapshot } from '../simulation/documentRuntime'
 import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollaborator, type CircuitCollaborator, type CollaboratorRole } from '../realtime/circuitCollaborators'
 import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realtime/circuitRooms'
 
@@ -123,6 +125,7 @@ export function CircuitEditor() {
   const [nextDelayTicks, setNextDelayTicks] = useState(1)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
+  const [sequentialSnapshot, setSequentialSnapshot] = useState<DocumentRuntimeSnapshot | null>(null)
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
   const [collaboratorUserId, setCollaboratorUserId] = useState('')
   const [collaboratorRole, setCollaboratorRole] = useState<CollaboratorRole>('editor')
@@ -253,13 +256,15 @@ export function CircuitEditor() {
           ...node.data,
           value: selectedEvaluation
             ? evaluationIsLit(selectedEvaluation, node.id)
-            : node.data.componentType === 'constant'
-              ? node.data.value
-              : node.data.initial,
+            : sequentialSnapshot && hasSequential
+              ? runtimeIsLit(sequentialSnapshot, node.id)
+              : node.data.componentType === 'constant'
+                ? node.data.value
+                : node.data.initial,
           busValue: selectedEvaluation && hasBuses ? evaluationBinary(selectedEvaluation, node.id) : undefined,
         },
       })),
-    [hasBuses, nodes, selectedEvaluation],
+    [hasBuses, hasSequential, nodes, selectedEvaluation, sequentialSnapshot],
   )
 
   const { broadcast: broadcastRemote, status: collaborationStatus } = collaboration
@@ -318,6 +323,10 @@ export function CircuitEditor() {
   }, [redo, undo])
 
   useEffect(() => {
+    setSequentialSnapshot(null)
+  }, [document])
+
+  useEffect(() => {
     if (collaborationStatus !== 'connected') return
     const timer = setTimeout(() => {
       void broadcastRemote(document)
@@ -328,7 +337,11 @@ export function CircuitEditor() {
   const renderedEdges = useMemo(
     () =>
       edges.map((edge) => {
-        const live = selectedEvaluation ? evaluationIsLit(selectedEvaluation, edge.source) : false
+        const live = selectedEvaluation
+          ? evaluationIsLit(selectedEvaluation, edge.source)
+          : sequentialSnapshot && hasSequential
+            ? runtimeIsLit(sequentialSnapshot, edge.source, edge.sourceHandle === 'qbar' ? 1 : 0)
+            : false
         return {
           ...edge,
           animated: live,
@@ -338,7 +351,7 @@ export function CircuitEditor() {
           },
         }
       }),
-    [edges, selectedEvaluation],
+    [edges, hasSequential, selectedEvaluation, sequentialSnapshot],
   )
 
   const onConnect = useCallback(
@@ -768,6 +781,10 @@ export function CircuitEditor() {
         </div>
       </div>
 
+      {hasSequential && issues.length === 0 && (
+        <SequentialCircuitPanel document={document} onSnapshot={setSequentialSnapshot} />
+      )}
+
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase dark:text-slate-500" htmlFor="circuit-project-name">
           Projeto local
@@ -1153,6 +1170,10 @@ function vectorAssignmentFromRow(document: CircuitDocument, table: CircuitVector
   if (!table || rowIndex === null || !table.rows[rowIndex]) return {}
   const inputs = document.nodes.filter((node) => node.type === 'input')
   return Object.fromEntries(inputs.map((node, index) => [node.id, parseBusLiteral(table.rows[rowIndex][index], node.options?.width ?? 1)]))
+}
+
+function runtimeIsLit(snapshot: DocumentRuntimeSnapshot, nodeId: string, port = 0): boolean {
+  return snapshot.values[nodeId]?.[port] === true
 }
 
 function evaluationIsLit(evaluation: CircuitEvaluation | CircuitVectorEvaluation, nodeId: string): boolean {

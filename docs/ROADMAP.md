@@ -220,3 +220,11 @@ A segunda fatia do v0.9.0 amplia o `CircuitDocument` e o `CircuitEditor` para ac
 A validação continua rejeitando ciclos puramente combinacionais, mas permite feedback quando o ciclo passa por um componente com estado, como o Q̄ de um DFF ligado de volta ao D. Isso prepara contadores e latches sem transformar um ciclo combinacional em comportamento indefinido. Widths vetoriais em componentes sequenciais continuam rejeitados nesta etapa.
 
 Tabela verdade, avaliação por seleção de linha, análise de IA e exportação HDL permanecem explicitamente bloqueadas quando o documento contém estado sequencial. O próximo incremento deverá conectar um `CircuitDocument` sequencial ao `Simulator`, com controles de Step/Run/Reset e observação do timeline para circuitos arbitrários criados no canvas.
+
+## Atualização da implementação — runtime temporal para documentos do canvas
+
+A terceira fatia do v0.9.0 conecta documentos sequenciais arbitrários do `CircuitEditor` ao `Simulator`. O adaptador `src/simulation/documentRuntime.ts` transforma o documento validado em netlist, aplica valores iniciais das entradas e expõe snapshots e Watchs derivados dos nós reais do canvas.
+
+O `SequentialCircuitPanel` adiciona `Step` de um tique, `Run` de oito tiques, `Reset`, alternância manual das entradas, Watch de `input`, `clock`, `dff`, `tff`, `delay` e `output`, além de uma timeline limitada aos últimos 32 estados. O canvas reflete o snapshot temporal: nós e fios ativos são iluminados sem reutilizar a tabela verdade combinacional.
+
+O runtime mantém a propagação síncrona do simulador e falha de forma visível quando o documento é inválido. Nesta etapa, a execução é local e em memória; persistência da timeline, clock editável durante a execução e colaboração do estado temporal permanecem para incrementos posteriores.
