@@ -45,6 +45,7 @@ import { useAuth } from '../auth/useAuth'
 import { useCloudCircuitProjects } from '../hooks/useCloudCircuitProjects'
 import { requestCircuitAi, type CircuitAiResult } from '../ai/circuitAi'
 import { CircuitVersionHistory } from './CircuitVersionHistory'
+import { AccessibleTooltip } from './AccessibleTooltip'
 import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
 import { SequentialCircuitPanel } from './SequentialCircuitPanel'
@@ -53,6 +54,7 @@ import { runtimeFreshness } from '../realtime/runtimeFreshness'
 import { EMPTY_RUNTIME_METRICS, recordRuntimeMetric, type RuntimeMetricEvent, type RuntimeMetrics } from '../realtime/runtimeMetrics'
 import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollaborator, type CircuitCollaborator, type CollaboratorRole } from '../realtime/circuitCollaborators'
 import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realtime/circuitRooms'
+import { buildCircuitIssueGuidance, summarizeCircuitIssues } from '../circuit/validationFeedback'
 
 interface EditorNodeData extends Record<string, unknown> {
   kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential'
@@ -708,15 +710,18 @@ export function CircuitEditor() {
     }
   }
 
+  const issueGuidance = useMemo(() => buildCircuitIssueGuidance(issues), [issues])
+  const issueSummary = useMemo(() => summarizeCircuitIssues(issues), [issues])
   const validationMessage =
-    issues[0]?.message ??
-    (hasSequential
-      ? 'Circuito sequencial válido: use o workspace de simulação para observar os tiques.'
-      : hasBuses
-      ? `Circuito vetorial válido: avaliação bitwise ativa para ${document.nodes.filter((node) => (node.options?.width ?? 1) > 1).length} componente(s).`
-      : truthTable
-        ? `Circuito válido: ${truthTable.variables.length} entrada(s), ${truthTable.totalRows} linha(s).`
-        : 'Adicione componentes e conecte as entradas para começar.')
+    issueSummary.valid
+      ? hasSequential
+        ? 'Circuito sequencial válido: use o workspace de simulação para observar os tiques.'
+        : hasBuses
+        ? `Circuito vetorial válido: avaliação bitwise ativa para ${document.nodes.filter((node) => (node.options?.width ?? 1) > 1).length} componente(s).`
+        : truthTable
+          ? `Circuito válido: ${truthTable.variables.length} entrada(s), ${truthTable.totalRows} linha(s).`
+          : 'Adicione componentes e conecte as entradas para começar.'
+      : issueSummary.message
 
   return (
     <section className="card p-4 sm:p-6" aria-labelledby="circuit-editor-title">
@@ -735,18 +740,21 @@ export function CircuitEditor() {
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="circuit-signal-width">
             Largura
+            <AccessibleTooltip label="Define quantos bits terão os próximos sinais. Use 1 bit para o fluxo escalar e larguras maiores para o fluxo vetorial." />
             <select id="circuit-signal-width" value={nextSignalWidth} onChange={(event) => setNextSignalWidth(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700">
               {[1, 2, 4, 8, 16, 32, 64].map((width) => <option key={width} value={width}>{width} bit{width === 1 ? '' : 's'}</option>)}
             </select>
           </label>
           <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="circuit-clock-period">
             Clock
+            <AccessibleTooltip label="Define o período inicial dos próximos componentes Clock, em tiques do simulador." />
             <select id="circuit-clock-period" value={nextClockPeriod} onChange={(event) => setNextClockPeriod(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700">
               {[1, 2, 3, 4, 8].map((period) => <option key={period} value={period}>{period} tique{period === 1 ? '' : 's'}</option>)}
             </select>
           </label>
           <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="circuit-delay-ticks">
             Delay
+            <AccessibleTooltip label="Define quantos tiques os próximos componentes Delay aguardam antes de propagar o sinal." />
             <select id="circuit-delay-ticks" value={nextDelayTicks} onChange={(event) => setNextDelayTicks(Number(event.target.value))} className="rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700">
               {[1, 2, 3, 4, 8].map((ticks) => <option key={ticks} value={ticks}>{ticks} tique{ticks === 1 ? '' : 's'}</option>)}
             </select>
@@ -858,9 +866,24 @@ export function CircuitEditor() {
             }`}
             role="status"
             aria-live="polite"
-            aria-atomic="true"
+            aria-atomic="false"
           >
-            {notice || validationMessage}
+            <div className="flex flex-wrap items-center gap-1">
+              <strong>{notice || (issueSummary.valid ? 'Validação do circuito' : issueSummary.title)}</strong>
+              {!notice && <AccessibleTooltip label="O editor valida conexões, entradas, ciclos e larguras antes de liberar tabela verdade, IA ou exportação." />}
+            </div>
+            <p className="mt-1">{notice || validationMessage}</p>
+            {!notice && issueGuidance.length > 0 && (
+              <ul className="mt-2 grid gap-1 text-xs" aria-label="Orientações para corrigir o circuito">
+                {issueGuidance.slice(0, 3).map((issue, index) => (
+                  <li key={`${issue.code}-${issue.nodeId ?? index}`}>
+                    <span className="font-semibold">{issue.title}:</span> {issue.action}
+                    {issue.nodeId && <span className="ml-1 opacity-75">Componente: {issue.nodeId}.</span>}
+                  </li>
+                ))}
+                {issueGuidance.length > 3 && <li className="opacity-75">Mais {issueGuidance.length - 3} problema(s) aguardam correção.</li>}
+              </ul>
+            )}
           </div>
         </div>
       </div>

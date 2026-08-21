@@ -417,3 +417,11 @@ A documentação operacional está em `docs/RELEASE-PROMOTION-GUARD.md`, incluin
 A habilidade reutilizável `veritas-feature-delivery` foi atualizada no ambiente de trabalho do agente para refletir o estado atual do projeto. O fluxo agora inclui `beta:readiness` como diagnóstico não destrutivo, `beta:preflight` estrito, proveniência anti-simulação para RLS/Realtime/Edge, o agregador de evidências e `release:guard` antes de qualquer tag. A referência RLS também passou a documentar os eventos temporais `runtime_config` e `runtime_state`, além do isolamento por projeto e room.
 
 A habilidade foi validada com `quick_validate.py` e permanece abaixo do limite de 500 linhas no arquivo principal. O artefato reutilizável continua separado do código de produto; esta entrada registra apenas a atualização do processo para que futuras fatias sigam os mesmos gates e sejam publicadas na `main`.
+
+## Atualização da implementação — feedback acionável e tooltips do editor — 2026-08-21
+
+O editor visual agora transforma os códigos de `CircuitIssue` em orientações reutilizáveis em português, com título, ação de correção e componente afetado. O status do canvas exibe o total de problemas, mostra até três correções prioritárias e informa quando existem itens adicionais, sem alterar a validação canônica nem o comportamento local-first.
+
+Foi adicionado o componente `AccessibleTooltip`, que associa cada orientação a uma descrição acessível por foco e hover. Os controles de largura de sinal, período de Clock e tiques de Delay agora explicam seus efeitos sem depender somente do atributo `title`. O contrato `validationFeedback` possui testes determinísticos para todos os códigos de validação, circuito válido e resumo de múltiplos problemas.
+
+A suíte completa, typecheck, lint, build frontend/PWA, build MCP e smoke local passaram. A inspeção no build local confirmou a presença do resumo `Validação do circuito` e do tooltip acessível. A inspeção manual em navegadores móveis, leitor de tela e zoom continua parte do gate beta externo e não foi convertida em aprovação automática.
