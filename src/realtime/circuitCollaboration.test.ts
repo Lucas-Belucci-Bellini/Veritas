@@ -73,6 +73,48 @@ describe('createCircuitCollaboration', () => {
     }))
   })
 
+  it('transmite estado temporal completo com timeline e hash', async () => {
+    const collaboration = createCircuitCollaboration('project-1', 'alpha')
+    await collaboration.connect()
+    await collaboration.broadcastRuntimeState({
+      inputs: { d: true },
+      clockPeriods: { clk: 2 },
+      simulator: { tickCount: 1, nodes: {} },
+      snapshot: { tick: 1, values: {} },
+      timeline: [{ tick: 0, values: {} }, { tick: 1, values: {} }],
+    }, 3)
+
+    expect(fakeChannel.send).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'broadcast',
+      event: 'runtime_state',
+      payload: expect.objectContaining({ baseVersion: 3, projectId: 'project-1', roomId: 'alpha', stateHash: expect.any(String) }),
+    }))
+  })
+
+  it('valida estado temporal recebido, isola a sala e ignora o próprio cliente', async () => {
+    const collaboration = createCircuitCollaboration('project-1', 'alpha')
+    const listener = vi.fn()
+    await collaboration.connect()
+    collaboration.onRemoteRuntimeState(listener)
+    await collaboration.broadcastRuntimeState({
+      inputs: { d: true },
+      clockPeriods: { clk: 2 },
+      simulator: { tickCount: 1, nodes: {} },
+      snapshot: { tick: 1, values: {} },
+      timeline: [{ tick: 1, values: {} }],
+    }, 4)
+    const sentPayload = fakeChannel.send.mock.calls.find(([value]) => value.event === 'runtime_state')?.[0].payload
+    const broadcastCallback = fakeChannel.on.mock.calls.find(([kind, config]) => kind === 'broadcast' && config.event === 'runtime_state')?.[2] as ((payload: { payload: unknown }) => void)
+
+    broadcastCallback({ payload: { ...sentPayload, roomId: 'beta', clientId: 'user-2' } })
+    broadcastCallback({ payload: { ...sentPayload, clientId: 'user-2' } })
+    broadcastCallback({ payload: { ...sentPayload, clientId: 'user-1' } })
+    broadcastCallback({ payload: { ...sentPayload, clientId: 'user-2', stateHash: 'invalid' } })
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ roomId: 'alpha', baseVersion: 4, state: expect.objectContaining({ clockPeriods: { clk: 2 } }) }))
+  })
+
   it('valida configuração temporal recebida, isola a sala e ignora o próprio cliente', async () => {
     const collaboration = createCircuitCollaboration('project-1', 'alpha')
     const listener = vi.fn()
@@ -142,8 +184,10 @@ describe('ROOM-001', () => {
           disconnect: vi.fn().mockResolvedValue(undefined),
           broadcast: vi.fn().mockResolvedValue(undefined),
           broadcastRuntimeConfig: vi.fn().mockResolvedValue(undefined),
+          broadcastRuntimeState: vi.fn().mockResolvedValue(undefined),
           onSnapshot: vi.fn(() => () => undefined),
           onRuntimeConfig: vi.fn(() => () => undefined),
+          onRuntimeState: vi.fn(() => () => undefined),
           onPresence: vi.fn(() => () => undefined),
           isConnected: vi.fn(() => false),
         }

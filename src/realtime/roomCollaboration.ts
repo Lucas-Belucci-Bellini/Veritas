@@ -1,6 +1,7 @@
 import type { RealtimeChannel, User } from '@supabase/supabase-js'
 import { MAX_BUS_WIDTH } from '../bus'
 import type { CircuitDocument } from '../circuit'
+import type { DocumentRuntimeState } from '../simulation/documentRuntime'
 import { buildCircuitContext } from '../circuit'
 import { supabase } from '../lib/supabase'
 
@@ -43,13 +44,25 @@ export interface RoomRuntimeConfig {
   sentAt: string
 }
 
+export interface RoomRuntimeState {
+  projectId: string
+  roomId: string
+  state: DocumentRuntimeState
+  stateHash: string
+  baseVersion: number
+  clientId: string
+  sentAt: string
+}
+
 export interface RoomSession {
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   broadcast: (document: CircuitDocument, baseVersion: number) => Promise<void>
   broadcastRuntimeConfig: (clockPeriods: Readonly<Record<string, number>>, baseVersion: number) => Promise<void>
+  broadcastRuntimeState: (state: DocumentRuntimeState, baseVersion: number) => Promise<void>
   onSnapshot: (listener: (message: RoomSnapshot) => void) => () => void
   onRuntimeConfig: (listener: (message: RoomRuntimeConfig) => void) => () => void
+  onRuntimeState: (listener: (message: RoomRuntimeState) => void) => () => void
   onPresence: (listener: (presence: RoomPresence[]) => void) => () => void
   isConnected: () => boolean
   room: RoomRef
@@ -77,6 +90,7 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
   let lastReceivedHash: string | null = null
   const snapshotListeners = new Set<(message: RoomSnapshot) => void>()
   const runtimeConfigListeners = new Set<(message: RoomRuntimeConfig) => void>()
+  const runtimeStateListeners = new Set<(message: RoomRuntimeState) => void>()
   const presenceListeners = new Set<(presence: RoomPresence[]) => void>()
 
   const notifyPresence = () => {
@@ -111,6 +125,11 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
           if (!message || message.clientId === currentUser?.id) return
           runtimeConfigListeners.forEach((listener) => listener(message))
         })
+        .on('broadcast', { event: 'runtime_state' }, (payload) => {
+          const message = normalizeRuntimeState(payload.payload, normalizedRoom)
+          if (!message || message.clientId === currentUser?.id) return
+          runtimeStateListeners.forEach((listener) => listener(message))
+        })
         .on('presence', { event: 'sync' }, notifyPresence)
         .on('presence', { event: 'join' }, notifyPresence)
         .on('presence', { event: 'leave' }, notifyPresence)
@@ -138,6 +157,7 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
       snapshotListeners.clear()
       presenceListeners.clear()
       runtimeConfigListeners.clear()
+      runtimeStateListeners.clear()
     },
     async broadcast(document, baseVersion) {
       if (!channel || !connected || !currentUser) return
@@ -184,6 +204,27 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
         },
       })
     },
+    async broadcastRuntimeState(state, baseVersion) {
+      if (role === 'viewer') throw new Error('Visualizadores não podem publicar estado temporal.')
+      if (!channel || !connected || !currentUser) return
+      if (!Number.isInteger(baseVersion) || baseVersion < 0) {
+        throw new Error('A versão-base do estado temporal precisa ser um inteiro não negativo.')
+      }
+      const stateHash = hashRuntimeState(state)
+      await channel.send({
+        type: 'broadcast',
+        event: 'runtime_state',
+        payload: {
+          projectId: normalizedRoom.projectId,
+          roomId: normalizedRoom.roomId,
+          state,
+          stateHash,
+          baseVersion,
+          clientId: currentUser.id,
+          sentAt: new Date().toISOString(),
+        },
+      })
+    },
     onSnapshot(listener) {
       snapshotListeners.add(listener)
       return () => snapshotListeners.delete(listener)
@@ -191,6 +232,10 @@ export function createRoomCollaboration(room: RoomRef, role: RoomRole = 'editor'
     onRuntimeConfig(listener) {
       runtimeConfigListeners.add(listener)
       return () => runtimeConfigListeners.delete(listener)
+    },
+    onRuntimeState(listener) {
+      runtimeStateListeners.add(listener)
+      return () => runtimeStateListeners.delete(listener)
     },
     onPresence(listener) {
       presenceListeners.add(listener)
@@ -245,6 +290,50 @@ function normalizeRoomRef(room: RoomRef): RoomRef {
   if (!isSafeIdentifier(room.roomId, 64)) throw new Error('roomId inválido para colaboração.')
   if (!['document', 'review', 'chat'].includes(room.kind)) throw new Error('Tipo de sala inválido.')
   return { projectId: room.projectId, roomId: room.roomId, kind: room.kind }
+}
+
+function normalizeRuntimeState(value: unknown, room: RoomRef): RoomRuntimeState | null {
+  if (!isRecord(value)) return null
+  if (value.projectId !== room.projectId || value.roomId !== room.roomId) return null
+  if (typeof value.clientId !== 'string' || typeof value.stateHash !== 'string' || typeof value.sentAt !== 'string') return null
+  if (!isNonNegativeInteger(value.baseVersion) || !isRuntimeState(value.state)) return null
+  if (hashRuntimeState(value.state) !== value.stateHash) return null
+  return {
+    projectId: room.projectId,
+    roomId: room.roomId,
+    state: value.state,
+    stateHash: value.stateHash,
+    baseVersion: value.baseVersion,
+    clientId: value.clientId,
+    sentAt: value.sentAt,
+  }
+}
+
+function isRuntimeState(value: unknown): value is DocumentRuntimeState {
+  if (!isRecord(value) || !isRecord(value.inputs) || !isRecord(value.clockPeriods) || !isRecord(value.simulator) || !isRecord(value.snapshot) || !Array.isArray(value.timeline)) return false
+  if (!Object.values(value.inputs).every((item) => typeof item === 'boolean')) return false
+  if (!Object.values(value.clockPeriods).every((item) => typeof item === 'number' && Number.isInteger(item) && item >= 1 && item <= 64)) return false
+  const snapshot = value.snapshot
+  if (!isNonNegativeInteger(snapshot.tick) || !isRecord(snapshot.values)) return false
+  if (!value.timeline.every((item) => isRecord(item) && isNonNegativeInteger(item.tick) && isRecord(item.values))) return false
+  return isRecord(value.simulator.nodes) && isNonNegativeInteger(value.simulator.tickCount)
+}
+
+function hashRuntimeState(state: DocumentRuntimeState): string {
+  return hashRuntimeConfig({
+    ...state.clockPeriods,
+    __tick: state.simulator.tickCount,
+    __timeline: state.timeline.length,
+  }) + hashRuntimePayload(JSON.stringify(state))
+}
+
+function hashRuntimePayload(value: string): string {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
 function normalizeRuntimeConfig(value: unknown, room: RoomRef): RoomRuntimeConfig | null {

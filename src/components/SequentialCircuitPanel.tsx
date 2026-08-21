@@ -7,6 +7,7 @@ import {
   runtimeValue,
   snapshotDocumentRuntime,
   type DocumentRuntimeSnapshot,
+  type DocumentRuntimeState,
 } from '../simulation/documentRuntime'
 import { Simulator } from '../simulation/simulator'
 import {
@@ -32,15 +33,34 @@ function signal(value: boolean): string {
   return value ? '1' : '0'
 }
 
+function runtimeState(
+  simulator: Simulator,
+  inputs: Record<string, boolean>,
+  clockPeriods: Record<string, number>,
+  snapshot: DocumentRuntimeSnapshot,
+  timeline: readonly DocumentRuntimeSnapshot[],
+): DocumentRuntimeState {
+  return {
+    inputs: { ...inputs },
+    clockPeriods: { ...clockPeriods },
+    simulator: simulator.exportState(),
+    snapshot,
+    timeline: [...timeline].slice(-RUNTIME_CHECKPOINT_TIMELINE_LIMIT),
+  }
+}
+
 interface SequentialCircuitPanelProps {
   document: CircuitDocument
   requestedClockPeriods?: Readonly<Record<string, number>>
+  requestedRuntimeState?: DocumentRuntimeState
   readOnly?: boolean
   onSnapshot?: (snapshot: DocumentRuntimeSnapshot) => void
   onClockPeriodsChange?: (clockPeriods: Readonly<Record<string, number>>) => void
+  onRuntimeStateChange?: (state: DocumentRuntimeState) => void
+  onRuntimeStateApplied?: () => void
 }
 
-export function SequentialCircuitPanel({ document, requestedClockPeriods, readOnly = false, onSnapshot, onClockPeriodsChange }: SequentialCircuitPanelProps) {
+export function SequentialCircuitPanel({ document, requestedClockPeriods, requestedRuntimeState, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
@@ -146,6 +166,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, readOn
       const nextTimeline = appendTimeline(timeline, [snapshot])
       setTimeline(nextTimeline)
       persist(simulator, inputs, clockPeriods, nextTimeline)
+      onRuntimeStateChange?.(runtimeState(simulator, inputs, clockPeriods, snapshot, nextTimeline))
       onSnapshot?.(snapshot)
       setError('')
     } catch (cause) {
@@ -166,10 +187,30 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, readOn
       const nextTimeline = appendTimeline(timeline, next)
       setTimeline(nextTimeline)
       persist(simulator, inputs, clockPeriods, nextTimeline)
+      onRuntimeStateChange?.(runtimeState(simulator, inputs, clockPeriods, next[next.length - 1], nextTimeline))
       onSnapshot?.(next[next.length - 1])
       setError('')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível executar a simulação.')
+    }
+  }
+
+  function applyRemoteRuntimeState(state: DocumentRuntimeState): void {
+    try {
+      const simulator = createDocumentRuntime(document, { clockPeriods: state.clockPeriods })
+      simulator.restoreState(state.simulator)
+      const snapshot = snapshotDocumentRuntime(simulator)
+      simulatorRef.current = simulator
+      setInputs({ ...state.inputs })
+      setClockPeriods({ ...state.clockPeriods })
+      setTimeline(state.timeline.length ? state.timeline.slice(-RUNTIME_CHECKPOINT_TIMELINE_LIMIT) : [snapshot])
+      persist(simulator, state.inputs, state.clockPeriods, state.timeline)
+      setPersistenceStatus('estado remoto aplicado')
+      setError('')
+      onSnapshot?.(snapshot)
+      onRuntimeStateApplied?.()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível aplicar o estado remoto.')
     }
   }
 
@@ -184,6 +225,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, readOn
       setInputs(nextInputs)
       setTimeline(nextTimeline)
       persist(simulator, nextInputs, clockPeriods, nextTimeline)
+      onRuntimeStateChange?.(runtimeState(simulator, nextInputs, clockPeriods, snapshot, nextTimeline))
       onSnapshot?.(snapshot)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível alterar a entrada.')
@@ -198,6 +240,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, readOn
   }
 
   const statusText = error ? 'erro' : current ? `tique ${current.tick}` : 'preparando'
+  const remoteStateTick = requestedRuntimeState?.snapshot.tick
 
   return (
     <section className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900/70 dark:bg-emerald-950/20" aria-label="Simulação temporal do circuito sequencial">
@@ -225,6 +268,13 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, readOn
               </select>
             </label>
           ))}
+        </div>
+      )}
+
+      {requestedRuntimeState && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100" role="status">
+          <span>Estado temporal remoto disponível no tique {remoteStateTick ?? 0}; o runtime local não foi substituído.</span>
+          <button type="button" className="key text-xs" onClick={() => applyRemoteRuntimeState(requestedRuntimeState)}>Aplicar estado remoto</button>
         </div>
       )}
 

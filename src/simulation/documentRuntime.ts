@@ -1,5 +1,5 @@
 import { toNetlist, type CircuitDocument } from '../circuit'
-import { Simulator } from './simulator'
+import { Simulator, type SimulatorState } from './simulator'
 
 export interface DocumentRuntimeSnapshot {
   tick: number
@@ -14,6 +14,14 @@ export interface DocumentRuntimeWatch {
 
 export interface DocumentRuntimeOptions {
   clockPeriods?: Readonly<Record<string, number>>
+}
+
+export interface DocumentRuntimeState {
+  inputs: Record<string, boolean>
+  clockPeriods: Record<string, number>
+  simulator: SimulatorState
+  snapshot: DocumentRuntimeSnapshot
+  timeline: DocumentRuntimeSnapshot[]
 }
 
 export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {

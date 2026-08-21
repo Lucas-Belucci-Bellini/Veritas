@@ -246,3 +246,9 @@ A configuração escolhida é persistida junto ao checkpoint do documento e rest
 A sexta fatia do v0.9.0 adiciona o evento privado `runtime_config` ao tópico já isolado por projeto e room. O payload carrega apenas `clockPeriods`, `baseVersion`, `configHash`, `clientId` e timestamp; o documento canônico e a timeline não são transmitidos por esse evento.
 
 O cliente valida projeto, room, versão-base, identificadores, faixa de 1–64 tiques e hash canônico antes de aplicar uma configuração remota. Se a versão-base recebida divergir da versão remota atual, o editor rejeita explicitamente a mudança. Viewers não podem publicar configuração temporal; editors e owners podem transmitir apenas quando conectados à room autorizada. A aplicação remota reinicia somente o runtime local e não altera o documento do circuito.
+
+## Atualização da implementação — estado temporal colaborativo com confirmação
+
+A sétima fatia do v0.9.0 adiciona o evento privado `runtime_state`. Ele transmite, separadamente do documento, as entradas, períodos de clock, estado interno do `Simulator`, snapshot atual e os últimos 32 estados da timeline, protegidos por hash e `baseVersion`.
+
+O estado remoto nunca substitui automaticamente o runtime local. Ao receber uma mensagem válida da mesma room e versão-base, o editor exibe um aviso e oferece `Aplicar estado remoto`; somente essa ação restaura o estado no Simulator e no checkpoint local. Viewers não publicam estados. Assim, edição estrutural, configuração temporal e execução temporal continuam sendo fontes de verdade distintas e podem evoluir sem sobrescrita silenciosa.

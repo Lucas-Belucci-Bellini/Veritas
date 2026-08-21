@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CircuitDocument } from '../circuit'
-import { createCircuitCollaboration, type CircuitPresence, type CircuitBroadcast, type CircuitRuntimeConfig } from '../realtime/circuitCollaboration'
+import type { DocumentRuntimeState } from '../simulation/documentRuntime'
+import { createCircuitCollaboration, type CircuitPresence, type CircuitBroadcast, type CircuitRuntimeConfig, type CircuitRuntimeState } from '../realtime/circuitCollaboration'
 import type { RoomRole } from '../realtime/roomCollaboration'
 
 export type CollaborationStatus = 'disabled' | 'connecting' | 'connected' | 'error'
@@ -13,6 +14,7 @@ interface UseCircuitCollaborationOptions {
   enabled: boolean
   onRemoteDocument: (document: CircuitDocument) => void
   onRemoteRuntimeConfig?: (message: CircuitRuntimeConfig) => void
+  onRemoteRuntimeState?: (message: CircuitRuntimeState) => void
 }
 
 export function useCircuitCollaboration({
@@ -23,6 +25,7 @@ export function useCircuitCollaboration({
   enabled,
   onRemoteDocument,
   onRemoteRuntimeConfig,
+  onRemoteRuntimeState,
 }: UseCircuitCollaborationOptions) {
   const [status, setStatus] = useState<CollaborationStatus>('disabled')
   const [participants, setParticipants] = useState<CircuitPresence[]>([])
@@ -30,9 +33,11 @@ export function useCircuitCollaboration({
   const [error, setError] = useState<string | null>(null)
   const listenerRef = useRef(onRemoteDocument)
   const runtimeListenerRef = useRef(onRemoteRuntimeConfig)
+  const runtimeStateListenerRef = useRef(onRemoteRuntimeState)
   const baseVersionRef = useRef(baseVersion)
   listenerRef.current = onRemoteDocument
   runtimeListenerRef.current = onRemoteRuntimeConfig
+  runtimeStateListenerRef.current = onRemoteRuntimeState
   baseVersionRef.current = Number.isInteger(baseVersion) && baseVersion >= 0 ? baseVersion : 0
 
   const collaborationRef = useRef<ReturnType<typeof createCircuitCollaboration> | null>(null)
@@ -61,6 +66,9 @@ export function useCircuitCollaboration({
     const removeRuntimeListener = collaboration.onRemoteRuntimeConfig((message) => {
       if (active) runtimeListenerRef.current?.(message)
     })
+    const removeRuntimeStateListener = collaboration.onRemoteRuntimeState((message) => {
+      if (active) runtimeStateListenerRef.current?.(message)
+    })
     const removePresenceListener = collaboration.onPresence((presence) => {
       if (active) setParticipants(presence)
     })
@@ -77,6 +85,7 @@ export function useCircuitCollaboration({
       active = false
       removeDocumentListener()
       removeRuntimeListener()
+      removeRuntimeStateListener()
       removePresenceListener()
       void collaboration.disconnect()
       if (collaborationRef.current === collaboration) collaborationRef.current = null
@@ -93,5 +102,10 @@ export function useCircuitCollaboration({
     await collaborationRef.current?.broadcastRuntimeConfig(clockPeriods, version)
   }, [])
 
-  return { status, participants, lastRemoteVersion, error, broadcast, broadcastRuntimeConfig, roomId }
+  const broadcastRuntimeState = useCallback(async (state: DocumentRuntimeState, nextBaseVersion?: number) => {
+    const version = nextBaseVersion ?? baseVersionRef.current
+    await collaborationRef.current?.broadcastRuntimeState(state, version)
+  }, [])
+
+  return { status, participants, lastRemoteVersion, error, broadcast, broadcastRuntimeConfig, broadcastRuntimeState, roomId }
 }

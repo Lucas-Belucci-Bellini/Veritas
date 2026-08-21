@@ -48,7 +48,7 @@ import { CircuitVersionHistory } from './CircuitVersionHistory'
 import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
 import { SequentialCircuitPanel } from './SequentialCircuitPanel'
-import type { DocumentRuntimeSnapshot } from '../simulation/documentRuntime'
+import type { DocumentRuntimeSnapshot, DocumentRuntimeState } from '../simulation/documentRuntime'
 import { addCircuitCollaborator, listCircuitCollaborators, removeCircuitCollaborator, type CircuitCollaborator, type CollaboratorRole } from '../realtime/circuitCollaborators'
 import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realtime/circuitRooms'
 
@@ -127,6 +127,7 @@ export function CircuitEditor() {
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [sequentialSnapshot, setSequentialSnapshot] = useState<DocumentRuntimeSnapshot | null>(null)
   const [remoteClockPeriods, setRemoteClockPeriods] = useState<Record<string, number> | null>(null)
+  const [remoteRuntimeState, setRemoteRuntimeState] = useState<DocumentRuntimeState | null>(null)
   const [collaborators, setCollaborators] = useState<CircuitCollaborator[]>([])
   const [collaboratorUserId, setCollaboratorUserId] = useState('')
   const [collaboratorRole, setCollaboratorRole] = useState<CollaboratorRole>('editor')
@@ -141,6 +142,16 @@ export function CircuitEditor() {
     }
     setRemoteClockPeriods({ ...message.clockPeriods })
     setNotice('Configuração temporal remota recebida; runtime reiniciado sem alterar o documento.')
+  }, [cloud.versions])
+
+  const applyRemoteRuntimeState = useCallback((message: { state: DocumentRuntimeState; baseVersion: number }) => {
+    const currentVersion = cloud.versions[0]?.versionNumber ?? 0
+    if (message.baseVersion !== currentVersion) {
+      setNotice(`Estado temporal remoto rejeitado: versão-base ${message.baseVersion} diverge da atual ${currentVersion}.`)
+      return
+    }
+    setRemoteRuntimeState(message.state)
+    setNotice('Estado temporal remoto recebido; confirme no painel para aplicá-lo localmente.')
   }, [cloud.versions])
 
   const applyRemoteDocument = useCallback((remoteDocument: CircuitDocument) => {
@@ -162,6 +173,7 @@ export function CircuitEditor() {
     enabled: Boolean(user && cloudProjectId),
     onRemoteDocument: applyRemoteDocument,
     onRemoteRuntimeConfig: applyRemoteRuntimeConfig,
+    onRemoteRuntimeState: applyRemoteRuntimeState,
   })
   useEffect(() => {
     if (historyRef.current?.commit(document)) setHistoryRevision((current) => current + 1)
@@ -279,10 +291,17 @@ export function CircuitEditor() {
     [hasBuses, hasSequential, nodes, selectedEvaluation, sequentialSnapshot],
   )
 
-  const { broadcast: broadcastRemote, broadcastRuntimeConfig, status: collaborationStatus } = collaboration
+  const { broadcast: broadcastRemote, broadcastRuntimeConfig, broadcastRuntimeState, status: collaborationStatus } = collaboration
   const readOnlyCollaboration = Boolean(user && collaborators.some((collaborator) => collaborator.userId === user.id && collaborator.role === 'viewer'))
   const canUndo = historyRevision >= 0 && (historyRef.current?.canUndo() ?? false)
   const canRedo = historyRevision >= 0 && (historyRef.current?.canRedo() ?? false)
+  const publishRuntimeState = useCallback((state: DocumentRuntimeState) => {
+    if (!user || !cloudProjectId || readOnlyCollaboration || collaborationStatus !== 'connected') return
+    void broadcastRuntimeState(state, collaborationBaseVersion).catch(() => {
+      setNotice('Não foi possível transmitir o estado temporal para a room atual.')
+    })
+  }, [broadcastRuntimeState, collaborationBaseVersion, collaborationStatus, cloudProjectId, readOnlyCollaboration, user])
+
   const publishClockPeriods = useCallback((clockPeriods: Readonly<Record<string, number>>) => {
     if (!user || !cloudProjectId || readOnlyCollaboration || collaborationStatus !== 'connected') return
     void broadcastRuntimeConfig(clockPeriods, collaborationBaseVersion).catch(() => {
@@ -343,10 +362,14 @@ export function CircuitEditor() {
   useEffect(() => {
     setSequentialSnapshot(null)
     setRemoteClockPeriods(null)
+    setRemoteRuntimeState(null)
   }, [document])
 
   useEffect(() => {
-    if (!user || !cloudProjectId) setRemoteClockPeriods(null)
+    if (!user || !cloudProjectId) {
+      setRemoteClockPeriods(null)
+      setRemoteRuntimeState(null)
+    }
   }, [activeRoomId, cloudProjectId, user])
 
   useEffect(() => {
@@ -808,8 +831,11 @@ export function CircuitEditor() {
         <SequentialCircuitPanel
           document={document}
           requestedClockPeriods={remoteClockPeriods ?? undefined}
+          requestedRuntimeState={remoteRuntimeState ?? undefined}
           onSnapshot={setSequentialSnapshot}
           onClockPeriodsChange={publishClockPeriods}
+          onRuntimeStateChange={publishRuntimeState}
+          onRuntimeStateApplied={() => setRemoteRuntimeState(null)}
           readOnly={readOnlyCollaboration}
         />
       )}
