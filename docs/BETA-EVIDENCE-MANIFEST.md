@@ -12,6 +12,7 @@ BETA_ACCESSIBILITY_REPORT=artifacts/accessibility-acceptance.md \
 BETA_ROLLBACK_REPORT=artifacts/rollback-acceptance.md \
 BETA_ONBOARDING_REPORT=artifacts/onboarding-acceptance.md \
 BETA_MCP_REPORT=artifacts/mcp-acceptance.md \
+BETA_MOBILE_REPORT=artifacts/mobile-acceptance.md \
 BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural.json \
 BETA_SUPABASE_PROJECT_ID=hcwzsxdcvmswebunznak \
 BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
@@ -41,6 +42,7 @@ BETA_ACCESSIBILITY_REPORT=artifacts/accessibility-acceptance.md \
 BETA_ROLLBACK_REPORT=artifacts/rollback-acceptance.md \
 BETA_ONBOARDING_REPORT=artifacts/onboarding-acceptance.md \
 BETA_MCP_REPORT=artifacts/mcp-acceptance.md \
+BETA_MOBILE_REPORT=artifacts/mobile-acceptance.md \
 BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural.json \
 SMOKE_URL=https://veritas-opal-seven.vercel.app \
 npm run beta:preflight
@@ -76,5 +78,6 @@ O preflight estrito não aceita somente linhas `PASS`. Relatórios de RLS, Realt
 | RLS | `Execution mode: REAL`, guard `RLS_RUNNER_ALLOW_REAL=1` e `Accounts: 4 disposable accounts`. | RLS-001 a RLS-022 em PASS. |
 | Realtime | `Execution mode: REAL_REQUIRED`, guard `REALTIME_RUNNER_ALLOW_REAL=1`, `RT_REQUIRE_REAL=1` e sessões autenticadas descartáveis. | RT-001 a RT-005 em PASS. |
 | Edge | `Execution mode: REAL`, `Authenticated mode: REAL_REQUIRED` e `Authenticated disposable JWT: provided`. | RLS-019, RLS-020 e RLS-021 em PASS. |
+| Mobile | `Execution mode: REAL_MANUAL`, `Runner guard: MOBILE_MANUAL_ALLOW_REAL=1`, revisor, dispositivo, navegador e timestamp. | MOBILE-001 a MOBILE-004 em PASS com evidência não vazia. |
 
 O runner seguro local pode gerar relatórios úteis para desenvolvimento, mas seus marcadores `SAFE`, `SKIP` ou `ANONYMOUS_ONLY` não são aceitos como evidência de promoção. Isso evita que um relatório manualmente editado ou uma execução sem contas reais mascare um bloqueador P0/P1.

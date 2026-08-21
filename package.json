@@ -23,6 +23,7 @@
     "beta:realtime": "node scripts/realtime-acceptance.mjs",
     "beta:hdl": "node scripts/hdl-acceptance.mjs",
     "beta:accessibility": "node scripts/accessibility-acceptance.mjs",
+    "beta:mobile": "node scripts/mobile-acceptance.mjs",
     "beta:rollback": "node scripts/rollback-acceptance.mjs",
     "beta:onboarding": "node scripts/onboarding-acceptance.mjs",
     "beta:mcp": "node scripts/mcp-acceptance.mjs",

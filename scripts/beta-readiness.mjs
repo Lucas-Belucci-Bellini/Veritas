@@ -38,6 +38,7 @@ function main() {
     'artifacts/rls-acceptance.md',
     'artifacts/realtime-acceptance.md',
     'artifacts/edge-acceptance.md',
+    'artifacts/mobile-acceptance.md',
     'artifacts/beta-evidence-manifest.json',
   ])
   results.push(result('RDY-005', evidenceMissing.length === 0 ? 'READY' : 'BLOCKED', 'artefatos de evidência', evidenceMissing.length === 0 ? 'artefatos esperados estão presentes; conteúdo não foi impresso' : `faltam ${evidenceMissing.length} artefatos: ${evidenceMissing.join(', ')}`))

@@ -57,8 +57,11 @@ jobs:
           HDL_REQUIRE_TOOLCHAINS: '1'
         run: npm run beta:hdl
 
-      - name: Accessibility and mobile acceptance
+      - name: Accessibility acceptance
         run: npm run beta:accessibility
+
+      - name: Mobile manual acceptance
+        run: npm run beta:mobile
 
       - name: Rollback acceptance
         env:

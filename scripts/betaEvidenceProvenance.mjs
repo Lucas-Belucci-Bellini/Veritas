@@ -27,6 +27,18 @@ export const REAL_EVIDENCE_REQUIREMENTS = {
     ],
     ids: ['RLS-019', 'RLS-020', 'RLS-021'],
   },
+  mobile: {
+    label: 'Mobile manual',
+    markers: [
+      'Execution mode: REAL_MANUAL',
+      'Runner guard: MOBILE_MANUAL_ALLOW_REAL=1',
+      'Reviewer: ',
+      'Device: ',
+      'Browser: ',
+      'Checked at: ',
+    ],
+    ids: ['MOBILE-001', 'MOBILE-002', 'MOBILE-003', 'MOBILE-004'],
+  },
 }
 
 export function missingEvidenceMarkers(report, kind) {

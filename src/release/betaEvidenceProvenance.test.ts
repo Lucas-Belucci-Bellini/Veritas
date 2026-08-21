@@ -19,6 +19,29 @@ describe('proveniência de evidências beta', () => {
     expect(missingPassScenarios(report, 'realtime')).toContain('RT-001')
   })
 
+  it('aceita mobile somente com checklist manual e proveniência explícita', () => {
+    const report = [
+      'Execution mode: REAL_MANUAL',
+      'Runner guard: MOBILE_MANUAL_ALLOW_REAL=1',
+      'Reviewer: external-reviewer',
+      'Device: iPhone test device',
+      'Browser: Safari iOS',
+      'Checked at: 2026-08-21T00:00:00.000Z',
+      'MOBILE-001 PASS — abertura',
+      'MOBILE-002 PASS — toque e foco',
+      'MOBILE-003 PASS — local-first',
+      'MOBILE-004 PASS — rotação e zoom',
+    ].join('\n')
+    expect(missingEvidenceMarkers(report, 'mobile')).toEqual([])
+    expect(missingPassScenarios(report, 'mobile')).toEqual([])
+  })
+
+  it('não trata mobile SKIP ou modo seguro como evidência real', () => {
+    const report = 'Execution mode: SAFE\nMOBILE-001 SKIP\nMOBILE-002 SKIP\nMOBILE-003 SKIP\nMOBILE-004 SKIP'
+    expect(missingEvidenceMarkers(report, 'mobile')).toContain('Execution mode: REAL_MANUAL')
+    expect(missingPassScenarios(report, 'mobile')).toContain('MOBILE-001')
+  })
+
   it('exige JWT descartável autenticado para Edge', () => {
     const report = 'Execution mode: REAL\nAuthenticated mode: ANONYMOUS_ONLY\nRLS-019 PASS\nRLS-020 SKIP\nRLS-021 SKIP'
     expect(missingEvidenceMarkers(report, 'edge')).toEqual([

@@ -271,6 +271,7 @@ if (process.env.SMOKE_URL) {
 checkRlsReport()
 checkRealReport('Realtime', 'BETA_REALTIME_REPORT', 'realtime', evidenceFlags.realtime)
 checkRealReport('Edge Function', 'BETA_EDGE_REPORT', 'edge', evidenceFlags.edge)
+checkRealReport('Mobile manual', 'BETA_MOBILE_REPORT', 'mobile', evidenceFlags.mobile)
 checkEvidenceManifest()
 checkSupabaseStructuralAudit()
 

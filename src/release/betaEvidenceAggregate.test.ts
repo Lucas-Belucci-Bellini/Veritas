@@ -27,6 +27,7 @@ describe('aggregateBetaEvidence', () => {
     expect(manifest.gates.realtime.status).toBe('PENDING')
     expect(manifest.gates.hdl.status).toBe('PENDING')
     expect(manifest.gates.accessibility.status).toBe('PENDING')
+    expect(manifest.gates.mobile.status).toBe('PENDING')
     expect(manifest.gates.rollback.status).toBe('PENDING')
     expect(manifest.gates.onboarding.status).toBe('PENDING')
     expect(manifest.gates.mcp.status).toBe('PENDING')
@@ -85,6 +86,22 @@ describe('aggregateBetaEvidence', () => {
     expect(manifest.gates.edge.status).toBe('PENDING')
     expect(manifest.gates.edge.evidence).toBe('')
     expect(manifest.openP1).toContain('EDGE-EVIDENCE-INCOMPLETE')
+  })
+
+  it('promove mobile somente com os quatro cenários PASS e caminho de evidência', () => {
+    const mobileReport = 'MOBILE-001 PASS\nMOBILE-002 PASS\nMOBILE-003 PASS\nMOBILE-004 PASS'
+    const manifest = aggregateBetaEvidence({
+      version: '0.9.0-rc.1',
+      mobileReport,
+      evidencePaths: { mobile: 'artifacts/mobile.md' },
+    })
+
+    expect(manifest.gates.mobile).toMatchObject({ status: 'PASS', evidence: 'artifacts/mobile.md' })
+    expect(manifest.openP1).not.toContain('MOBILE-EVIDENCE-INCOMPLETE')
+  })
+
+  it('reconhece IDs MOBILE no parser sanitizado', () => {
+    expect(parseEvidenceReport('MOBILE-001 PASS\nMOBILE-004 SKIP')).toEqual({ 'MOBILE-001': 'PASS', 'MOBILE-004': 'SKIP' })
   })
 
   it('parseia somente linhas de cenário reconhecidas', () => {

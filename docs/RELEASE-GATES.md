@@ -45,6 +45,8 @@ SMOKE_URL=https://veritas-opal-seven.vercel.app \
 BETA_PREFLIGHT_REQUIRE_SMOKE=1 \
 BETA_PREFLIGHT_REQUIRE_RLS=1 \
 BETA_RLS_REPORT=artifacts/rls-acceptance.md \
+BETA_PREFLIGHT_REQUIRE_MOBILE=1 \
+BETA_MOBILE_REPORT=artifacts/mobile-acceptance.md \
 BETA_PREFLIGHT_REQUIRE_EVIDENCE=1 \
 BETA_EVIDENCE_MANIFEST=artifacts/beta-evidence.json \
 BETA_PREFLIGHT_REQUIRE_SUPABASE_STRUCTURAL=1 \
@@ -53,7 +55,7 @@ BETA_SUPABASE_STRUCTURAL_REPORT=artifacts/supabase-structural-audit.json \
 npm run beta:preflight
 ```
 
-O manifesto JSON de evidências deve declarar a mesma versão candidata, `generatedAt`, listas vazias `openP0` e `openP1` e os gates `rls`, `realtime`, `hdl`, `accessibility`, `mobile`, `rollback` e `onboarding`. Cada gate precisa ter `status: "PASS"` e uma referência não vazia em `evidence`. O preflight valida o contrato, mas não inventa nem substitui as evidências externas.
+O manifesto JSON de evidências deve declarar a mesma versão candidata, `generatedAt`, listas vazias `openP0` e `openP1` e os gates `rls`, `realtime`, `hdl`, `accessibility`, `mobile`, `rollback`, `onboarding` e `mcp`. Cada gate precisa ter `status: "PASS"` e uma referência não vazia em `evidence`. O gate mobile depende de `MOBILE-001` a `MOBILE-004` em PASS, com relatório `REAL_MANUAL`, revisor, dispositivo, navegador, timestamp e `MOBILE_MANUAL_ALLOW_REAL=1`. O preflight valida o contrato, mas não inventa nem substitui as evidências externas.
 
 A auditoria estrutural Supabase é um gate separado. O arquivo indicado por `BETA_SUPABASE_STRUCTURAL_REPORT` deve listar o `projectId`, as seis tabelas Veritas com `rlsEnabled: true` e `policyCount` positivo, além das quatro policies Realtime ROOM-001. Ela confirma schema e policies implantados, mas não pode ser usada sozinha como aprovação RLS cross-user.
 
@@ -71,6 +73,7 @@ Exemplo mínimo de estrutura, a ser preenchido somente com resultados reais:
     "hdl": { "status": "PASS", "evidence": "artifacts/hdl-toolchains.md" },
     "accessibility": { "status": "PASS", "evidence": "artifacts/accessibility.md" },
     "mobile": { "status": "PASS", "evidence": "artifacts/mobile-pwa.md" },
+    "mcp": { "status": "PASS", "evidence": "artifacts/mcp.md" },
     "rollback": { "status": "PASS", "evidence": "artifacts/rollback.md" },
     "onboarding": { "status": "PASS", "evidence": "artifacts/onboarding.md" }
   }
@@ -81,7 +84,7 @@ O preflight não cria sessões Supabase nem substitui a prova de RLS. Siga [`doc
 
 Ele valida três superfícies públicas sem acessar conta de usuário: a homepage deve retornar HTML com `#root`, `manifest.webmanifest` deve ser JSON com `name`, `start_url`, `display` e ícones, e `sw.js` deve conter o service worker esperado. O mesmo script roda no Preview local do Vite para detectar falhas de build antes do deployment.
 
-Para uma validação beta, o smoke HTTP deve ser complementado por uma matriz de navegadores. A matriz mínima inclui Chromium desktop, Firefox desktop, Safari/iOS ou WebKit, viewport móvel e uma segunda abertura em modo offline após o service worker ter sido instalado.
+Para uma validação beta, o smoke HTTP deve ser complementado por uma matriz de navegadores. A matriz mínima inclui Chromium desktop, Firefox desktop, Safari/iOS ou WebKit, viewport móvel e uma segunda abertura em modo offline após o service worker ter sido instalado. O checklist mobile deve ser produzido por `npm run beta:mobile`; sem evidência humana ele permanece `SKIP` e mantém `MOBILE-EVIDENCE-INCOMPLETE` em `openP1`.
 
 ## 4. Testes de integração beta
 
@@ -128,7 +131,7 @@ A permissão `contents: write` existe somente no workflow de release; o workflow
 
 ## 7. Critérios de promoção
 
-A promoção de alpha para beta exige zero P0 e zero P1 de segurança, perda de dados ou bloqueio do fluxo principal. A promoção de beta para release candidate exige que o tutorial seja concluível, a matriz móvel tenha sido executada, os fixtures HDL passem e o rollback da deployment tenha sido ensaiado. A promoção para `v1.0.0` exige que o contrato público esteja documentado e que qualquer recurso ainda instável esteja explicitamente marcado como beta ou roadmap.
+A promoção de alpha para beta exige zero P0 e zero P1 de segurança, perda de dados ou bloqueio do fluxo principal. Também exige que a matriz móvel manual esteja anexada com MOBILE-001 a MOBILE-004 em PASS e proveniência `REAL_MANUAL`. A promoção de beta para release candidate exige que o tutorial seja concluível, a matriz móvel tenha sido executada, os fixtures HDL passem e o rollback da deployment tenha sido ensaiado. A promoção para `v1.0.0` exige que o contrato público esteja documentado e que qualquer recurso ainda instável esteja explicitamente marcado como beta ou roadmap.
 
 ## Referências
 

@@ -10,6 +10,7 @@ describe('contrato de preflight beta', () => {
       rls: false,
       realtime: false,
       edge: false,
+      mobile: false,
       supabaseStructural: false,
       smoke: false,
     })
@@ -23,6 +24,7 @@ describe('contrato de preflight beta', () => {
       rls: true,
       realtime: true,
       edge: true,
+      mobile: true,
       supabaseStructural: true,
       smoke: true,
     })

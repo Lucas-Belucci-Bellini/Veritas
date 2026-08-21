@@ -433,3 +433,11 @@ O runner `npm run beta:accessibility` foi fortalecido sem alterar os cinco IDs p
 O cenário A11Y-005 executa em conjunto os testes do contrato de acessibilidade e de `validationFeedback`, evitando que o novo feedback perca cobertura. O runbook `docs/BETA-ACCESSIBILITY-ACCEPTANCE.md` foi alinhado. A execução produziu 5 PASS, e a suíte completa permaneceu com 314 testes aprovados; typecheck, lint, build frontend/PWA e build MCP também passaram.
 
 Esse gate estrutural não substitui a inspeção manual com leitor de tela, navegadores móveis, zoom, rotação e dispositivo físico. A promoção beta continua bloqueada até essas evidências externas e os demais gates cross-user reais estarem completos.
+
+## Atualização da implementação — gate mobile manual e proveniência — 2026-08-21
+
+Foi criado `npm run beta:mobile` com os cenários MOBILE-001 a MOBILE-004. Sem `MOBILE_MANUAL_EVIDENCE_PATH`, o runner gera `SKIP` explícito e não simula inspeção. Para aceitar uma revisão externa, exige `MOBILE_MANUAL_ALLOW_REAL=1`, JSON com `executionMode: REAL_MANUAL`, guard, revisor, dispositivo, navegador, timestamp e todos os cenários em `PASS` com evidência não vazia.
+
+O agregador beta agora consome `BETA_MOBILE_REPORT`, o preflight estrito exige essa fonte e valida seus marcadores de proveniência, e o readiness doctor passou a considerar `artifacts/mobile-acceptance.md` no conjunto de artefatos. O workflow de qualidade executa o runner no modo seguro; assim, a CI continua determinística, mas o manifesto mantém `MOBILE-EVIDENCE-INCOMPLETE` enquanto a inspeção humana não for anexada.
+
+A documentação operacional está em `docs/BETA-MOBILE-ACCEPTANCE.md`; `docs/BETA-EVIDENCE-MANIFEST.md`, `docs/BETA-READINESS-DOCTOR.md` e `docs/RELEASE-GATES.md` foram alinhados. O relatório estrutural de teste passa apenas no ensaio local e não representa aprovação mobile real.
