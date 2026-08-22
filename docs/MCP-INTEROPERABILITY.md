@@ -138,6 +138,8 @@ O MCP-012 fornece apenas o construtor puro `buildProtectedResourceMetadata` em `
 
 O MCP-013 integra essa metadata ao handler HTTP local apenas quando `VERITAS_MCP_HTTP_RESOURCE` e `VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS` são fornecidos explicitamente. Sem essas variáveis, a rota `/.well-known/oauth-protected-resource` retorna 404; com configuração completa, retorna o documento validado e mantém a allowlist de Origin. Essa integração continua limitada ao ambiente local/controlado e não habilita OAuth público.
 
+O MCP-014 torna a política CORS explícita: a rota de metadata anuncia apenas `GET, OPTIONS`, conserva `Vary: Origin` e rejeita `POST`; o endpoint `/mcp` permanece limitado a `POST, OPTIONS`, com Bearer obrigatório. Essa correção reduz ambiguidade de clientes sem ampliar a superfície para HTTP remoto ou autorização.
+
 ### Referências
 
 [1]: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports "MCP — Transports"

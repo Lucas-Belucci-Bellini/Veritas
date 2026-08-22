@@ -609,3 +609,13 @@ Critérios de aceite: default sem metadata continua retornando 404; configuraç�
 A rota `/.well-known/oauth-protected-resource` foi integrada ao handler HTTP local somente quando `VERITAS_MCP_HTTP_RESOURCE` e `VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS` são definidos no ambiente. `VERITAS_MCP_HTTP_SCOPES` é opcional; qualquer configuração parcial falha antes de iniciar o processo. O default continua 404, o MCP `/mcp` continua exigindo Bearer e o stdio permanece inalterado.
 
 Critérios realizados: metadata ausente retorna 404; metadata opt-in retorna JSON determinístico; Origin ausente retorna 403; cinco testes unitários do contrato MCP-012, sete testes do handler HTTP, nove checks de regressão MCP-011 e cinco checks MCP-013; typecheck, build HTTP, `node --check` e runner combinado com 14 PASS, 0 FAIL e 0 SKIP. Nenhum token é emitido/persistido e nenhuma rota pública foi habilitada. OAuth real, HTTPS público, discovery dinâmica, PKCE, rate limiting, threat model e smoke remoto continuam bloqueados até provedor aprovado.
+
+## Planejamento MCP-014 — conformidade CORS da metadata local — 2026-08-22
+Com o modo remoto deliberadamente adiado, a próxima fatia local-only será corrigir e explicitar a resposta CORS da rota de Protected Resource Metadata. A rota deve anunciar somente `GET, OPTIONS`, manter `POST` bloqueado, devolver `Vary: Origin` e não ampliar a superfície de headers ou métodos do endpoint MCP protegido. O contrato será testado no handler e no runner sanitizado, sem rede pública, login ou mudança no stdio.
+
+Critérios de aceite: `GET` e preflight `OPTIONS` da metadata retornam `Access-Control-Allow-Methods: GET, OPTIONS`; `POST` continua `405`; Origin fora da allowlist continua `403`; o endpoint `/mcp` continua anunciando somente `POST, OPTIONS` e exigindo Bearer; regressão dos 14 checks anteriores, suíte, builds e smoke permanecem verdes.
+
+## Implementação MCP-014 — conformidade CORS da metadata local — 2026-08-22
+O handler agora usa headers CORS específicos para a rota de metadata: somente `GET, OPTIONS` são anunciados, `Vary: Origin` é preservado e `POST` continua bloqueado. O endpoint `/mcp` manteve seu contrato separado de `POST, OPTIONS`, Bearer obrigatório e allowlist de Origin. O stdio, o schema das ferramentas e a exposição local-only não foram alterados.
+
+Critérios realizados: regressões unitárias do preflight MCP, GET/OPTIONS da metadata, `Vary: Origin`, POST 405 e Bearer no `/mcp`; acceptance combinado MCP-011/MCP-013/MCP-014 com 17 PASS, 0 FAIL e 0 SKIP; typecheck e build HTTP aprovados. OAuth remoto, HTTPS público e qualquer deployment externo continuam fora do escopo.

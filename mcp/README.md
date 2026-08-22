@@ -119,6 +119,12 @@ A metadata não contém tokens. Para habilitar a rota somente durante uma execu�
 
 Antes de publicar `.well-known/oauth-protected-resource` fora do localhost, ainda é obrigatório aprovar o provedor OAuth, resource indicator/audience, PKCE, HTTPS, rate limiting, threat model e smoke remoto.
 
+### MCP-014: CORS explícito da metadata local
+
+O MCP-014 endurece a superfície HTTP local sem criar uma nova rota: a metadata anuncia somente `GET, OPTIONS`, o preflight preserva `Vary: Origin`, `POST` continua retornando `405` e o endpoint protegido `/mcp` continua anunciando somente `POST, OPTIONS` com Bearer obrigatório. Essa mudança existe para evitar que uma resposta CORS ampla seja interpretada como autorização remota.
+
+A aceitação combinada mantém os nove checks do MCP-011 e os cinco checks do MCP-013, acrescentando três checks MCP-014 para os métodos CORS da metadata, o preflight do MCP e a rejeição de `POST`. O runner usa apenas localhost e dados sintéticos; isso não constitui suporte OAuth público.
+
 ## Exemplo
 
 ```

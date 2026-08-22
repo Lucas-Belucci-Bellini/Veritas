@@ -70,6 +70,9 @@ function initializeBody(id = 1) {
 describe('MCP-011 Streamable HTTP local', () => {
   it('negocia initialize em modo stateless e lista as ferramentas existentes', async () => {
     const url = await startServer()
+    const mcpOptions = await fetch(url, { method: 'OPTIONS', headers: { Origin: ORIGIN } })
+    expect(mcpOptions.status).toBe(204)
+    expect(mcpOptions.headers.get('access-control-allow-methods')).toBe('POST, OPTIONS')
     const initialize = await fetch(url, {
       method: 'POST',
       headers: headers({ 'Mcp-Method': 'initialize', 'Mcp-Name': 'veritas' }),
@@ -191,10 +194,13 @@ describe('MCP-011 Streamable HTTP local', () => {
     const response = await fetch(metadataUrl, { method: 'GET', headers: { Origin: ORIGIN } })
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toContain('application/json')
+    expect(response.headers.get('access-control-allow-methods')).toBe('GET, OPTIONS')
+    expect(response.headers.get('vary')).toBe('Origin')
     expect(await response.json()).toEqual(metadata)
 
     const options = await fetch(metadataUrl, { method: 'OPTIONS', headers: { Origin: ORIGIN } })
     expect(options.status).toBe(204)
+    expect(options.headers.get('access-control-allow-methods')).toBe('GET, OPTIONS')
 
     const missingBearerOnMcp = await fetch(configuredUrl, {
       method: 'POST',
@@ -216,6 +222,7 @@ describe('MCP-011 Streamable HTTP local', () => {
 
     const post = await fetch(url, { method: 'POST', headers: { Origin: ORIGIN } })
     expect(post.status).toBe(405)
+    expect(post.headers.get('access-control-allow-methods')).toBe('GET, OPTIONS')
   })
 
   it('exige configuração segura e nunca aceita token vazio ou Origin curinga', () => {

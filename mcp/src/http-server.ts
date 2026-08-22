@@ -76,6 +76,15 @@ function corsHeaders(origin: string): Record<string, string> {
   }
 }
 
+function metadataCorsHeaders(origin: string): Record<string, string> {
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-headers': 'Accept',
+    'access-control-allow-methods': 'GET, OPTIONS',
+    vary: 'Origin',
+  }
+}
+
 function validateOrigin(req: IncomingMessage, config: HttpConfig): string {
   const origin = originHeader(req)
   if (!origin || !config.allowedOrigins.includes(origin)) {
@@ -164,7 +173,7 @@ async function handleMetadataRequest(req: IncomingMessage, res: ServerResponse, 
   try {
     origin = validateOrigin(req, config)
     const responseHeaders = {
-      ...corsHeaders(origin),
+      ...metadataCorsHeaders(origin),
       'cache-control': 'no-store',
     }
     if (req.method === 'OPTIONS') {
@@ -187,7 +196,7 @@ async function handleMetadataRequest(req: IncomingMessage, res: ServerResponse, 
     res.end(JSON.stringify(config.protectedResourceMetadata))
   } catch (error) {
     if (error instanceof HttpRequestError) {
-      errorResponse(res, error.statusCode, error.errorCode, error.message, origin ? corsHeaders(origin) : undefined)
+      errorResponse(res, error.statusCode, error.errorCode, error.message, origin ? metadataCorsHeaders(origin) : undefined)
       return
     }
     errorResponse(res, 500, -32603, 'Erro interno da rota de metadata.')

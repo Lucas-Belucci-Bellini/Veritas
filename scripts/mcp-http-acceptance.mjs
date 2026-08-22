@@ -216,8 +216,23 @@ async function main() {
     const metadataOk = metadataResponse.status === 200 && metadataJson?.resource === 'https://veritas.example/mcp' && metadataJson?.authorization_servers?.[0] === 'https://auth.example/realms/veritas'
     result('MCP-013-HTTP-002', metadataOk ? 'PASS' : 'FAIL', 'metadata opt-in', `status=${metadataResponse.status}, metadata=${metadataOk}`)
 
+    const metadataMethodsOk = metadataResponse.headers.get('access-control-allow-methods') === 'GET, OPTIONS' && metadataResponse.headers.get('vary') === 'Origin'
+    result('MCP-014-HTTP-001', metadataMethodsOk ? 'PASS' : 'FAIL', 'CORS da metadata', 'metadata anuncia somente GET, OPTIONS e Vary: Origin')
+
+    const mcpOptions = await fetch(metadataServer.url.replace('/mcp', '/mcp'), {
+      method: 'OPTIONS',
+      headers: { Origin: ORIGIN },
+    })
+    result('MCP-014-HTTP-002', mcpOptions.status === 204 && mcpOptions.headers.get('access-control-allow-methods') === 'POST, OPTIONS' ? 'PASS' : 'FAIL', 'CORS do MCP', 'endpoint protegido mantém somente POST, OPTIONS')
+
     const metadataMissingOrigin = await fetch(metadataServer.url.replace('/mcp', metadataPath), { method: 'GET' })
     result('MCP-013-HTTP-003', metadataMissingOrigin.status === 403 ? 'PASS' : 'FAIL', 'Origin da metadata', `Origin ausente retorna ${metadataMissingOrigin.status}`)
+
+    const metadataPost = await fetch(metadataServer.url.replace('/mcp', metadataPath), {
+      method: 'POST',
+      headers: { Origin: ORIGIN },
+    })
+    result('MCP-014-HTTP-003', metadataPost.status === 405 && metadataPost.headers.get('access-control-allow-methods') === 'GET, OPTIONS' ? 'PASS' : 'FAIL', 'método da metadata', 'POST permanece 405 e não é anunciado pelo CORS')
 
     const partialMetadataRejected = await rejectsStartup({
       VERITAS_MCP_HTTP_RESOURCE: 'https://veritas.example/mcp',
@@ -230,14 +245,14 @@ async function main() {
     })
     result('MCP-013-HTTP-005', insecureMetadataRejected ? 'PASS' : 'FAIL', 'metadata HTTPS', 'processo rejeita recurso remoto sem HTTPS')
   } catch (error) {
-    result('MCP-013-HTTP-006', 'FAIL', 'runner HTTP', error instanceof Error ? error.message : 'erro desconhecido')
+    result('MCP-014-HTTP-004', 'FAIL', 'runner HTTP', error instanceof Error ? error.message : 'erro desconhecido')
   } finally {
     if (metadataServer) await stopServer(metadataServer.child)
     if (server) await stopServer(server.child)
   }
 
   const lines = [
-    `# MCP-011 + MCP-013 HTTP acceptance ${new Date().toISOString()}`,
+    `# MCP-011 + MCP-013 + MCP-014 HTTP acceptance ${new Date().toISOString()}`,
     '',
     'O ensaio usa somente localhost, token efêmero do processo, Origin allowlist e dados determinísticos; nenhum segredo é persistido.',
     '',
