@@ -18,6 +18,13 @@ import {
   type Notation,
 } from '../../src/engine/index'
 import type { ChipCatalog, ChipEntry } from '../../src/chips/types'
+import {
+  buildCustomChipDefinition,
+  elaborateCustomChipDocument,
+  isCircuitDocumentShape,
+  type CircuitDocument,
+  type CustomChipLibraryEntry,
+} from '../../src/circuit/index'
 import { Simulator, type ComponentSpec } from '../../src/simulation/index'
 import { resolveWirelessChannels } from '../../src/circuit/wirelessChannels'
 import {
@@ -429,6 +436,107 @@ export function normalForms(expression: string, notation: Notation = 'math'): To
   }
 }
 
+export interface CustomChipToolDefinition {
+  id: number
+  definition: unknown
+}
+
+export interface SimulateCircuitOptions {
+  customChips?: readonly CustomChipToolDefinition[]
+}
+
+export const MAX_CUSTOM_CHIP_LIBRARY_ENTRIES = 128
+
+function normalizeCustomChipLibrary(entries: readonly CustomChipToolDefinition[] = []): CustomChipLibraryEntry[] {
+  if (entries.length > MAX_CUSTOM_CHIP_LIBRARY_ENTRIES) {
+    throw new Error(`A biblioteca MCP aceita no máximo ${MAX_CUSTOM_CHIP_LIBRARY_ENTRIES} chips customizados por chamada.`)
+  }
+  const ids = new Set<number>()
+  return entries.map((entry, index) => {
+    if (!Number.isSafeInteger(entry.id) || entry.id < 1) throw new Error(`O chip customizado ${index + 1} possui um ID inválido.`)
+    if (ids.has(entry.id)) throw new Error(`O ID de chip customizado ${entry.id} aparece mais de uma vez.`)
+    ids.add(entry.id)
+    if (!isRecord(entry.definition) || !isCircuitDocumentShape(entry.definition.document)) {
+      throw new Error(`A definição do chip customizado ${entry.id} não possui um documento veritas-circuit válido.`)
+    }
+    return {
+      id: entry.id,
+      definition: buildCustomChipDefinition(entry.definition.document, typeof entry.definition.name === 'string' ? entry.definition.name : undefined),
+    }
+  })
+}
+
+function expandCustomChipComponents(
+  components: readonly ComponentSpec[],
+  customChips: readonly CustomChipLibraryEntry[],
+  watch: readonly string[],
+): ComponentSpec[] {
+  if (!components.some((component) => component.type === 'custom-chip')) return [...components]
+  const unsupported = components.filter((component) => !isCanonicalComponent(component)).map((component) => component.type)
+  if (unsupported.length > 0) {
+    throw new Error(`Componentes MCP incompatíveis com expansão custom-chip: ${[...new Set(unsupported)].join(', ')}.`)
+  }
+  const canonicalComponents = components.filter(isCanonicalComponent)
+  const document: CircuitDocument = {
+    format: 'veritas-circuit',
+    version: 1,
+    name: 'MCP custom circuit',
+    nodes: canonicalComponents.map((component) => ({
+      id: component.id,
+      type: component.type,
+      position: { x: 0, y: 0 },
+      ...(component.label ? { label: component.label } : {}),
+      ...(component.options ? { options: component.options } : {}),
+    })),
+    connections: canonicalComponents.flatMap((component) => (component.inputs ?? []).map((input, port) => ({
+      source: { node: input.node, ...(input.port === undefined ? {} : { port: input.port }) },
+      target: { node: component.id, port },
+    }))),
+  }
+  const expanded = elaborateCustomChipDocument(document, { customChips })
+  const incoming = new Map<string, Array<{ node: string; port?: number }>>()
+  for (const connection of expanded.connections) {
+    const inputs = incoming.get(connection.target.node) ?? []
+    inputs[connection.target.port] = {
+      node: connection.source.node,
+      ...(connection.source.port === undefined ? {} : { port: connection.source.port }),
+    }
+    incoming.set(connection.target.node, inputs)
+  }
+  const result: ComponentSpec[] = expanded.nodes.map((node) => {
+    const type = node.type === 'input' && node.options?.customChipBoundary === 'internal' ? 'output' : node.type
+    return {
+      id: node.id,
+      type,
+      ...(node.label ? { label: node.label } : {}),
+      ...(node.options ? { options: node.options } : {}),
+      ...(incoming.has(node.id) ? { inputs: (incoming.get(node.id) ?? []).filter(Boolean) } : {}),
+    }
+  })
+  const entries = new Map(customChips.map((entry) => [entry.id, entry] as const))
+  for (const component of canonicalComponents) {
+    if (component.type !== 'custom-chip' || !watch.includes(component.id)) continue
+    const entry = entries.get(component.options?.customChipId ?? NaN)
+    const output = entry?.definition.outputs[0]
+    if (!entry || !output) continue
+    result.push({
+      id: component.id,
+      type: 'output',
+      label: component.label,
+      inputs: [{ node: `${component.id}__${output.id}` }],
+    })
+  }
+  return result
+}
+
+function isCanonicalComponent(component: ComponentSpec): component is ComponentSpec & { type: CircuitDocument['nodes'][number]['type'] } {
+  return ['input', 'output', 'constant', 'and', 'or', 'not', 'xor', 'clock', 'dff', 'tff', 'delay', 'transmitter', 'receiver', 'custom-chip'].includes(component.type)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 export interface SimulationStep {
   /** Valores a aplicar nos pinos de entrada antes de rodar os tiques. */
   set?: Record<string, boolean>
@@ -473,6 +581,7 @@ export function simulateCircuit(
   components: ComponentSpec[],
   steps: SimulationStep[],
   watch: string[],
+  options: SimulateCircuitOptions = {},
 ): ToolResult {
   const total = steps.reduce((sum, step) => sum + (step.ticks ?? 1), 0)
   if (total > MAX_SIMULATION_TICKS) {
@@ -485,7 +594,9 @@ export function simulateCircuit(
   let simulator: Simulator
   let resolvedComponents: ComponentSpec[]
   try {
-    resolvedComponents = resolveWirelessComponentInputs(components)
+    const customChips = normalizeCustomChipLibrary(options.customChips)
+    const expandedComponents = expandCustomChipComponents(components, customChips, watch)
+    resolvedComponents = resolveWirelessComponentInputs(expandedComponents)
     simulator = new Simulator({ components: resolvedComponents })
   } catch (error) {
     return {

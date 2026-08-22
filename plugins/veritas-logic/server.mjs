@@ -20959,6 +20959,611 @@ function combinationalResult(type, values) {
 	if (!fold) return null;
 	return values.length === 0 ? false : fold(values);
 }
+//#endregion
+//#region src/circuit/documentLimits.ts
+var MAX_CIRCUIT_SERIALIZED_BYTES = 5e5;
+//#endregion
+//#region src/circuit/wirelessChannels.ts
+function normalizeWirelessChannel(channel) {
+	return channel.trim().replace(/\s+/g, "-").toLowerCase();
+}
+function resolveWirelessChannels(endpoints) {
+	const issues = [];
+	const seenNodes = /* @__PURE__ */ new Set();
+	const grouped = /* @__PURE__ */ new Map();
+	for (const endpoint of endpoints) {
+		const nodeId = endpoint.nodeId.trim();
+		const channel = normalizeWirelessChannel(endpoint.channel);
+		if (!nodeId || seenNodes.has(nodeId)) {
+			issues.push({
+				code: "duplicate-node",
+				nodeId,
+				message: `O endpoint wireless "${nodeId}" está vazio ou duplicado.`
+			});
+			continue;
+		}
+		seenNodes.add(nodeId);
+		if (!channel) {
+			issues.push({
+				code: "empty-channel",
+				nodeId,
+				message: `O endpoint wireless "${nodeId}" precisa informar um canal.`
+			});
+			continue;
+		}
+		if (channel.length > 64) {
+			issues.push({
+				code: "channel-too-long",
+				nodeId,
+				channel,
+				message: `O canal wireless "${channel}" pode ter no máximo 64 caracteres.`
+			});
+			continue;
+		}
+		if (!Number.isInteger(endpoint.width) || endpoint.width < 1 || endpoint.width > 64) {
+			issues.push({
+				code: "invalid-width",
+				nodeId,
+				channel,
+				message: `O canal wireless "${channel}" usa uma largura inválida.`
+			});
+			continue;
+		}
+		const normalized = {
+			...endpoint,
+			nodeId,
+			channel,
+			width: endpoint.width
+		};
+		const current = grouped.get(channel) ?? [];
+		current.push(normalized);
+		grouped.set(channel, current);
+	}
+	const channels = [];
+	for (const [channel, channelEndpoints] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+		const transmitters = channelEndpoints.filter((endpoint) => endpoint.kind === "transmitter").sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+		const receivers = channelEndpoints.filter((endpoint) => endpoint.kind === "receiver").sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+		const transmitter = transmitters[0];
+		for (const duplicate of transmitters.slice(1)) issues.push({
+			code: "duplicate-transmitter",
+			nodeId: duplicate.nodeId,
+			channel,
+			message: `O canal wireless "${channel}" possui mais de um transmissor.`
+		});
+		if (!transmitter) {
+			for (const receiver of receivers) issues.push({
+				code: "missing-transmitter",
+				nodeId: receiver.nodeId,
+				channel,
+				message: `O receptor "${receiver.nodeId}" não encontra transmissor no canal wireless "${channel}".`
+			});
+			continue;
+		}
+		for (const receiver of receivers) if (receiver.width !== transmitter.width) issues.push({
+			code: "width-mismatch",
+			nodeId: receiver.nodeId,
+			channel,
+			message: `O receptor "${receiver.nodeId}" usa ${receiver.width} bits, mas o transmissor usa ${transmitter.width}.`
+		});
+		channels.push({
+			channel,
+			width: transmitter.width,
+			transmitter,
+			receivers
+		});
+	}
+	return {
+		channels,
+		issues
+	};
+}
+//#endregion
+//#region src/circuit/documentContract.ts
+/**
+* Normaliza somente representação, nunca corrige semântica inválida.
+* IDs são aparados junto das referências para manter o documento consistente.
+*/
+function normalizeCircuitDocument(document) {
+	const rawName = document.name;
+	const name = typeof rawName === "string" ? rawName.trim() : "Circuito sem nome";
+	let changed = name !== rawName;
+	const nodes = document.nodes.map((node) => {
+		const id = node.id.trim();
+		const label = normalizeOptionalText(node.label);
+		const channel = node.options?.channel === void 0 ? void 0 : normalizeWirelessChannel(node.options.channel);
+		if (id !== node.id || label !== node.label || channel !== node.options?.channel) changed = true;
+		return {
+			...node,
+			id,
+			label,
+			position: node.position ? {
+				x: node.position.x,
+				y: node.position.y
+			} : node.position,
+			options: node.options ? {
+				...node.options,
+				...channel === void 0 ? {} : { channel }
+			} : void 0
+		};
+	});
+	const connections = document.connections.map((connection) => {
+		const sourceNode = connection.source.node.trim();
+		const targetNode = connection.target.node.trim();
+		if (sourceNode !== connection.source.node || targetNode !== connection.target.node) changed = true;
+		return {
+			source: {
+				node: sourceNode,
+				...connection.source.port === void 0 ? {} : { port: connection.source.port }
+			},
+			target: {
+				node: targetNode,
+				port: connection.target.port
+			}
+		};
+	});
+	if (!changed) return document;
+	return {
+		...document,
+		name,
+		nodes,
+		connections
+	};
+}
+function getCircuitDocumentBoundIssues(document) {
+	const issues = [];
+	const trimmedName = typeof document.name === "string" ? document.name.trim() : "";
+	if (trimmedName.length === 0) issues.push({
+		code: "invalid-document-name",
+		message: "O circuito precisa ter um nome não vazio."
+	});
+	else if (trimmedName.length > 200) issues.push({
+		code: "invalid-document-name",
+		message: `O nome do circuito pode ter no máximo 200 caracteres.`
+	});
+	if (document.nodes.length > 256) issues.push({
+		code: "document-too-many-nodes",
+		message: `O circuito pode ter no máximo 256 componentes.`
+	});
+	if (document.connections.length > 512) issues.push({
+		code: "document-too-many-connections",
+		message: `O circuito pode ter no máximo 512 conexões.`
+	});
+	for (const node of document.nodes) {
+		if ((node.label?.trim().length ?? 0) > 120) issues.push({
+			code: "node-label-too-long",
+			nodeId: node.id,
+			message: `O rótulo do componente "${node.id}" pode ter no máximo 120 caracteres.`
+		});
+		if (node.options?.channel !== void 0 && normalizeWirelessChannel(node.options.channel).length > 64) issues.push({
+			code: "wireless-channel-too-long",
+			nodeId: node.id,
+			message: `O canal wireless do componente "${node.id}" pode ter no máximo 64 caracteres.`
+		});
+	}
+	if (documentSerializedBytes(document) > 5e5) issues.push({
+		code: "document-too-large",
+		message: `O documento serializado pode ter no máximo ${MAX_CIRCUIT_SERIALIZED_BYTES} bytes.`
+	});
+	return issues;
+}
+function documentSerializedBytes(document) {
+	return new TextEncoder().encode(JSON.stringify(document)).length;
+}
+/** Guard estrutural compartilhável por importadores e integrações externas. */
+function isCircuitDocumentShape(value) {
+	if (!isRecord$1(value) || value.format !== "veritas-circuit" || value.version !== 1) return false;
+	if (typeof value.name !== "string" || !Array.isArray(value.nodes) || !Array.isArray(value.connections)) return false;
+	return value.nodes.every(isCircuitNodeShape) && value.connections.every(isCircuitConnectionShape);
+}
+function isCircuitNodeShape(value) {
+	if (!isRecord$1(value) || typeof value.id !== "string" || typeof value.type !== "string") return false;
+	if (!isRecord$1(value.position) || !isFiniteNumber(value.position.x) || !isFiniteNumber(value.position.y)) return false;
+	if (value.label !== void 0 && typeof value.label !== "string") return false;
+	return value.options === void 0 || isRecord$1(value.options);
+}
+function isCircuitConnectionShape(value) {
+	if (!isRecord$1(value) || !isRecord$1(value.source) || !isRecord$1(value.target)) return false;
+	return typeof value.source.node === "string" && (value.source.port === void 0 || Number.isInteger(value.source.port)) && typeof value.target.node === "string" && Number.isInteger(value.target.port);
+}
+function normalizeOptionalText(value) {
+	const normalized = value?.trim();
+	return normalized ? normalized : void 0;
+}
+function isRecord$1(value) {
+	return typeof value === "object" && value !== null;
+}
+function isFiniteNumber(value) {
+	return typeof value === "number" && Number.isFinite(value);
+}
+//#endregion
+//#region src/circuit/editorModel.ts
+var EDITOR_COMPONENT_TYPES = [
+	"input",
+	"output",
+	"constant",
+	"and",
+	"or",
+	"not",
+	"xor",
+	"clock",
+	"dff",
+	"tff",
+	"delay",
+	"transmitter",
+	"receiver",
+	"custom-chip"
+];
+var CircuitValidationError = class extends Error {
+	issues;
+	constructor(issues) {
+		super(issues.map((issue) => issue.message).join(" "));
+		this.name = "CircuitValidationError";
+		this.issues = issues;
+	}
+};
+/** Número de entradas que o editor da v0.7.0 espera em cada componente. */
+function editorInputCount(type) {
+	switch (type) {
+		case "input":
+		case "constant":
+		case "clock": return 0;
+		case "not":
+		case "output":
+		case "delay":
+		case "transmitter": return 1;
+		case "receiver":
+		case "custom-chip": return 0;
+		case "and":
+		case "or":
+		case "xor":
+		case "dff":
+		case "tff": return 2;
+	}
+}
+function isStatefulEditorType(type) {
+	return type === "clock" || type === "dff" || type === "tff" || type === "delay";
+}
+function validateCircuit(document, options = {}) {
+	document = normalizeCircuitDocument(document);
+	const customChips = new Map((options.customChips ?? []).map((entry) => [entry.id, entry]));
+	const issues = getCircuitDocumentBoundIssues(document).map((issue) => ({
+		code: issue.code,
+		nodeId: issue.nodeId,
+		message: issue.message
+	}));
+	const nodes = /* @__PURE__ */ new Map();
+	for (const node of document.nodes) {
+		if (!node.id.trim() || nodes.has(node.id)) {
+			issues.push({
+				code: "duplicate-node",
+				nodeId: node.id,
+				message: `O identificador do componente "${node.id}" está vazio ou duplicado.`
+			});
+			continue;
+		}
+		if (!EDITOR_COMPONENT_TYPES.includes(node.type)) {
+			issues.push({
+				code: "invalid-node",
+				nodeId: node.id,
+				message: `O componente "${node.id}" usa um tipo que o editor visual não suporta.`
+			});
+			continue;
+		}
+		if (node.type === "custom-chip" && !customChips.has(node.options?.customChipId ?? NaN)) issues.push({
+			code: "custom-chip-missing-definition",
+			nodeId: node.id,
+			message: `A instância de chip "${node.id}" não encontrou a definição local solicitada.`
+		});
+		const width = circuitNodeWidth(node);
+		if (!isValidCircuitWidth(width)) issues.push({
+			code: "invalid-width",
+			nodeId: node.id,
+			message: `A largura do componente "${node.id}" precisa ser um inteiro entre 1 e 64.`
+		});
+		else if (width !== 1 && (!options.allowBuses || isStatefulEditorType(node.type))) issues.push({
+			code: "unsupported-width",
+			nodeId: node.id,
+			message: isStatefulEditorType(node.type) ? `O componente sequencial "${node.id}" ainda aceita somente sinais escalares de 1 bit.` : `O componente "${node.id}" usa ${width} bits, mas a avaliação visual atual ainda aceita somente sinais escalares de 1 bit.`
+		});
+		nodes.set(node.id, node);
+	}
+	const wirelessResolution = resolveWirelessChannels(document.nodes.filter((node) => node.type === "transmitter" || node.type === "receiver").map((node) => ({
+		nodeId: node.id,
+		channel: node.options?.channel ?? "",
+		kind: node.type,
+		width: circuitNodeWidth(node)
+	})));
+	for (const issue of wirelessResolution.issues) {
+		if (issue.code === "duplicate-node") continue;
+		const code = issue.code === "empty-channel" ? "wireless-empty-channel" : issue.code === "duplicate-transmitter" ? "wireless-duplicate-transmitter" : issue.code === "missing-transmitter" ? "wireless-missing-transmitter" : issue.code === "invalid-width" ? "invalid-width" : "width-mismatch";
+		issues.push({
+			code,
+			nodeId: issue.nodeId,
+			message: issue.message
+		});
+	}
+	const occupiedInputs = /* @__PURE__ */ new Set();
+	const outgoing = /* @__PURE__ */ new Map();
+	for (const connection of document.connections) {
+		const source = nodes.get(connection.source.node);
+		const target = nodes.get(connection.target.node);
+		if (!source || !target) {
+			issues.push({
+				code: "missing-node",
+				nodeId: target?.id ?? source?.id,
+				message: "A conexão aponta para um componente que não existe no documento."
+			});
+			continue;
+		}
+		const sourcePort = connection.source.port ?? 0;
+		const sourceOutputCount = nodeOutputCount(source, customChips);
+		if (sourcePort < 0 || sourcePort >= sourceOutputCount) issues.push({
+			code: "invalid-source-port",
+			nodeId: source.id,
+			message: `O componente "${source.id}" não possui a saída ${sourcePort}.`
+		});
+		const inputCount = nodeInputCount(target, customChips);
+		if (connection.target.port < 0 || connection.target.port >= inputCount) {
+			issues.push({
+				code: "invalid-target-port",
+				nodeId: target.id,
+				message: `A entrada ${connection.target.port} não existe no componente "${target.id}".`
+			});
+			continue;
+		}
+		const sourceWidth = nodeOutputWidth(source, sourcePort, customChips);
+		const targetWidth = nodeInputWidth(target, connection.target.port, customChips);
+		if (isValidCircuitWidth(sourceWidth) && isValidCircuitWidth(targetWidth) && sourceWidth !== targetWidth) issues.push({
+			code: "width-mismatch",
+			nodeId: target.id,
+			message: `A conexão entre "${source.id}" (${sourceWidth} bits) e "${target.id}" (${targetWidth} bits) exige larguras iguais.`
+		});
+		const inputKey = `${target.id}:${connection.target.port}`;
+		if (occupiedInputs.has(inputKey)) issues.push({
+			code: "duplicate-target-port",
+			nodeId: target.id,
+			message: `A entrada ${connection.target.port} do componente "${target.id}" recebeu mais de uma conexão.`
+		});
+		occupiedInputs.add(inputKey);
+		if (source.id === target.id && !isStatefulEditorType(target.type)) issues.push({
+			code: "self-connection",
+			nodeId: target.id,
+			message: `O componente "${target.id}" não pode se conectar a si mesmo na lógica combinacional.`
+		});
+		const targets = outgoing.get(source.id) ?? [];
+		targets.push(target.id);
+		outgoing.set(source.id, targets);
+	}
+	for (const node of nodes.values()) {
+		const expected = nodeInputCount(node, customChips);
+		for (let port = 0; port < expected; port += 1) if (!occupiedInputs.has(`${node.id}:${port}`)) issues.push({
+			code: "missing-input",
+			nodeId: node.id,
+			message: `A entrada ${port + 1} do componente "${node.label ?? node.id}" está desconectada.`
+		});
+	}
+	const visiting = /* @__PURE__ */ new Set();
+	const stack = [];
+	const visited = /* @__PURE__ */ new Set();
+	const visit = (id) => {
+		if (visiting.has(id)) {
+			const cycleStart = stack.indexOf(id);
+			if (!(cycleStart >= 0 ? stack.slice(cycleStart) : [id]).some((cycleId) => {
+				const cycleNode = nodes.get(cycleId);
+				return cycleNode ? isStatefulEditorType(cycleNode.type) : false;
+			})) issues.push({
+				code: "cycle",
+				nodeId: id,
+				message: `O circuito contém um ciclo combinacional envolvendo "${id}".`
+			});
+			return;
+		}
+		if (visited.has(id)) return;
+		visiting.add(id);
+		stack.push(id);
+		for (const target of outgoing.get(id) ?? []) visit(target);
+		stack.pop();
+		visiting.delete(id);
+		visited.add(id);
+	};
+	for (const node of nodes.values()) visit(node.id);
+	return issues;
+}
+function nodeInputCount(node, customChips) {
+	if (node.type === "input" && node.options?.customChipBoundary === "internal") return 1;
+	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0;
+	return editorInputCount(node.type);
+}
+function nodeOutputCount(node, customChips) {
+	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0;
+	return outputCount(node.type);
+}
+function nodeInputWidth(node, port, customChips) {
+	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs[port]?.width ?? 1;
+	return circuitNodeWidth(node);
+}
+function nodeOutputWidth(node, port, customChips) {
+	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs[port]?.width ?? 1;
+	return circuitNodeWidth(node);
+}
+function circuitNodeWidth(node) {
+	return node.options?.width ?? 1;
+}
+function isValidCircuitWidth(width) {
+	return Number.isInteger(width) && width >= 1 && width <= 64;
+}
+/**
+* Converte um documento com nós `custom-chip` em um documento HDL-ready sem
+* instâncias hierárquicas. Portas internas continuam como sinais nomeados e
+* recebem uma marca de fronteira para não virarem portas externas do módulo.
+*/
+function elaborateCustomChipDocument(document, options = {}) {
+	const normalized = normalizeCircuitDocument(document);
+	const definitions = new Map((options.customChips ?? []).map((entry) => [entry.id, entry]));
+	const issues = validateCircuit(normalized, {
+		allowBuses: true,
+		customChips: [...definitions.values()]
+	});
+	if (issues.length > 0) throw new CircuitValidationError(issues);
+	const result = elaborate(normalized, {
+		definitions,
+		usedIds: /* @__PURE__ */ new Set(),
+		maxDepth: options.maxDepth ?? 8
+	}, "", []);
+	const elaboratedIssues = validateCircuit(result.document, { allowBuses: true });
+	if (elaboratedIssues.length > 0) throw new CircuitValidationError(elaboratedIssues);
+	return result.document;
+}
+function elaborate(document, context, prefix, stack) {
+	const normalized = normalizeCircuitDocument(document);
+	const customNodes = normalized.nodes.filter((node) => node.type === "custom-chip");
+	const nativeNodes = normalized.nodes.filter((node) => node.type !== "custom-chip");
+	const idMap = /* @__PURE__ */ new Map();
+	for (const node of nativeNodes) idMap.set(node.id, allocateId(context, `${prefix}${node.id}`));
+	const nodes = nativeNodes.map((node) => ({
+		...node,
+		id: idMap.get(node.id),
+		position: {
+			x: node.position.x,
+			y: node.position.y
+		},
+		options: markInternalBoundary(node, prefix)
+	}));
+	const boundaries = /* @__PURE__ */ new Map();
+	const nestedConnections = [];
+	for (const node of customNodes) {
+		const entry = getDefinition(node, context.definitions);
+		if (stack.includes(entry.id)) throw new Error(`A definição do chip "${entry.definition.name}" contém uma referência recursiva.`);
+		if (stack.length >= context.maxDepth) throw new Error(`A hierarquia de chips excede o limite seguro de ${context.maxDepth} níveis.`);
+		const child = elaborate(entry.definition.document, context, `${prefix}${node.id}__`, [...stack, entry.id]);
+		nodes.push(...child.document.nodes);
+		nestedConnections.push(...child.document.connections);
+		boundaries.set(node.id, child.boundary);
+	}
+	const connections = [...normalized.connections.flatMap((connection) => {
+		const source = resolveSource(connection.source.node, connection.source.port ?? 0, idMap, boundaries);
+		const target = resolveTarget(connection.target.node, connection.target.port, idMap, boundaries);
+		if (!source || !target) return [];
+		return [{
+			source,
+			target
+		}];
+	}), ...nestedConnections];
+	return {
+		document: {
+			...normalized,
+			nodes,
+			connections
+		},
+		boundary: {
+			inputs: normalized.nodes.filter((node) => node.type === "input").map((node) => idMap.get(node.id)),
+			outputs: normalized.nodes.filter((node) => node.type === "output").map((node) => idMap.get(node.id))
+		}
+	};
+}
+function getDefinition(node, definitions) {
+	const entry = definitions.get(node.options?.customChipId ?? NaN);
+	if (!entry) throw new CircuitValidationError([{
+		code: "custom-chip-missing-definition",
+		nodeId: node.id,
+		message: `A instância de chip "${node.id}" não encontrou a definição local solicitada.`
+	}]);
+	return entry;
+}
+function resolveSource(nodeId, port, idMap, boundaries) {
+	const boundary = boundaries.get(nodeId);
+	if (boundary) {
+		const output = boundary.outputs[port];
+		return output ? { node: output } : null;
+	}
+	const node = idMap.get(nodeId);
+	return node ? {
+		node,
+		...port === 0 ? {} : { port }
+	} : null;
+}
+function resolveTarget(nodeId, port, idMap, boundaries) {
+	const boundary = boundaries.get(nodeId);
+	if (boundary) {
+		const input = boundary.inputs[port];
+		return input ? {
+			node: input,
+			port: 0
+		} : null;
+	}
+	const node = idMap.get(nodeId);
+	return node ? {
+		node,
+		port
+	} : null;
+}
+function markInternalBoundary(node, prefix) {
+	if (!prefix) return node.options;
+	const options = { ...node.options };
+	if (node.type === "input" || node.type === "output") options.customChipBoundary = "internal";
+	if ((node.type === "transmitter" || node.type === "receiver") && options.channel) {
+		const channel = normalizeWirelessChannel(`${prefix}${options.channel}`);
+		if (channel.length > 64) throw new Error(`O canal wireless interno da instância "${prefix}" excede 64 caracteres após a elaboração.`);
+		options.channel = channel;
+	}
+	return Object.keys(options).length > 0 ? options : void 0;
+}
+function allocateId(context, candidate) {
+	let id = candidate;
+	let suffix = 2;
+	while (context.usedIds.has(id)) id = `${candidate}_${suffix++}`;
+	context.usedIds.add(id);
+	return id;
+}
+//#endregion
+//#region src/circuit/customChip.ts
+var CUSTOM_CHIP_FORMAT = "veritas-custom-chip";
+var STATEFUL_TYPES = [
+	"clock",
+	"dff",
+	"tff",
+	"delay"
+];
+/**
+* Cria uma definição serializável sem mutar o documento original.
+* A execução hierárquica e a instanciação no canvas ficam para CHIP-002.
+*/
+function buildCustomChipDefinition(document, name = document.name) {
+	const normalizedDocument = normalizeCircuitDocument(document);
+	const normalizedName = name.trim() || normalizedDocument.name;
+	if (normalizedName.length === 0) throw new Error("O chip customizado precisa ter um nome não vazio.");
+	if (normalizedName.length > 200) throw new Error(`O nome do chip customizado pode ter no máximo 200 caracteres.`);
+	if (normalizedDocument.nodes.some((node) => node.type === "custom-chip")) throw new Error("Chips customizados desta versão não podem conter outras instâncias de chip.");
+	const issues = validateCircuit(normalizedDocument, { allowBuses: true });
+	if (issues.length > 0) throw new CircuitValidationError(issues);
+	if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) throw new Error("Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF ou delay.");
+	const inputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === "input"));
+	const outputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === "output"));
+	if (inputs.length === 0) throw new Error("O chip customizado precisa ter pelo menos uma entrada.");
+	if (outputs.length === 0) throw new Error("O chip customizado precisa ter pelo menos uma saída.");
+	return {
+		format: CUSTOM_CHIP_FORMAT,
+		version: 1,
+		name: normalizedName,
+		document: normalizedDocument,
+		inputs,
+		outputs
+	};
+}
+function buildPorts(nodes) {
+	const used = /* @__PURE__ */ new Map();
+	return [...nodes].sort((a, b) => a.id.localeCompare(b.id)).map((node) => {
+		const baseName = (node.label?.trim() || node.id).replace(/\s+/g, " ");
+		const key = baseName.toLocaleLowerCase("pt-BR");
+		const occurrence = (used.get(key) ?? 0) + 1;
+		used.set(key, occurrence);
+		return {
+			id: node.id,
+			name: occurrence === 1 ? baseName : `${baseName}_${occurrence}`,
+			width: node.options?.width ?? 1
+		};
+	});
+}
 /**
 * Simulador de circuitos por tiques.
 *
@@ -21195,101 +21800,6 @@ function createState(spec) {
 		nextQueue: [...queue],
 		counter: 0,
 		nextCounter: 0
-	};
-}
-//#endregion
-//#region src/circuit/wirelessChannels.ts
-function normalizeWirelessChannel(channel) {
-	return channel.trim().replace(/\s+/g, "-").toLowerCase();
-}
-function resolveWirelessChannels(endpoints) {
-	const issues = [];
-	const seenNodes = /* @__PURE__ */ new Set();
-	const grouped = /* @__PURE__ */ new Map();
-	for (const endpoint of endpoints) {
-		const nodeId = endpoint.nodeId.trim();
-		const channel = normalizeWirelessChannel(endpoint.channel);
-		if (!nodeId || seenNodes.has(nodeId)) {
-			issues.push({
-				code: "duplicate-node",
-				nodeId,
-				message: `O endpoint wireless "${nodeId}" está vazio ou duplicado.`
-			});
-			continue;
-		}
-		seenNodes.add(nodeId);
-		if (!channel) {
-			issues.push({
-				code: "empty-channel",
-				nodeId,
-				message: `O endpoint wireless "${nodeId}" precisa informar um canal.`
-			});
-			continue;
-		}
-		if (channel.length > 64) {
-			issues.push({
-				code: "channel-too-long",
-				nodeId,
-				channel,
-				message: `O canal wireless "${channel}" pode ter no máximo 64 caracteres.`
-			});
-			continue;
-		}
-		if (!Number.isInteger(endpoint.width) || endpoint.width < 1 || endpoint.width > 64) {
-			issues.push({
-				code: "invalid-width",
-				nodeId,
-				channel,
-				message: `O canal wireless "${channel}" usa uma largura inválida.`
-			});
-			continue;
-		}
-		const normalized = {
-			...endpoint,
-			nodeId,
-			channel,
-			width: endpoint.width
-		};
-		const current = grouped.get(channel) ?? [];
-		current.push(normalized);
-		grouped.set(channel, current);
-	}
-	const channels = [];
-	for (const [channel, channelEndpoints] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right))) {
-		const transmitters = channelEndpoints.filter((endpoint) => endpoint.kind === "transmitter").sort((left, right) => left.nodeId.localeCompare(right.nodeId));
-		const receivers = channelEndpoints.filter((endpoint) => endpoint.kind === "receiver").sort((left, right) => left.nodeId.localeCompare(right.nodeId));
-		const transmitter = transmitters[0];
-		for (const duplicate of transmitters.slice(1)) issues.push({
-			code: "duplicate-transmitter",
-			nodeId: duplicate.nodeId,
-			channel,
-			message: `O canal wireless "${channel}" possui mais de um transmissor.`
-		});
-		if (!transmitter) {
-			for (const receiver of receivers) issues.push({
-				code: "missing-transmitter",
-				nodeId: receiver.nodeId,
-				channel,
-				message: `O receptor "${receiver.nodeId}" não encontra transmissor no canal wireless "${channel}".`
-			});
-			continue;
-		}
-		for (const receiver of receivers) if (receiver.width !== transmitter.width) issues.push({
-			code: "width-mismatch",
-			nodeId: receiver.nodeId,
-			channel,
-			message: `O receptor "${receiver.nodeId}" usa ${receiver.width} bits, mas o transmissor usa ${transmitter.width}.`
-		});
-		channels.push({
-			channel,
-			width: transmitter.width,
-			transmitter,
-			receivers
-		});
-	}
-	return {
-		channels,
-		issues
 	};
 }
 //#endregion
@@ -22206,6 +22716,105 @@ function normalForms(expression, notation = "math") {
 		cheaper
 	].join("\n") };
 }
+function normalizeCustomChipLibrary(entries = []) {
+	if (entries.length > 128) throw new Error(`A biblioteca MCP aceita no máximo 128 chips customizados por chamada.`);
+	const ids = /* @__PURE__ */ new Set();
+	return entries.map((entry, index) => {
+		if (!Number.isSafeInteger(entry.id) || entry.id < 1) throw new Error(`O chip customizado ${index + 1} possui um ID inválido.`);
+		if (ids.has(entry.id)) throw new Error(`O ID de chip customizado ${entry.id} aparece mais de uma vez.`);
+		ids.add(entry.id);
+		if (!isRecord(entry.definition) || !isCircuitDocumentShape(entry.definition.document)) throw new Error(`A definição do chip customizado ${entry.id} não possui um documento veritas-circuit válido.`);
+		return {
+			id: entry.id,
+			definition: buildCustomChipDefinition(entry.definition.document, typeof entry.definition.name === "string" ? entry.definition.name : void 0)
+		};
+	});
+}
+function expandCustomChipComponents(components, customChips, watch) {
+	if (!components.some((component) => component.type === "custom-chip")) return [...components];
+	const unsupported = components.filter((component) => !isCanonicalComponent(component)).map((component) => component.type);
+	if (unsupported.length > 0) throw new Error(`Componentes MCP incompatíveis com expansão custom-chip: ${[...new Set(unsupported)].join(", ")}.`);
+	const canonicalComponents = components.filter(isCanonicalComponent);
+	const expanded = elaborateCustomChipDocument({
+		format: "veritas-circuit",
+		version: 1,
+		name: "MCP custom circuit",
+		nodes: canonicalComponents.map((component) => ({
+			id: component.id,
+			type: component.type,
+			position: {
+				x: 0,
+				y: 0
+			},
+			...component.label ? { label: component.label } : {},
+			...component.options ? { options: component.options } : {}
+		})),
+		connections: canonicalComponents.flatMap((component) => (component.inputs ?? []).map((input, port) => ({
+			source: {
+				node: input.node,
+				...input.port === void 0 ? {} : { port: input.port }
+			},
+			target: {
+				node: component.id,
+				port
+			}
+		})))
+	}, { customChips });
+	const incoming = /* @__PURE__ */ new Map();
+	for (const connection of expanded.connections) {
+		const inputs = incoming.get(connection.target.node) ?? [];
+		inputs[connection.target.port] = {
+			node: connection.source.node,
+			...connection.source.port === void 0 ? {} : { port: connection.source.port }
+		};
+		incoming.set(connection.target.node, inputs);
+	}
+	const result = expanded.nodes.map((node) => {
+		const type = node.type === "input" && node.options?.customChipBoundary === "internal" ? "output" : node.type;
+		return {
+			id: node.id,
+			type,
+			...node.label ? { label: node.label } : {},
+			...node.options ? { options: node.options } : {},
+			...incoming.has(node.id) ? { inputs: (incoming.get(node.id) ?? []).filter(Boolean) } : {}
+		};
+	});
+	const entries = new Map(customChips.map((entry) => [entry.id, entry]));
+	for (const component of canonicalComponents) {
+		if (component.type !== "custom-chip" || !watch.includes(component.id)) continue;
+		const entry = entries.get(component.options?.customChipId ?? NaN);
+		const output = entry?.definition.outputs[0];
+		if (!entry || !output) continue;
+		result.push({
+			id: component.id,
+			type: "output",
+			label: component.label,
+			inputs: [{ node: `${component.id}__${output.id}` }]
+		});
+	}
+	return result;
+}
+function isCanonicalComponent(component) {
+	return [
+		"input",
+		"output",
+		"constant",
+		"and",
+		"or",
+		"not",
+		"xor",
+		"clock",
+		"dff",
+		"tff",
+		"delay",
+		"transmitter",
+		"receiver",
+		"custom-chip"
+	].includes(component.type);
+}
+function isRecord(value) {
+	return typeof value === "object" && value !== null;
+}
 /** Teto de tiques por chamada, para não deixar o servidor rodando à toa. */
 var MAX_SIMULATION_TICKS = 1e3;
 /**
@@ -22229,7 +22838,7 @@ function resolveWirelessComponentInputs(components) {
 		inputs: [wirelessByReceiver.get(component.id)]
 	} : component);
 }
-function simulateCircuit(components, steps, watch) {
+function simulateCircuit(components, steps, watch, options = {}) {
 	const total = steps.reduce((sum, step) => sum + (step.ticks ?? 1), 0);
 	if (total > 1e3) return {
 		isError: true,
@@ -22238,7 +22847,7 @@ function simulateCircuit(components, steps, watch) {
 	let simulator;
 	let resolvedComponents;
 	try {
-		resolvedComponents = resolveWirelessComponentInputs(components);
+		resolvedComponents = resolveWirelessComponentInputs(expandCustomChipComponents(components, normalizeCustomChipLibrary(options.customChips), watch));
 		simulator = new Simulator({ components: resolvedComponents });
 	} catch (error) {
 		return {
@@ -22431,7 +23040,8 @@ var COMPONENT = object({
 		"tff",
 		"delay",
 		"transmitter",
-		"receiver"
+		"receiver",
+		"custom-chip"
 	]),
 	inputs: array(object({
 		node: string(),
@@ -22442,22 +23052,27 @@ var COMPONENT = object({
 		ticks: number().int().min(1).optional().describe("delay: tamanho do atraso"),
 		value: boolean().optional().describe("constant: o valor fixo"),
 		initial: boolean().optional().describe("valor no instante zero"),
-		channel: string().max(64).optional().describe("transmitter/receiver: nome do canal wireless")
+		channel: string().max(64).optional().describe("transmitter/receiver: nome do canal wireless"),
+		customChipId: number().int().min(1).optional().describe("custom-chip: ID da definição fornecida em custom_chips")
 	}).optional(),
 	label: string().optional()
 });
 server.registerTool("simulate_circuit", {
 	title: "Simular circuito",
-	description: "Roda um circuito por alguns tiques e devolve o diagrama de tempo. Diferente da tabela verdade, aceita clock, flip-flops (dff/tff), atrasos e canais wireless, cujo resultado depende do que aconteceu antes. Cada componente leva um tique para propagar. As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1).",
+	description: "Roda um circuito por alguns tiques e devolve o diagrama de tempo. Diferente da tabela verdade, aceita clock, flip-flops (dff/tff), atrasos e canais wireless, cujo resultado depende do que aconteceu antes. Cada componente leva um tique para propagar. As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1). Instâncias custom-chip devem referenciar uma definição correspondente em custom_chips.",
 	inputSchema: {
 		components: array(COMPONENT).min(1).describe("Os componentes do circuito"),
 		steps: array(object({
 			set: record(string(), boolean()).optional().describe("Valores a aplicar nos pinos de entrada antes de rodar"),
 			ticks: number().int().min(1).default(1)
 		})).min(1).describe("Roteiro da simulação, em ordem"),
-		watch: array(string()).default([]).describe("Quais componentes acompanhar. Vazio acompanha todos")
+		watch: array(string()).default([]).describe("Quais componentes acompanhar. Vazio acompanha todos"),
+		custom_chips: array(object({
+			id: number().int().min(1),
+			definition: unknown()
+		})).max(128).default([]).describe("Definições veritas-custom-chip portáteis usadas pelas instâncias custom-chip")
 	}
-}, async ({ components, steps, watch }) => guard(() => simulateCircuit(components, steps, watch)));
+}, async ({ components, steps, watch, custom_chips }) => guard(() => simulateCircuit(components, steps, watch, { customChips: custom_chips })));
 server.registerTool("list_chips", {
 	title: "Listar chips",
 	description: "Busca na biblioteca de 1121 chips importados do Digital Logic Sim: somadores, multiplexadores, comparadores, registradores e afins.",

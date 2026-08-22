@@ -15,6 +15,7 @@ import {
   truthTable,
 } from './tools'
 import { createAlgorithmDocument } from '../../src/algorithms'
+import { buildCustomChipDefinition, createCircuitDocument, type CircuitDocument } from '../../src/circuit'
 
 describe('logic_case', () => {
   it('avalia um caso didático e expõe o contraexemplo', () => {
@@ -164,6 +165,29 @@ describe.skipIf(!hasCatalog)('biblioteca de chips', () => {
   })
 })
 
+function customChipDefinition(): CircuitDocument {
+  return {
+    ...createCircuitDocument('NOT MCP'),
+    nodes: [
+      { id: 'input', type: 'input', position: { x: 0, y: 0 }, label: 'Entrada' },
+      { id: 'not', type: 'not', position: { x: 120, y: 0 }, label: 'NOT' },
+      { id: 'output', type: 'output', position: { x: 240, y: 0 }, label: 'Saída' },
+    ],
+    connections: [
+      { source: { node: 'input' }, target: { node: 'not', port: 0 } },
+      { source: { node: 'not' }, target: { node: 'output', port: 0 } },
+    ],
+  }
+}
+
+const customChipComponents = [
+  { id: 'input', type: 'input' as const },
+  { id: 'chip', type: 'custom-chip' as const, inputs: [{ node: 'input' }], options: { customChipId: 7 } },
+  { id: 'out', type: 'output' as const, inputs: [{ node: 'chip' }] },
+]
+
+const customChips = [{ id: 7, definition: buildCustomChipDefinition(customChipDefinition(), 'NOT MCP') }]
+
 describe('simulate_circuit', () => {
   it('devolve o diagrama de tempo de um contador', () => {
     const { text } = simulateCircuit(
@@ -231,6 +255,21 @@ describe('simulate_circuit', () => {
     const result = simulateCircuit([{ id: 'a', type: 'input' }], [{ ticks: 1 }], ['b'])
     expect(result.isError).toBe(true)
     expect(result.text).toContain('Não existem no circuito: b')
+  })
+
+  it('simula custom-chip com definição portátil e permite acompanhar a instância', () => {
+    const result = simulateCircuit(customChipComponents, [{ set: { input: true }, ticks: 3 }], ['input', 'chip', 'out'], { customChips })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('| tique | input | chip | out | evento |')
+    expect(result.text).toContain('| 3 | 1 | 1 | 1 |')
+  })
+
+  it('recusa custom-chip sem definição correspondente', () => {
+    const result = simulateCircuit(customChipComponents, [{ ticks: 1 }], [], { customChips: [] })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('definição local')
   })
 
   it('recusa simulação longa demais', () => {

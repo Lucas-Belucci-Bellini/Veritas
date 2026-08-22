@@ -17,6 +17,7 @@ O comando `npm run beta:mcp` inicia `mcp/dist/server.js` como subprocesso Node e
 | MCP-004 | `logic_case` e `propositional_truth_table` | Caso didático e tabela proposicional devolvem o formato textual esperado. |
 | MCP-005 | Erro de ferramenta | Expressão inválida retorna `isError=true` e mensagem em português; o processo continua protocolar. |
 | MCP-006 | Transporte | Todas as respostas observadas são JSON-RPC `2.0`, sem saída não protocolar em stdout. |
+| MCP-007 | `simulate_circuit` com `custom-chip` | Instância com `options.customChipId` e definição correspondente em `custom_chips` propaga a saída no vetor golden; definição ausente retorna erro controlado. |
 
 ## 2. Execução
 
@@ -36,11 +37,11 @@ BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
 npm run beta:evidence
 ```
 
-O gate `mcp` só fica `PASS` quando MCP-001 a MCP-006 possuem `PASS` explícito e o relatório está anexado. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
+O gate `mcp` só fica `PASS` quando MCP-001 a MCP-007 possuem `PASS` explícito e o relatório está anexado. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
 
 ## 3. Compatibilidade com clientes
 
-Como o transporte é stdio e o servidor não depende de uma sessão de IA, a mesma matriz pode ser usada por Claude Code, Codex, Hermes, OpenClaw, Manus e outros clientes que suportem MCP local. O cliente deve iniciar o comando configurado, enviar o handshake padrão, respeitar o stdout exclusivamente protocolar e mostrar `content[].text` e `isError` sem reinterpretar o domínio.
+Como o transporte é stdio e o servidor não depende de uma sessão de IA, a mesma matriz pode ser usada por Claude Code, Codex, Hermes, OpenClaw, Manus e outros clientes que suportem MCP local. O cliente deve iniciar o comando configurado, enviar o handshake padrão, respeitar o stdout exclusivamente protocolar e mostrar `content[].text` e `isError` sem reinterpretar o domínio. Para `custom-chip`, o cliente precisa incluir explicitamente a definição serializável no argumento `custom_chips`; o servidor não acessa o IndexedDB do navegador.
 
 Exemplo de configuração local genérica:
 
@@ -59,7 +60,7 @@ O caminho real deve ser absoluto no ambiente do cliente. Nenhuma API key é nece
 
 ## 4. Limites
 
-Esta aceitação cobre interoperabilidade local de protocolo e conteúdo, não prova integração visual de cada host, suporte a configuração específica de cada produto, transporte remoto Streamable HTTP, autenticação remota ou performance sob carga. Cada cliente deve repetir MCP-001 a MCP-006 no seu próprio ambiente antes de publicar uma integração.
+Esta aceitação cobre interoperabilidade local de protocolo e conteúdo, não prova integração visual de cada host, suporte a configuração específica de cada produto, transporte remoto Streamable HTTP, autenticação remota ou performance sob carga. Cada cliente deve repetir MCP-001 a MCP-007 no seu próprio ambiente antes de publicar uma integração.
 
 Uma falha deve ser classificada por camada: domínio se o resultado lógico estiver errado; schema se `tools/list` mudar sem contrato; protocolo se JSON-RPC ou stdout falhar; transporte se o processo não iniciar; ou cliente se a configuração do host estiver incorreta. Não corrija uma falha de cliente alterando o domínio sem evidência.
 

@@ -20,7 +20,7 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `simplify_expression` | Forma mínima em soma de produtos (Quine-McCluskey) e a economia de portas |
 | `karnaugh_map` | Mapa de Karnaugh de 1 a 4 variáveis com os agrupamentos |
 | `normal_forms` | SOP e POS, canônicas e mínimas, e a classificação da expressão dada |
-| `simulate_circuit` | Roda um circuito com clock, flip-flops, atrasos e canais wireless e devolve o diagrama de tempo |
+| `simulate_circuit` | Roda um circuito com clock, flip-flops, atrasos, canais wireless e instâncias `custom-chip`; devolve o diagrama de tempo |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
 
@@ -108,6 +108,8 @@ A instalação stdio atende clientes que iniciam processos locais. Para Claude A
 
 A simulação wireless usa `transmitter` com `options.channel` como origem e `receiver` com o mesmo canal como destino virtual. Cada canal aceita um transmissor e vários receptores; canal ausente, transmissor duplicado ou receptor órfão devem ser corrigidos antes da simulação.
 
+As definições de `custom_chips` são validadas e reconstruídas pelo contrato CHIP-001 antes da expansão. O MCP rejeita IDs duplicados, documentos inválidos, chips aninhados e referências sem definição correspondente. A expansão é combinacional e respeita o limite seguro de oito níveis; componentes que não pertencem ao documento canônico são rejeitados com erro controlado quando aparecem junto de um `custom-chip`.
+
 Erro de sintaxe não derruba o servidor: volta como resposta de erro da
 ferramenta, com o dedo no lugar exato do problema.
 
@@ -124,3 +126,43 @@ Falta fechar 1 parêntese.
 testes exercitam direto. `mcp/src/server.ts` só cuida do transporte e dos
 esquemas. O build empacota o motor do Veritas junto e deixa o SDK do MCP de
 fora, como dependência declarada.
+
+## Exemplo de custom-chip portátil
+
+A instância referencia o ID da definição e recebe suas entradas no campo `inputs`. A definição inteira viaja no mesmo pedido, o que torna o comportamento independente da biblioteca local do navegador:
+
+```json
+{
+  "components": [
+    { "id": "input", "type": "input" },
+    { "id": "chip", "type": "custom-chip", "inputs": [{ "node": "input" }], "options": { "customChipId": 7 } },
+    { "id": "out", "type": "output", "inputs": [{ "node": "chip" }] }
+  ],
+  "steps": [{ "set": { "input": true }, "ticks": 3 }],
+  "watch": ["input", "chip", "out"],
+  "custom_chips": [{
+    "id": 7,
+    "definition": {
+      "format": "veritas-custom-chip",
+      "version": 1,
+      "name": "NOT MCP",
+      "document": {
+        "format": "veritas-circuit",
+        "version": 1,
+        "name": "NOT MCP",
+        "nodes": [
+          { "id": "input", "type": "input", "position": { "x": 0, "y": 0 }, "label": "Entrada" },
+          { "id": "not", "type": "not", "position": { "x": 120, "y": 0 }, "label": "NOT" },
+          { "id": "output", "type": "output", "position": { "x": 240, "y": 0 }, "label": "Saída" }
+        ],
+        "connections": [
+          { "source": { "node": "input" }, "target": { "node": "not", "port": 0 } },
+          { "source": { "node": "not" }, "target": { "node": "output", "port": 0 } }
+        ]
+      },
+      "inputs": [{ "id": "input", "name": "Entrada", "width": 1 }],
+      "outputs": [{ "id": "output", "name": "Saída", "width": 1 }]
+    }
+  }]
+}
+```

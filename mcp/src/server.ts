@@ -237,6 +237,7 @@ const COMPONENT = z.object({
     'delay',
     'transmitter',
     'receiver',
+    'custom-chip',
   ]),
   inputs: z
     .array(z.object({ node: z.string(), port: z.number().int().min(0).optional() }))
@@ -249,6 +250,7 @@ const COMPONENT = z.object({
       value: z.boolean().optional().describe('constant: o valor fixo'),
       initial: z.boolean().optional().describe('valor no instante zero'),
       channel: z.string().max(64).optional().describe('transmitter/receiver: nome do canal wireless'),
+      customChipId: z.number().int().min(1).optional().describe('custom-chip: ID da definição fornecida em custom_chips'),
     })
     .optional(),
   label: z.string().optional(),
@@ -262,7 +264,8 @@ server.registerTool(
       'Roda um circuito por alguns tiques e devolve o diagrama de tempo. Diferente da ' +
       'tabela verdade, aceita clock, flip-flops (dff/tff), atrasos e canais wireless, cujo resultado ' +
       'depende do que aconteceu antes. Cada componente leva um tique para propagar. ' +
-      'As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1).',
+      'As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1). Instâncias custom-chip ' +
+      'devem referenciar uma definição correspondente em custom_chips.',
     inputSchema: {
       components: z.array(COMPONENT).min(1).describe('Os componentes do circuito'),
       steps: z
@@ -281,10 +284,15 @@ server.registerTool(
         .array(z.string())
         .default([])
         .describe('Quais componentes acompanhar. Vazio acompanha todos'),
+      custom_chips: z
+        .array(z.object({ id: z.number().int().min(1), definition: z.unknown() }))
+        .max(128)
+        .default([])
+        .describe('Definições veritas-custom-chip portáteis usadas pelas instâncias custom-chip'),
     },
   },
-  async ({ components, steps, watch }) =>
-    guard(() => simulateCircuit(components, steps, watch)),
+  async ({ components, steps, watch, custom_chips }) =>
+    guard(() => simulateCircuit(components, steps, watch, { customChips: custom_chips })),
 )
 
 server.registerTool(

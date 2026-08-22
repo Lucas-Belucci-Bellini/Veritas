@@ -7,7 +7,7 @@ import {
 
 describe('contrato de aceitação MCP', () => {
   it('mantém os seis cenários MCP em ordem estável', () => {
-    expect(MCP_ACCEPTANCE_IDS).toEqual(['MCP-001', 'MCP-002', 'MCP-003', 'MCP-004', 'MCP-005', 'MCP-006'])
+    expect(MCP_ACCEPTANCE_IDS).toEqual(['MCP-001', 'MCP-002', 'MCP-003', 'MCP-004', 'MCP-005', 'MCP-006', 'MCP-007'])
   })
 
   it('sanitiza credenciais sem alterar o protocolo do resultado', () => {
@@ -25,9 +25,10 @@ describe('contrato de aceitação MCP', () => {
       { id: 'MCP-004', status: 'PASS', operation: 'golden', message: 'ok' },
       { id: 'MCP-005', status: 'PASS', operation: 'error', message: 'ok' },
       { id: 'MCP-006', status: 'SKIP', operation: 'transport', message: 'ensaio remoto' },
+      { id: 'MCP-007', status: 'PASS', operation: 'custom-chip', message: 'ok' },
     ], '2026-08-21T00:00:00.000Z')
     expect(report).toContain('# MCP acceptance 2026-08-21T00:00:00.000Z')
-    expect(report).toContain('Resumo: 5 PASS, 0 FAIL, 1 SKIP.')
+    expect(report).toContain('Resumo: 6 PASS, 0 FAIL, 1 SKIP.')
     expect(report).toContain('sem sessão de IA')
   })
 })
