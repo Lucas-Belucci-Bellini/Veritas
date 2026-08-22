@@ -8,10 +8,12 @@ import { bitVector, toBinary, type BitVector } from '../bus'
 import { evaluateCircuit, evaluateCircuitVectors } from './evaluate'
 import { validateCircuit, type CircuitDocument } from './editorModel'
 import { normalizeCircuitDocument } from './documentContract'
+import type { CustomChipLibraryEntry } from './customChip'
 
 export interface CircuitTruthTableOptions {
   maxRows?: number
   outputId?: string
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 export const MAX_CIRCUIT_VARIABLES = 16
@@ -21,6 +23,7 @@ export interface CircuitVectorTruthTableOptions {
   maxBits?: number
   maxRows?: number
   outputId?: string
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 export interface CircuitVectorTruthTableColumn {
@@ -55,7 +58,7 @@ export function buildCircuitTruthTable(
   options: CircuitTruthTableOptions = {},
 ): TruthTable {
   const normalized = normalizeCircuitDocument(document)
-  const issues = validateCircuit(normalized)
+  const issues = validateCircuit(normalized, { customChips: options.customChips })
   if (issues.length > 0) throw new Error(issues[0].message)
 
   const inputs = normalized.nodes.filter((node) => node.type === 'input')
@@ -96,7 +99,7 @@ export function buildCircuitTruthTable(
   let trueCount = 0
   for (let index = 0; index < generatedRows; index += 1) {
     const assignment = assignmentForRow(variables, index)
-    const evaluation = evaluateCircuit(normalized, assignment)
+    const evaluation = evaluateCircuit(normalized, assignment, { customChips: options.customChips })
     const row = [
       ...variables.map((id) => assignment[id]),
       ...outputs
@@ -128,7 +131,7 @@ export function buildCircuitVectorTruthTable(
   options: CircuitVectorTruthTableOptions = {},
 ): CircuitVectorTruthTable {
   const normalized = normalizeCircuitDocument(document)
-  const issues = validateCircuit(normalized, { allowBuses: true })
+  const issues = validateCircuit(normalized, { allowBuses: true, customChips: options.customChips })
   if (issues.length > 0) throw new Error(issues[0].message)
 
   const inputs = normalized.nodes.filter((node) => node.type === 'input')
@@ -174,7 +177,7 @@ export function buildCircuitVectorTruthTable(
   let allOnes = true
   for (let index = 0; index < generatedRows; index += 1) {
     const assignment = vectorAssignment(inputs, index, totalInputBits)
-    const evaluation = evaluateCircuitVectors(normalized, assignment)
+    const evaluation = evaluateCircuitVectors(normalized, assignment, { customChips: options.customChips })
     const selectedValue = evaluation.outputs[selectedOutput.id] ?? bitVector(selectedOutput.options?.width ?? 1, 0)
     const active = selectedValue.bits.some(Boolean)
     const maximum = selectedValue.bits.every(Boolean)

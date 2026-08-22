@@ -20,6 +20,7 @@ import { assignmentAt } from '../engine'
 import {
   buildCircuitTruthTable,
   buildCircuitVectorTruthTable,
+  createCircuitDocument,
   editorInputCount,
   evaluateCircuit,
   evaluateCircuitVectors,
@@ -34,6 +35,7 @@ import {
   type CircuitNode,
   type CircuitVectorEvaluation,
   type CircuitVectorTruthTable,
+  type CustomChipLibraryEntry,
   type EditorComponentType,
 } from '../circuit'
 import { GateSymbol } from '../circuit/GateSymbol'
@@ -63,10 +65,13 @@ import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realti
 import { buildCircuitIssueGuidance, summarizeCircuitIssues } from '../circuit/validationFeedback'
 
 interface EditorNodeData extends Record<string, unknown> {
-  kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential' | 'wireless'
+  kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential' | 'wireless' | 'custom-chip'
   componentType: EditorComponentType
   label: string
   inputs: number
+  outputs: number
+  inputLabels?: string[]
+  outputLabels?: string[]
   width: number
   op?: GateOp
   value?: boolean
@@ -75,6 +80,7 @@ interface EditorNodeData extends Record<string, unknown> {
   ticks?: number
   initial?: boolean
   channel?: string
+  customChipId?: number
 }
 
 type EditorFlowNode = Node<EditorNodeData>
@@ -111,6 +117,7 @@ const NODE_LABELS: Record<EditorComponentType, string> = {
   delay: 'Delay',
   transmitter: 'Transmissor',
   receiver: 'Receptor',
+  'custom-chip': 'Chip customizado',
 }
 
 export function CircuitEditor() {
@@ -131,6 +138,10 @@ export function CircuitEditor() {
   const [historyRevision, setHistoryRevision] = useState(0)
   const storage = useCircuitProjects()
   const customChips = useCustomChips()
+  const customChipEntries = useMemo<CustomChipLibraryEntry[]>(
+    () => customChips.chips.map((chip) => ({ id: chip.id, definition: chip.definition })),
+    [customChips.chips],
+  )
   const { user } = useAuth()
   const cloud = useCloudCircuitProjects()
   const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
@@ -189,13 +200,13 @@ export function CircuitEditor() {
   }, [cloud.versions, recordRuntimeEvent])
 
   const applyRemoteSnapshot = useCallback((message: CircuitBroadcast): boolean => {
-    if (validateCircuit(message.document).length > 0) return false
+    if (validateCircuit(message.document, { customChips: customChipEntries }).length > 0) return false
     lastSyncedDocumentRef.current = message.document
     setLastAppliedRemoteVersion(message.baseVersion)
     setPendingRemoteSnapshot(null)
     historyRef.current?.replace(message.document)
     setHistoryRevision((current) => current + 1)
-    const flow = fromDocument(message.document)
+    const flow = fromDocument(message.document, customChipEntries)
     setNodes(flow.nodes)
     setEdges(flow.edges)
     setProjectName(message.document.name)
@@ -203,7 +214,7 @@ export function CircuitEditor() {
     setSelectedNodeId(null)
     setNotice(`Alteração remota v${message.baseVersion} aplicada de outro colaborador.`)
     return true
-  }, [setEdges, setNodes])
+  }, [customChipEntries, setEdges, setNodes])
   const applyRemoteDocument = useCallback((message: CircuitBroadcast): boolean => {
     const decision = decideRemoteCircuitUpdate(document, lastSyncedDocumentRef.current, message.document)
     if (decision.action === 'ignore') return false
@@ -237,8 +248,9 @@ export function CircuitEditor() {
     () => document.nodes.some((node) => node.type === 'clock' || node.type === 'dff' || node.type === 'tff' || node.type === 'delay'),
     [document],
   )
-  const issues = useMemo(() => validateCircuit(document, { allowBuses: true }), [document])
-  const scalarIssues = useMemo(() => validateCircuit(document), [document])
+  const hasCustomChipInstances = useMemo(() => document.nodes.some((node) => node.type === 'custom-chip'), [document])
+  const issues = useMemo(() => validateCircuit(document, { allowBuses: true, customChips: customChipEntries }), [customChipEntries, document])
+  const scalarIssues = useMemo(() => validateCircuit(document, { customChips: customChipEntries }), [customChipEntries, document])
   const wirelessResolution = useMemo(
     () => resolveWirelessChannels(
       document.nodes
@@ -306,46 +318,46 @@ export function CircuitEditor() {
     if (latest) {
       historyRef.current?.replace(latest.document)
       setHistoryRevision((current) => current + 1)
-      loadProject(latest, setNodes, setEdges, setProjectName, setActiveProjectId)
+      loadProject(latest, setNodes, setEdges, setProjectName, setActiveProjectId, customChipEntries)
       setNotice(`Circuito local "${latest.name}" restaurado.`)
     }
     setHydrated(true)
-  }, [hydrated, setEdges, setNodes, storage.projects, storage.ready])
+  }, [customChipEntries, hydrated, setEdges, setNodes, storage.projects, storage.ready])
 
   const truthTable = useMemo(() => {
     if (hasSequential || scalarIssues.length > 0) return null
     try {
-      return buildCircuitTruthTable(document, { outputId: selectedOutputId })
+      return buildCircuitTruthTable(document, { outputId: selectedOutputId, customChips: customChipEntries })
     } catch {
       return null
     }
-  }, [document, hasSequential, scalarIssues, selectedOutputId])
+  }, [customChipEntries, document, hasSequential, scalarIssues, selectedOutputId])
 
   const vectorTruthTable = useMemo(() => {
     if (hasSequential || !hasBuses || issues.length > 0) return null
     try {
-      return buildCircuitVectorTruthTable(document)
+      return buildCircuitVectorTruthTable(document, { customChips: customChipEntries })
     } catch {
       return null
     }
-  }, [document, hasBuses, hasSequential, issues])
+  }, [customChipEntries, document, hasBuses, hasSequential, issues])
 
   const selectedEvaluation = useMemo<CircuitEvaluation | CircuitVectorEvaluation | null>(() => {
     if (hasSequential) return null
     if (hasBuses) {
       try {
-        return evaluateCircuitVectors(document, vectorAssignmentFromRow(document, vectorTruthTable, selectedVectorRow))
+        return evaluateCircuitVectors(document, vectorAssignmentFromRow(document, vectorTruthTable, selectedVectorRow), { customChips: customChipEntries })
       } catch {
         return null
       }
     }
     if (!truthTable || selectedRow === null) return null
     try {
-      return evaluateCircuit(document, assignmentAt(truthTable, selectedRow))
+      return evaluateCircuit(document, assignmentAt(truthTable, selectedRow), { customChips: customChipEntries })
     } catch {
       return null
     }
-  }, [document, hasBuses, hasSequential, selectedRow, selectedVectorRow, truthTable, vectorTruthTable])
+  }, [customChipEntries, document, hasBuses, hasSequential, selectedRow, selectedVectorRow, truthTable, vectorTruthTable])
 
   const renderedNodes = useMemo(
     () =>
@@ -389,12 +401,12 @@ export function CircuitEditor() {
   }, [broadcastRuntimeConfig, collaborationBaseVersion, collaborationStatus, cloudProjectId, readOnlyCollaboration, recordRuntimeEvent, user])
 
   const restoreHistoryDocument = useCallback((nextDocument: CircuitDocument) => {
-    const flow = fromDocument(nextDocument)
+    const flow = fromDocument(nextDocument, customChipEntries)
     setNodes(flow.nodes)
     setEdges(flow.edges)
     setProjectName(nextDocument.name)
     setSelectedRow(null)
-  }, [setEdges, setNodes])
+  }, [customChipEntries, setEdges, setNodes])
 
   const undo = useCallback(() => {
     if (readOnlyCollaboration) {
@@ -525,6 +537,16 @@ export function CircuitEditor() {
     [edges, setEdges],
   )
 
+  const addCustomChip = (entry: CustomChipLibraryEntry) => {
+    if (readOnlyCollaboration) {
+      setNotice('Você está conectado como visualizador e não pode editar este circuito.')
+      return
+    }
+    setNotice('')
+    setSelectedRow(null)
+    setNodes((current) => [...current, createCustomChipNode(entry, current.length, nextCustomChipId(entry, current))])
+  }
+
   const addComponent = (type: EditorComponentType) => {
     if (readOnlyCollaboration) {
       setNotice('Você está conectado como visualizador e não pode editar este circuito.')
@@ -548,6 +570,10 @@ export function CircuitEditor() {
     }
     if (hasSequential) {
       setNotice('Chips customizados desta versão precisam ser combinacionais; remova os componentes sequenciais.')
+      return
+    }
+    if (hasCustomChipInstances) {
+      setNotice('Chips customizados desta versão não podem conter outras instâncias de chip.')
       return
     }
     if (issues.length > 0) {
@@ -635,7 +661,7 @@ export function CircuitEditor() {
   const openLocal = (project: CircuitProject) => {
     historyRef.current?.replace(project.document)
     setHistoryRevision((current) => current + 1)
-    loadProject(project, setNodes, setEdges, setProjectName, setActiveProjectId)
+    loadProject(project, setNodes, setEdges, setProjectName, setActiveProjectId, customChipEntries)
     setCloudProjectId(null)
     lastSyncedDocumentRef.current = null
     setLastAppliedRemoteVersion(null)
@@ -686,6 +712,10 @@ export function CircuitEditor() {
   }
 
   const runAi = async (action: 'analyze' | 'optimize') => {
+    if (hasCustomChipInstances) {
+      setNotice('A análise de IA de instâncias customizadas será habilitada em uma próxima fatia.')
+      return
+    }
     if (hasSequential) {
       setNotice('A análise de IA do editor ainda está disponível somente para circuitos combinacionais.')
       return
@@ -713,7 +743,7 @@ export function CircuitEditor() {
   const applyAiOptimization = () => {
     const optimized = aiResult?.optimizedDocument
     if (!optimized) return
-    const flow = fromDocument(optimized)
+    const flow = fromDocument(optimized, customChipEntries)
     setNodes(flow.nodes)
     setEdges(flow.edges)
     setProjectName(optimized.name)
@@ -751,7 +781,7 @@ export function CircuitEditor() {
   const openCloud = (project: (typeof cloud.projects)[number]) => {
     historyRef.current?.replace(project.document)
     setHistoryRevision((current) => current + 1)
-    const flow = fromDocument(project.document)
+    const flow = fromDocument(project.document, customChipEntries)
     setNodes(flow.nodes)
     setEdges(flow.edges)
     setProjectName(project.name)
@@ -769,7 +799,7 @@ export function CircuitEditor() {
   const openCloudVersion = (version: (typeof cloud.versions)[number]) => {
     historyRef.current?.replace(version.document)
     setHistoryRevision((current) => current + 1)
-    const flow = fromDocument(version.document)
+    const flow = fromDocument(version.document, customChipEntries)
     setNodes(flow.nodes)
     setEdges(flow.edges)
     setProjectName(version.name)
@@ -911,16 +941,16 @@ export function CircuitEditor() {
             Nome do chip
             <input id="custom-chip-name" value={customChipName} onChange={(event) => setCustomChipName(event.target.value)} placeholder={projectName || 'Meu chip'} maxLength={200} className="w-28 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700" />
           </label>
-          <button type="button" className="key text-xs" onClick={() => void saveAsCustomChip()} disabled={readOnlyCollaboration || hasSequential || issues.length > 0 || !customChips.ready || Boolean(customChips.unavailable)} title="Salvar este circuito combinacional na biblioteca local de chips">
+          <button type="button" className="key text-xs" onClick={() => void saveAsCustomChip()} disabled={readOnlyCollaboration || hasSequential || hasCustomChipInstances || issues.length > 0 || !customChips.ready || Boolean(customChips.unavailable)} title="Salvar este circuito combinacional na biblioteca local de chips">
             Salvar como chip
           </button>
           <button type="button" className="key text-xs" onClick={exportLocal}>
             Exportar
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={hasSequential || scalarIssues.length > 0} title={hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={hasSequential || hasCustomChipInstances || scalarIssues.length > 0} title={hasCustomChipInstances ? 'A exportação HDL de instâncias customizadas será habilitada em uma próxima fatia.' : hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
             Verilog
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={hasSequential || scalarIssues.length > 0} title={hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={hasSequential || hasCustomChipInstances || scalarIssues.length > 0} title={hasCustomChipInstances ? 'A exportação HDL de instâncias customizadas será habilitada em uma próxima fatia.' : hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
             VHDL
           </button>
           <button type="button" className="key text-xs" onClick={() => fileInputRef.current?.click()}>
@@ -973,6 +1003,28 @@ export function CircuitEditor() {
               </button>
             ))}
           </div>
+          {customChips.ready && !customChips.unavailable && customChips.chips.length > 0 && (
+            <section className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-800" aria-labelledby="custom-chip-palette-title">
+              <h3 id="custom-chip-palette-title" className="mb-2 text-xs font-semibold tracking-wide text-violet-600 uppercase dark:text-violet-300">
+                Chips customizados
+              </h3>
+              <div className="grid gap-2">
+                {customChipEntries.map((entry) => (
+                  <button
+                    key={`palette-chip-${entry.id}`}
+                    type="button"
+                    className="rounded-lg border border-violet-200 px-3 py-2 text-left transition hover:border-violet-400 hover:bg-violet-50 dark:border-violet-900/70 dark:hover:border-violet-500 dark:hover:bg-violet-950/40"
+                    onClick={() => addCustomChip(entry)}
+                    disabled={readOnlyCollaboration}
+                    title={`Adicionar ${entry.definition.name} ao canvas`}
+                  >
+                    <span className="block truncate text-sm font-semibold text-violet-800 dark:text-violet-200">{entry.definition.name}</span>
+                    <span className="block text-[11px] text-violet-600 dark:text-violet-300">{entry.definition.inputs.length} entrada{entry.definition.inputs.length === 1 ? '' : 's'} · {entry.definition.outputs.length} saída{entry.definition.outputs.length === 1 ? '' : 's'}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           {selectedWirelessNode && (
             <section className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-3 dark:border-cyan-900/70 dark:bg-cyan-950/30" aria-labelledby="wireless-channel-editor-title">
               <h3 id="wireless-channel-editor-title" className="text-xs font-semibold tracking-wide text-cyan-800 uppercase dark:text-cyan-200">
@@ -1213,8 +1265,8 @@ export function CircuitEditor() {
               <p className="mt-1 text-xs text-violet-800/80 dark:text-violet-200/80">Analisa o contexto do circuito e propõe uma limpeza conservadora das portas.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses} onClick={() => void runAi('analyze')} title={hasBuses ? 'A análise vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Analisando…' : 'Analisar com IA'}</button>
-              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses} onClick={() => void runAi('optimize')} title={hasBuses ? 'A otimização vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Otimizando…' : 'Otimizar portas'}</button>
+              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses || hasCustomChipInstances} onClick={() => void runAi('analyze')} title={hasCustomChipInstances ? 'A análise de IA de chips instanciados será habilitada em uma próxima fatia.' : hasBuses ? 'A análise vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Analisando…' : 'Analisar com IA'}</button>
+              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses || hasCustomChipInstances} onClick={() => void runAi('optimize')} title={hasCustomChipInstances ? 'A otimização de IA de chips instanciados será habilitada em uma próxima fatia.' : hasBuses ? 'A otimização vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Otimizando…' : 'Otimizar portas'}</button>
             </div>
           </div>
           {aiResult && (
@@ -1305,6 +1357,23 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
   const lit = data.value === true
   const dot = `!h-1.5 !w-1.5 !border-0 ${lit ? '!bg-amber-500' : '!bg-slate-400 dark:!bg-slate-500'}`
 
+  if (data.kind === 'custom-chip') {
+    const inputCount = data.inputs
+    const outputCount = data.outputs
+    return (
+      <div className="relative flex min-h-16 w-36 flex-col items-center justify-center rounded-lg border-2 border-violet-300 bg-violet-50 px-3 py-2 text-center shadow-sm dark:border-violet-700 dark:bg-violet-950/30" title={data.label}>
+        {Array.from({ length: inputCount }, (_, index) => (
+          <Handle key={`input-${index}`} type="target" position={Position.Left} id={`in-${index}`} style={{ top: `${((index + 1) / (inputCount + 1)) * 100}%` }} className={dot} />
+        ))}
+        <span className="max-w-full truncate font-mono text-xs font-black text-violet-800 dark:text-violet-200">{data.label}</span>
+        <span className="text-[10px] text-violet-700 dark:text-violet-300">{inputCount} entrada{inputCount === 1 ? '' : 's'} · {outputCount} saída{outputCount === 1 ? '' : 's'}</span>
+        {Array.from({ length: outputCount }, (_, index) => (
+          <Handle key={`output-${index}`} type="source" position={Position.Right} id={`out-${index}`} style={{ top: `${((index + 1) / (outputCount + 1)) * 100}%` }} className={dot} />
+        ))}
+      </div>
+    )
+  }
+
   if (data.kind === 'wireless') {
     const isTransmitter = data.componentType === 'transmitter'
     return (
@@ -1388,6 +1457,7 @@ function buildNodeOptions(data: EditorNodeData): CircuitNode['options'] {
     options.initial = data.initial ?? false
   }
   if (data.componentType === 'transmitter' || data.componentType === 'receiver') options.channel = normalizeWirelessChannel(data.channel ?? '')
+  if (data.componentType === 'custom-chip' && data.customChipId !== undefined) options.customChipId = data.customChipId
   if (data.width !== 1) options.width = data.width
   return Object.keys(options).length > 0 ? options : undefined
 }
@@ -1410,8 +1480,8 @@ function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
       if (!edge.source || !edge.target) return []
       return [
         {
-          source: { node: edge.source, ...(edge.sourceHandle === 'qbar' ? { port: 1 } : {}) },
-          target: { node: edge.target, port: edge.targetHandle === 'b' ? 1 : 0 },
+          source: { node: edge.source, ...portFromHandle(edge.sourceHandle, 'qbar') },
+          target: { node: edge.target, port: portFromHandle(edge.targetHandle, 'b').port ?? 0 },
         },
       ]
     }),
@@ -1440,6 +1510,7 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       componentType: type,
       label,
       inputs: editorInputCount(type),
+      outputs: type === 'dff' || type === 'tff' ? 2 : 1,
       width,
       op: type === 'not' ? 'not' : type === 'and' || type === 'or' || type === 'xor' ? type : undefined,
       value: defaultValue,
@@ -1447,6 +1518,27 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       period: type === 'clock' ? 1 : undefined,
       ticks: type === 'delay' ? 1 : undefined,
       channel: type === 'transmitter' || type === 'receiver' ? 'bus-a' : undefined,
+    },
+  }
+}
+
+function createCustomChipNode(entry: CustomChipLibraryEntry, index: number, id: string): EditorFlowNode {
+  return {
+    id,
+    type: 'editorLogic',
+    position: { x: 40 + (index % 3) * 150, y: 40 + Math.floor(index / 3) * 100 },
+    data: {
+      kind: 'custom-chip',
+      componentType: 'custom-chip',
+      label: entry.definition.name,
+      inputs: entry.definition.inputs.length,
+      outputs: entry.definition.outputs.length,
+      inputLabels: entry.definition.inputs.map((port) => port.name),
+      outputLabels: entry.definition.outputs.map((port) => port.name),
+      width: 1,
+      customChipId: entry.id,
+      value: false,
+      initial: false,
     },
   }
 }
@@ -1468,6 +1560,16 @@ function createDemoEdges(): Edge[] {
   ]
 }
 
+function nextCustomChipId(entry: CustomChipLibraryEntry, nodes: EditorFlowNode[]): string {
+  let index = nodes.length + 1
+  let id = `custom-chip-${entry.id}-${index}`
+  while (nodes.some((node) => node.id === id)) {
+    index += 1
+    id = `custom-chip-${entry.id}-${index}`
+  }
+  return id
+}
+
 function nextNodeId(type: EditorComponentType, nodes: EditorFlowNode[]): string {
   let index = nodes.length + 1
   let id = `${type}-${index}`
@@ -1478,11 +1580,17 @@ function nextNodeId(type: EditorComponentType, nodes: EditorFlowNode[]): string 
   return id
 }
 
-function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edges: Edge[] } {
+function fromDocument(document: CircuitDocument, customChips: readonly CustomChipLibraryEntry[] = []): { nodes: EditorFlowNode[]; edges: Edge[] } {
   const normalized = normalizeCircuitDocument(document)
+  const entries = new Map(customChips.map((entry) => [entry.id, entry] as const))
   return {
     nodes: normalized.nodes.map((node, index) =>
-      createNode(node.type, index, node.id),
+      node.type === 'custom-chip'
+        ? createCustomChipNode(entries.get(node.options?.customChipId ?? NaN) ?? {
+            id: node.options?.customChipId ?? -1,
+            definition: { format: 'veritas-custom-chip', version: 1, name: node.label ?? 'Chip indisponível', document: createCircuitDocument(node.label ?? 'Chip indisponível'), inputs: [], outputs: [] },
+          }, index, node.id)
+        : createNode(node.type, index, node.id),
     ).map((node, index) => {
       const source = normalized.nodes[index]
       return {
@@ -1497,18 +1605,31 @@ function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edg
           initial: source.options?.initial ?? false,
           period: source.options?.period ?? 1,
           ticks: source.options?.ticks ?? 1,
+          customChipId: source.options?.customChipId,
+          inputs: source.type === 'custom-chip' ? (entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0) : node.data.inputs,
+          outputs: source.type === 'custom-chip' ? (entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0) : node.data.outputs,
+          inputLabels: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.map((port) => port.name) : node.data.inputLabels,
+          outputLabels: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.map((port) => port.name) : node.data.outputLabels,
         },
       }
     }),
     edges: normalized.connections.map((connection) => {
       const sourceNode = normalized.nodes.find((node) => node.id === connection.source.node)
-      const hasNamedOutputs = sourceNode?.type === 'dff' || sourceNode?.type === 'tff'
+      const targetNode = normalized.nodes.find((node) => node.id === connection.target.node)
+      const sourcePort = connection.source.port ?? 0
+      const targetPort = connection.target.port
+      const sourceHandle = sourceNode?.type === 'custom-chip'
+        ? `out-${sourcePort}`
+        : sourceNode?.type === 'dff' || sourceNode?.type === 'tff'
+          ? sourcePort === 1 ? 'qbar' : 'q'
+          : undefined
+      const targetHandle = targetNode?.type === 'custom-chip' ? `in-${targetPort}` : targetPort === 1 ? 'b' : 'a'
       return {
-        id: `${connection.source.node}->${connection.target.node}:${connection.source.port === 1 ? 'qbar' : 'q'}:${connection.target.port === 1 ? 'b' : 'a'}`,
+        id: `${connection.source.node}->${connection.target.node}:${sourcePort}:${targetPort}`,
         source: connection.source.node,
-        ...(hasNamedOutputs ? { sourceHandle: connection.source.port === 1 ? 'qbar' : 'q' } : {}),
+        ...(sourceHandle ? { sourceHandle } : {}),
         target: connection.target.node,
-        targetHandle: connection.target.port === 1 ? 'b' : 'a',
+        targetHandle,
         type: 'smoothstep',
       }
     }),
@@ -1521,12 +1642,20 @@ function loadProject(
   setEdges: (edges: Edge[]) => void,
   setProjectName: (name: string) => void,
   setActiveProjectId: (id: number | null) => void,
+  customChips: readonly CustomChipLibraryEntry[] = [],
 ): void {
-  const flow = fromDocument(project.document)
+  const flow = fromDocument(project.document, customChips)
   setNodes(flow.nodes)
   setEdges(flow.edges)
   setProjectName(project.name)
   setActiveProjectId(project.id)
+}
+
+function portFromHandle(handle: string | null | undefined, nativeHandle: string): { port?: number } {
+  if (handle === nativeHandle) return { port: 1 }
+  const match = /^(?:in|out)-(\d+)$/.exec(handle ?? '')
+  if (match) return { port: Number(match[1]) }
+  return {}
 }
 
 function vectorAssignmentFromRow(document: CircuitDocument, table: CircuitVectorTruthTable | null, rowIndex: number | null): Record<string, BitVector> {

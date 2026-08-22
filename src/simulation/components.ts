@@ -22,6 +22,7 @@ export type ComponentType =
   | 'delay'
   | 'transmitter'
   | 'receiver'
+  | 'custom-chip'
 
 /** De onde vem um sinal: um componente e qual das saídas dele. */
 export interface PortRef {
@@ -43,6 +44,8 @@ export interface ComponentOptions {
   width?: number
   /** Nome normalizado do canal wireless para transmitter/receiver. */
   channel?: string
+  /** ID da definição local usada por uma instância `custom-chip`. */
+  customChipId?: number
 }
 
 export interface ComponentSpec {

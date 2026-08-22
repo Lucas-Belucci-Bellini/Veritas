@@ -8,6 +8,7 @@ import {
   type PortRef,
 } from '../simulation/components'
 import { getCircuitDocumentBoundIssues, normalizeCircuitDocument } from './documentContract'
+import type { CustomChipLibraryEntry } from './customChip'
 import { resolveWirelessChannels } from './wirelessChannels'
 
 export const CIRCUIT_DOCUMENT_FORMAT = 'veritas-circuit'
@@ -28,6 +29,7 @@ export type EditorComponentType = Extract<
   | 'delay'
   | 'transmitter'
   | 'receiver'
+  | 'custom-chip'
 >
 
 export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
@@ -44,6 +46,7 @@ export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
   'delay',
   'transmitter',
   'receiver',
+  'custom-chip',
 ]
 
 export interface CircuitPosition {
@@ -78,6 +81,8 @@ export interface CircuitDocument {
 export interface CircuitValidationOptions {
   /** Permite widths 2–64 para o avaliador vetorial; a API escalar mantém false. */
   allowBuses?: boolean
+  /** Definições locais disponíveis para validar instâncias `custom-chip`. */
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 export interface CircuitIssue {
@@ -103,6 +108,7 @@ export interface CircuitIssue {
   | 'wireless-duplicate-transmitter'
   | 'wireless-missing-transmitter'
   | 'wireless-channel-too-long'
+  | 'custom-chip-missing-definition'
   message: string
   nodeId?: string
 }
@@ -130,6 +136,7 @@ export function editorInputCount(type: EditorComponentType): number {
     case 'transmitter':
       return 1
     case 'receiver':
+    case 'custom-chip':
       return 0
     case 'and':
     case 'or':
@@ -156,6 +163,7 @@ export function createCircuitDocument(name = 'Circuito sem título'): CircuitDoc
 
 export function validateCircuit(document: CircuitDocument, options: CircuitValidationOptions = {}): CircuitIssue[] {
   document = normalizeCircuitDocument(document)
+  const customChips = new Map((options.customChips ?? []).map((entry) => [entry.id, entry] as const))
   const issues: CircuitIssue[] = getCircuitDocumentBoundIssues(document).map((issue) => ({
     code: issue.code,
     nodeId: issue.nodeId,
@@ -179,6 +187,13 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
         message: `O componente "${node.id}" usa um tipo que o editor visual não suporta.`,
       })
       continue
+    }
+    if (node.type === 'custom-chip' && !customChips.has(node.options?.customChipId ?? NaN)) {
+      issues.push({
+        code: 'custom-chip-missing-definition',
+        nodeId: node.id,
+        message: `A instância de chip "${node.id}" não encontrou a definição local solicitada.`,
+      })
     }
     const width = circuitNodeWidth(node)
     if (!isValidCircuitWidth(width)) {
@@ -240,7 +255,8 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
     }
 
     const sourcePort = connection.source.port ?? 0
-    if (sourcePort < 0 || sourcePort >= outputCount(source.type)) {
+    const sourceOutputCount = nodeOutputCount(source, customChips)
+    if (sourcePort < 0 || sourcePort >= sourceOutputCount) {
       issues.push({
         code: 'invalid-source-port',
         nodeId: source.id,
@@ -248,7 +264,7 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
       })
     }
 
-    const inputCount = editorInputCount(target.type)
+    const inputCount = nodeInputCount(target, customChips)
     if (connection.target.port < 0 || connection.target.port >= inputCount) {
       issues.push({
         code: 'invalid-target-port',
@@ -258,8 +274,8 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
       continue
     }
 
-    const sourceWidth = circuitNodeWidth(source)
-    const targetWidth = circuitNodeWidth(target)
+    const sourceWidth = nodeOutputWidth(source, sourcePort, customChips)
+    const targetWidth = nodeInputWidth(target, connection.target.port, customChips)
     if (isValidCircuitWidth(sourceWidth) && isValidCircuitWidth(targetWidth) && sourceWidth !== targetWidth) {
       issues.push({
         code: 'width-mismatch',
@@ -292,7 +308,7 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
   }
 
   for (const node of nodes.values()) {
-    const expected = editorInputCount(node.type)
+    const expected = nodeInputCount(node, customChips)
     for (let port = 0; port < expected; port += 1) {
       if (!occupiedInputs.has(`${node.id}:${port}`)) {
         issues.push({
@@ -337,6 +353,26 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
   for (const node of nodes.values()) visit(node.id)
 
   return issues
+}
+
+function nodeInputCount(node: CircuitNode, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
+  if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0
+  return editorInputCount(node.type)
+}
+
+function nodeOutputCount(node: CircuitNode, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
+  if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0
+  return outputCount(node.type)
+}
+
+function nodeInputWidth(node: CircuitNode, port: number, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
+  if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs[port]?.width ?? 1
+  return circuitNodeWidth(node)
+}
+
+function nodeOutputWidth(node: CircuitNode, port: number, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
+  if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs[port]?.width ?? 1
+  return circuitNodeWidth(node)
 }
 
 export function circuitNodeWidth(node: CircuitNode): number {

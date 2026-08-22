@@ -10,6 +10,9 @@ import {
   type CircuitDocument,
   type EditorComponentType,
 } from './editorModel'
+import { assertCustomChipDepth, resolveCustomChipDefinition } from './customChipInstance'
+import type { CustomChipLibraryEntry } from './customChip'
+import { normalizeCircuitDocument } from './documentContract'
 import { topologicalOrder } from './topology'
 
 export interface CircuitEvaluation {
@@ -24,9 +27,13 @@ export interface CircuitEvaluation {
 export interface CircuitEvaluationOptions {
   /** Valor padrão aplicado a entradas que não foram informadas. */
   defaultInput?: boolean
+  /** Definições locais para expandir instâncias `custom-chip`. */
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 export type VectorInput = BitVector | bigint | number | string
+
+type CircuitVectorValue = BitVector | BitVector[]
 
 export interface CircuitVectorEvaluation {
   values: Record<string, BitVector>
@@ -37,6 +44,8 @@ export interface CircuitVectorEvaluation {
 export interface CircuitVectorEvaluationOptions {
   /** Valor padrão aplicado a entradas ausentes, repetido na largura da porta. */
   defaultInput?: VectorInput
+  /** Definições locais para expandir instâncias `custom-chip`. */
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 export function evaluateCircuit(
@@ -44,7 +53,8 @@ export function evaluateCircuit(
   inputs: Record<string, boolean> = {},
   options: CircuitEvaluationOptions = {},
 ): CircuitEvaluation {
-  return evaluateNetlist(toNetlist(document), inputs, options)
+  const resolved = normalizeCircuitDocument(document)
+  return evaluateNetlist(toNetlist(resolved, { customChips: options.customChips }), inputs, options)
 }
 
 export function evaluateCircuitVectors(
@@ -52,7 +62,8 @@ export function evaluateCircuitVectors(
   inputs: Record<string, VectorInput> = {},
   options: CircuitVectorEvaluationOptions = {},
 ): CircuitVectorEvaluation {
-  return evaluateVectorNetlist(toNetlist(document, { allowBuses: true }), inputs, options)
+  const resolved = normalizeCircuitDocument(document)
+  return evaluateVectorNetlist(toNetlist(resolved, { allowBuses: true, customChips: options.customChips }), inputs, options)
 }
 
 /**
@@ -63,6 +74,7 @@ export function evaluateNetlist(
   netlist: Netlist,
   inputs: Record<string, boolean> = {},
   options: CircuitEvaluationOptions = {},
+  depth = 0,
 ): CircuitEvaluation {
   const components = new Map<string, ComponentSpec>()
   for (const component of netlist.components) {
@@ -78,7 +90,9 @@ export function evaluateNetlist(
   for (const id of order) {
     const component = components.get(id)!
     const componentInputs = (component.inputs ?? []).map((input) => readPort(values, input))
-    const output = evaluateComponent(component, componentInputs, inputs, options)
+    const output = component.type === 'custom-chip'
+      ? evaluateCustomComponent(component, componentInputs, options, depth)
+      : evaluateComponent(component, componentInputs, inputs, options)
     values[id] = output
   }
 
@@ -94,6 +108,7 @@ function evaluateVectorNetlist(
   netlist: Netlist,
   inputs: Record<string, VectorInput>,
   options: CircuitVectorEvaluationOptions,
+  depth = 0,
 ): CircuitVectorEvaluation {
   const components = new Map<string, ComponentSpec>()
   for (const component of netlist.components) {
@@ -103,18 +118,48 @@ function evaluateVectorNetlist(
 
   const order = topologicalOrder([...components.values()])
 
-  const values: Record<string, BitVector> = {}
+  const values: Record<string, CircuitVectorValue> = {}
   for (const id of order) {
     const component = components.get(id)!
     const componentInputs = (component.inputs ?? []).map((input) => readVectorPort(values, input))
-    values[id] = evaluateVectorComponent(component, componentInputs, inputs, options)
+    values[id] = component.type === 'custom-chip'
+      ? evaluateCustomVectorComponent(component, componentInputs, options, depth)
+      : evaluateVectorComponent(component, componentInputs, inputs, options)
   }
 
   const outputs: Record<string, BitVector> = {}
   for (const component of components.values()) {
-    if (component.type === 'output') outputs[component.id] = values[component.id] ?? bitVector(component.options?.width ?? 1, 0)
+    if (component.type === 'output') outputs[component.id] = readVectorPort(values, { node: component.id })
   }
-  return { values, outputs, order }
+  const publicValues: Record<string, BitVector> = {}
+  for (const [id, value] of Object.entries(values)) publicValues[id] = Array.isArray(value) ? value[0] : value
+  return { values: publicValues, outputs, order }
+}
+
+function evaluateCustomComponent(
+  component: ComponentSpec,
+  componentInputs: boolean[],
+  options: CircuitEvaluationOptions,
+  depth: number,
+): boolean[] {
+  assertCustomChipDepth(depth)
+  const definition = resolveCustomChipDefinition({ id: component.id, type: 'custom-chip', options: component.options }, options.customChips)
+  const nestedInputs = Object.fromEntries(definition.inputs.map((port, index) => [port.id, componentInputs[index] ?? false]))
+  const nested = evaluateNetlist(toNetlist(definition.document, { customChips: options.customChips }), nestedInputs, options, depth + 1)
+  return definition.outputs.map((port) => nested.outputs[port.id] ?? false)
+}
+
+function evaluateCustomVectorComponent(
+  component: ComponentSpec,
+  componentInputs: BitVector[],
+  options: CircuitVectorEvaluationOptions,
+  depth: number,
+): BitVector[] {
+  assertCustomChipDepth(depth)
+  const definition = resolveCustomChipDefinition({ id: component.id, type: 'custom-chip', options: component.options }, options.customChips)
+  const nestedInputs = Object.fromEntries(definition.inputs.map((port, index) => [port.id, componentInputs[index] ?? bitVector(port.width, 0)]))
+  const nested = evaluateVectorNetlist(toNetlist(definition.document, { allowBuses: true, customChips: options.customChips }), nestedInputs, options, depth + 1)
+  return definition.outputs.map((port) => nested.outputs[port.id] ?? bitVector(port.width, 0))
 }
 
 function evaluateVectorComponent(
@@ -161,9 +206,14 @@ function coerceVector(value: VectorInput | boolean, width: number): BitVector {
   return bitVector(width, typeof value === 'boolean' ? (value ? 1n : 0n) : value)
 }
 
-function readVectorPort(values: Record<string, BitVector>, reference: PortRef): BitVector {
+function readVectorPort(values: Record<string, CircuitVectorValue>, reference: PortRef): BitVector {
   const source = values[reference.node]
   if (!source) throw new Error(`A saída de "${reference.node}" ainda não está disponível.`)
+  if (Array.isArray(source)) {
+    const value = source[reference.port ?? 0]
+    if (!value) throw new Error(`A porta vetorial ${reference.port ?? 0} não existe em "${reference.node}".`)
+    return value
+  }
   if (reference.port !== undefined && reference.port !== 0) throw new Error(`A porta vetorial ${reference.port} não existe em "${reference.node}".`)
   return source
 }

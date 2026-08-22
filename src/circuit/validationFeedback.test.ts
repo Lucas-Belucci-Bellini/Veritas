@@ -21,6 +21,7 @@ describe('feedback de validação do editor', () => {
       'wireless-duplicate-transmitter',
       'wireless-missing-transmitter',
       'wireless-channel-too-long',
+      'custom-chip-missing-definition',
     ]
     const guidance = buildCircuitIssueGuidance(codes.map((code) => ({ code, message: `erro ${code}` })))
 

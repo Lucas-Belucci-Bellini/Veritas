@@ -99,6 +99,10 @@ const GUIDANCE: Record<CircuitIssue['code'], Pick<CircuitIssueGuidance, 'title' 
     title: 'Canal wireless muito longo',
     action: 'Reduza o nome do canal para no máximo 64 caracteres.',
   },
+  'custom-chip-missing-definition': {
+    title: 'Definição de chip ausente',
+    action: 'Recarregue a biblioteca local ou remova a instância que aponta para um chip indisponível.',
+  },
 }
 
 export function buildCircuitIssueGuidance(issues: readonly CircuitIssue[]): CircuitIssueGuidance[] {

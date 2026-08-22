@@ -17,6 +17,11 @@ export interface CustomChipPort {
   width: number
 }
 
+export interface CustomChipLibraryEntry {
+  id: number
+  definition: CustomChipDefinition
+}
+
 export interface CustomChipDefinition {
   format: typeof CUSTOM_CHIP_FORMAT
   version: typeof CUSTOM_CHIP_VERSION
@@ -43,6 +48,9 @@ export function buildCustomChipDefinition(
     throw new Error(`O nome do chip customizado pode ter no máximo ${MAX_CIRCUIT_NAME_LENGTH} caracteres.`)
   }
 
+  if (normalizedDocument.nodes.some((node) => node.type === 'custom-chip')) {
+    throw new Error('Chips customizados desta versão não podem conter outras instâncias de chip.')
+  }
   const issues = validateCircuit(normalizedDocument, { allowBuses: true })
   if (issues.length > 0) throw new CircuitValidationError(issues)
   if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) {
