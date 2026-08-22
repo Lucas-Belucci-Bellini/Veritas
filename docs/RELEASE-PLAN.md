@@ -4,7 +4,7 @@
 **Produto:** Veritas — editor e simulador didático de lógica digital
 **Repositório:** https://github.com/Lucas-Belucci-Bellini/Veritas
 **Preview/produção atual:** https://veritas-opal-seven.vercel.app
-**Versão declarada no `package.json`:** `0.9.0-rc.2`
+**Versão declarada no `package.json`:** `0.9.0-rc.3`
 
 ## 1. Decisão de posicionamento
 
@@ -22,7 +22,7 @@ Há, porém, quatro fatos que impedem chamar o estado atual de `1.0.0` sem uma r
 
 | Área | Estado atual | Consequência para o lançamento |
 | --- | --- | --- |
-| Versionamento | `package.json` está em `0.9.0-rc.2`; `v0.9.0-rc.1` está publicada e a nova RC está em preparação; ainda não há release estável. | Executar os gates da RC-2 e manter a sequência de pré-releases antes do estável. |
+| Versionamento | `package.json` está em `0.9.0-rc.3`; `v0.9.0-rc.2` está publicada e a nova RC está em preparação; ainda não há release estável. | Executar os gates da RC-3 e manter a sequência de pré-releases antes do estável. |
 | Distribuição | Existe deployment Vercel público, mas o fluxo de Preview/Production, domínio, headers e rollback ainda precisa ser formalizado. | Tratar o deployment atual como preview até concluir o checklist. |
 | MCP | Ferramentas determinísticas estão disponíveis por `stdio`; transporte HTTP remoto autenticado ainda é roadmap. | Não prometer integração web remota no lançamento inicial. |
 | Colaboração | Broadcast de snapshots e Presence funcionam, mas não são CRDT nem merge campo a campo. | Rotular como colaboração beta/preview e documentar o risco de sobrescrita concorrente. |
@@ -38,6 +38,7 @@ A recomendação é usar SemVer e manter os artefatos publicados imutáveis: cor
 | `v0.8.0-rc.1` | Release candidate multi-bit | Testadores convidados e mantenedores | Quality gates verdes, RLS auditado, smoke externo aprovado e nenhum P0/P1 aberto. |
 | `v0.9.0-rc.1` | Release candidate sequencial | Testadores convidados e mantenedores | Runtime temporal validado, smoke externo aprovado, contrato MCP alinhado e nenhum P0/P1 aberto. |
 | `v0.9.0-rc.2` | Release candidate MCP vetorial | Testadores convidados e mantenedores | MCP-001…MCP-010, tabela vetorial, smoke local/externo e nenhum P0/P1 novo; beta continua condicionado aos gates reais. |
+| `v0.9.0-rc.3` | Release candidate de endurecimento do CI | Testadores convidados e mantenedores | Rollback determinístico com histórico/tags, quality workflow verde, smoke local/externo e nenhum P0/P1 novo; beta continua condicionado aos gates reais. |
 | `v0.9.0-beta.1` | Beta público sequencial | Estudantes/professores convidados | Manifesto de evidências completo, RLS/Realtime/HDL/mobile/acessibilidade/rollback aprovados e zero P0/P1. |
 | `v0.8.x` | Correções de beta/RC | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
 | `v1.0.0` | Lançamento estável | Público geral | API/documento público estável, política de dados, suporte básico e critérios P0/P1 encerrados. |

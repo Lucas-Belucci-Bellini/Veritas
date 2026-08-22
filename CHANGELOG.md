@@ -2,6 +2,19 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.3] — 2026-08-22
+
+### Corrigido
+
+- Quality workflow agora baixa o histórico completo e as tags Git necessárias para validar rollback de forma determinística.
+- O baseline do rollback foi atualizado para a última RC publicada, evitando comparar uma candidata com uma tag futura.
+
+### Validação
+
+- Quality workflow da main aprovado após a correção: testes, typecheck, lint, build frontend, build MCP, MCP-001…MCP-010, HDL, acessibilidade, rollback, onboarding e smoke PWA local.
+- A RC-2 permanece imutável e continua disponível para reprodução; esta versão é uma nova candidata de correção, não uma reescrita.
+- RLS-001…RLS-022 e RT-001…RT-005 reais continuam pendentes e bloqueiam o beta público.
+
 ## [0.9.0-rc.2] — 2026-08-22
 
 ### Adicionado
