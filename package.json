@@ -22,6 +22,7 @@
     "bench:rust": "cargo bench --manifest-path engine-rs/Cargo.toml --offline --bench throughput",
     "bench:compare": "node scripts/engine-comparison-benchmark.mjs",
     "beta:rust": "node scripts/rust-engine-acceptance.mjs",
+    "beta:wasm": "node scripts/wasm-readiness.mjs",
     "build:plugin": "vite build --config vite.plugin.config.ts",
     "smoke:release": "node scripts/smoke-release.mjs",
     "beta:preflight": "bash scripts/beta-preflight.sh",

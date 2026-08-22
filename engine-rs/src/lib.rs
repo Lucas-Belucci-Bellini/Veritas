@@ -10,6 +10,21 @@ use std::fmt;
 
 pub const MAX_WIDTH: u8 = 64;
 
+/// Version of the intentionally minimal WASM readiness ABI.
+pub const WASM_ABI_VERSION: u32 = 1;
+/// Bit 0 advertises only that the ABI marker is available; no evaluator is exported.
+pub const WASM_CAPABILITY_ABI_MARKER: u32 = 1;
+
+#[no_mangle]
+pub extern "C" fn veritas_wasm_abi_version() -> u32 {
+    WASM_ABI_VERSION
+}
+
+#[no_mangle]
+pub extern "C" fn veritas_wasm_capabilities() -> u32 {
+    WASM_CAPABILITY_ABI_MARKER
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Signal {
     pub width: u8,
@@ -402,6 +417,12 @@ mod tests {
 
     fn s(width: u8, bits: u64) -> Signal {
         Signal::new(width, bits).unwrap()
+    }
+
+    #[test]
+    fn exposes_only_the_versioned_wasm_readiness_marker() {
+        assert_eq!(veritas_wasm_abi_version(), 1);
+        assert_eq!(veritas_wasm_capabilities(), WASM_CAPABILITY_ABI_MARKER);
     }
 
     #[test]

@@ -46,6 +46,7 @@ A recomendação é usar SemVer e manter os artefatos publicados imutáveis: cor
 | `v0.9.0-rc.8` | Release candidate MCP-015 proteção de paths locais | Testadores convidados e mantenedores | Path MCP coincidente com a rota de metadata é rejeitado no startup, paths válidos continuam funcionando, 18 checks HTTP locais verdes e nenhuma rota OAuth pública habilitada. |
 | `v0.9.0-rc.9` | Release candidate EDITOR-001 + RUST-001 | Testadores convidados e mantenedores | NAND/NOR/XNOR estão alinhados no editor, avaliação e HDL; núcleo Rust experimental passa acceptance offline e paridade golden; workflows Quality/Release verdes; nenhum endpoint remoto é habilitado e o beta continua bloqueado sem evidência RLS/Realtime cross-user real. |
 | `v0.9.0-rc.10` | Release candidate RUST-002 — benchmark comparativo TypeScript/Rust | Testadores convidados e mantenedores | Fixture compartilhado, quatro larguras, outputs/checksums independentes e paridade entre runtimes; tempos registrados apenas como observação local; TypeScript continua runtime produtivo, sem WASM ou promoção beta automática. |
+| `v0.9.0-rc.11` | Release candidate WASM-001 — readiness experimental | Testadores convidados e mantenedores | Target WASM compilado com Rust 1.75, ABI mínimo versionado, zero imports, exports limitados, instanciação validada e métricas de tamanho/cold start/repetição; artefato fora do bundle e TypeScript continua fallback. |
 | `v0.9.0-beta.1` | Beta público sequencial | Estudantes/professores convidados | Manifesto de evidências completo, RLS/Realtime/HDL/mobile/acessibilidade/rollback aprovados e zero P0/P1. |
 | `v0.8.x` | Correções de beta/RC | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
 | `v1.0.0` | Lançamento estável | Público geral | API/documento público estável, política de dados, suporte básico e critérios P0/P1 encerrados. |
@@ -79,6 +80,7 @@ npm run build
 npm run build:mcp
 npm run build:mcp:http
 npm run beta:rust
+npm run beta:wasm
 npm run bench:compare
 ```
 

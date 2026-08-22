@@ -9,6 +9,7 @@ rust-version = "1.75"
 [lib]
 name = "veritas_engine"
 path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
 
 [[bench]]
 name = "throughput"

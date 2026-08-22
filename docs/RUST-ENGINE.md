@@ -51,6 +51,14 @@ O lado TypeScript é carregado pelo bundle transformado pelo Vitest/esbuild e ch
 
 A paridade de saída é o gate obrigatório. Os tempos servem apenas como observação da mesma máquina e execução: não são uma comparação científica entre sistemas operacionais, compiladores ou máquinas diferentes, e não autorizam afirmar superioridade do Rust. Esta etapa também não habilita WASM, não muda o runtime do navegador e não remove o fallback TypeScript. Uma eventual integração futura deverá medir, separadamente, tamanho do artefato, cold start, memória, repetição, carregamento e comportamento offline.
 
+## WASM-001 — readiness experimental
+
+O gate `npm run beta:wasm` compila o crate para `wasm32-unknown-unknown` com Rust 1.75 e verifica um ABI mínimo, sem expor o avaliador de netlists. O módulo deve ter zero imports e exatamente dois exports ABI de função: `veritas_wasm_abi_version() -> u32`, que retorna `1`, e `veritas_wasm_capabilities() -> u32`, que retorna o bit `1` somente para indicar a presença do marcador ABI. O linker Rust também pode registrar os metadados técnicos `memory`, `__data_end` e `__heap_base`; eles são aceitos como auxiliares, não fazem parte da API pública e não anunciam avaliação, memória compartilhada, DOM, rede ou persistência.
+
+O runner instancia o módulo pela API WASM nativa do Node, valida os marcadores, repete 100 instanciações e registra tamanho bruto, tamanho gzip, cold start e tempo total de repetição em `artifacts/wasm-readiness.md` e no JSON local correspondente. O `.wasm` é produzido em `engine-rs/target/` e permanece ignorado pelo Git; nenhum binário entra no bundle web, no MCP ou no plugin.
+
+Esta etapa é uma prova de empacotamento e carregabilidade, não uma integração de runtime. Ela não usa `wasm-bindgen`, não recebe `CircuitDocument`, não expõe memória linear e não permite executar documentos arbitrários. O TypeScript continua sendo o runtime produtivo e fallback. A próxima prova, se necessária, deverá definir um adaptador de `Netlist`, comparar resultados golden dentro do WASM e medir cold start, memória, tamanho e comportamento offline em um cenário de produto antes de qualquer carregamento no navegador.
+
 ## Referências
 
 [1]: https://github.com/Lucas-Belucci-Bellini/Veritas/blob/main/src/bus/bitVector.ts "Contrato BitVector do Veritas"
