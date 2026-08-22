@@ -21,6 +21,7 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `karnaugh_map` | Mapa de Karnaugh de 1 a 4 variáveis com os agrupamentos |
 | `normal_forms` | SOP e POS, canônicas e mínimas, e a classificação da expressão dada |
 | `simulate_circuit` | Roda um circuito com clock, flip-flops, atrasos, canais wireless e instâncias `custom-chip`; devolve o diagrama de tempo |
+| `circuit_truth_table` | Gera a tabela verdade de um `CircuitDocument`, incluindo instâncias `custom-chip` com definições explícitas |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
 

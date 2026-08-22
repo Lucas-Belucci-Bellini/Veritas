@@ -19,6 +19,7 @@ import {
 } from '../../src/engine/index'
 import type { ChipCatalog, ChipEntry } from '../../src/chips/types'
 import {
+  buildCircuitTruthTable,
   buildCustomChipDefinition,
   elaborateCustomChipDocument,
   isCircuitDocumentShape,
@@ -433,6 +434,36 @@ export function normalForms(expression: string, notation: Notation = 'math'): To
       '',
       cheaper,
     ].join('\n'),
+  }
+}
+
+export interface CircuitTruthTableToolQuery {
+  document: unknown
+  maxRows?: number
+  outputId?: string
+  customChips?: readonly CustomChipToolDefinition[]
+}
+
+export function circuitTruthTable(query: CircuitTruthTableToolQuery): ToolResult {
+  try {
+    if (!isCircuitDocumentShape(query.document)) return { isError: true, text: 'O documento não possui o formato veritas-circuit esperado.' }
+    const customChips = normalizeCustomChipLibrary(query.customChips)
+    const table = buildCircuitTruthTable(query.document, {
+      maxRows: query.maxRows,
+      outputId: query.outputId,
+      customChips,
+    })
+    const header = `| ${table.columns.map((column) => column.label).join(' | ')} |`
+    const divider = `| ${table.columns.map(() => '---').join(' | ')} |`
+    const rows = table.rows.map((row) => `| ${row.map((value) => (value ? '1' : '0')).join(' | ')} |`)
+    const notes = [
+      `Classificação: ${table.classification}`,
+      `${table.trueCount} de ${table.rows.length} linhas verdadeiras`,
+    ]
+    if (table.truncated) notes.push(`Exibindo ${table.rows.length} de ${table.totalRows} linhas.`)
+    return { text: [header, divider, ...rows, '', ...notes].join('\n') }
+  } catch (error) {
+    return { isError: true, text: error instanceof Error ? error.message : 'Falha ao gerar a tabela verdade do circuito.' }
   }
 }
 

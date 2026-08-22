@@ -72,6 +72,21 @@ const CUSTOM_CHIP_DEFINITION = {
   outputs: [{ id: 'output', name: 'Saída', width: 1 }],
 }
 
+const CUSTOM_CHIP_CIRCUIT = {
+  format: 'veritas-circuit',
+  version: 1,
+  name: 'Circuito NOT MCP',
+  nodes: [
+    { id: 'input', type: 'input', position: { x: 0, y: 0 }, label: 'Entrada' },
+    { id: 'chip', type: 'custom-chip', position: { x: 120, y: 0 }, label: 'NOT', options: { customChipId: 7 } },
+    { id: 'output', type: 'output', position: { x: 240, y: 0 }, label: 'Resultado' },
+  ],
+  connections: [
+    { source: { node: 'input' }, target: { node: 'chip', port: 0 } },
+    { source: { node: 'chip' }, target: { node: 'output', port: 0 } },
+  ],
+}
+
 function main() {
   if (!existsSync(SERVER_PATH)) throw new Error('mcp/dist/server.js ausente; execute npm run build:mcp antes do gate')
   const session = runSession([
@@ -90,6 +105,11 @@ function main() {
       watch: ['input', 'chip', 'out'],
       custom_chips: [{ id: 7, definition: CUSTOM_CHIP_DEFINITION }],
     } }),
+    request(8, 'tools/call', { name: 'circuit_truth_table', arguments: {
+      document: CUSTOM_CHIP_CIRCUIT,
+      max_rows: 4,
+      custom_chips: [{ id: 7, definition: CUSTOM_CHIP_DEFINITION }],
+    } }),
   ])
   const initialize = responseFor(session.responses, 1)
   const listed = responseFor(session.responses, 2)
@@ -98,8 +118,9 @@ function main() {
   const propositional = responseFor(session.responses, 5)
   const invalid = responseFor(session.responses, 6)
   const customSimulation = responseFor(session.responses, 7)
+  const customTruthTable = responseFor(session.responses, 8)
   const toolNames = listed.result?.tools?.map((tool) => tool.name) ?? []
-  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit']
+  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit', 'circuit_truth_table']
   const missingTools = expectedTools.filter((name) => !toolNames.includes(name))
   const initializeOk = initialize.result?.serverInfo?.name === 'veritas' && initialize.result?.protocolVersion
   const truthText = textOf(truth)
@@ -107,6 +128,7 @@ function main() {
   const propositionalText = textOf(propositional)
   const invalidText = textOf(invalid)
   const customSimulationText = textOf(customSimulation)
+  const customTruthTableText = textOf(customTruthTable)
   const results = [
     result('MCP-001', initializeOk ? 'PASS' : 'FAIL', 'initialize JSON-RPC', initializeOk ? `servidor ${initialize.result.serverInfo.name} negociou ${initialize.result.protocolVersion}` : JSON.stringify(initialize)),
     result('MCP-002', missingTools.length === 0 ? 'PASS' : 'FAIL', 'tools/list schema', missingTools.length === 0 ? `${toolNames.length} ferramentas listadas com nomes estáveis` : `ferramentas ausentes: ${missingTools.join(', ')}`),
@@ -115,6 +137,7 @@ function main() {
     result('MCP-005', invalid.result?.isError === true && invalidText.includes('Dois operadores seguidos') ? 'PASS' : 'FAIL', 'erro controlado de ferramenta', invalidText || JSON.stringify(invalid)),
     result('MCP-006', session.responses.every((item) => item.jsonrpc === '2.0') ? 'PASS' : 'FAIL', 'transporte stdio JSON-RPC', `${session.responses.length} respostas JSON-RPC válidas sem saída não protocolar`),
     result('MCP-007', customSimulation.result?.isError !== true && customSimulationText.includes('| 3 | 1 | 1 | 1 |') ? 'PASS' : 'FAIL', 'simulate_circuit custom-chip golden', customSimulationText || JSON.stringify(customSimulation)),
+    result('MCP-008', customTruthTable.result?.isError !== true && customTruthTableText.includes('| Entrada | Resultado |') && customTruthTableText.includes('| 0 | 1 |') ? 'PASS' : 'FAIL', 'circuit_truth_table custom-chip golden', customTruthTableText || JSON.stringify(customTruthTable)),
   ]
   if (results.some((item) => !MCP_ACCEPTANCE_IDS.includes(item.id))) throw new Error('IDs MCP fora do contrato')
   mkdirSync(dirname(REPORT_PATH), { recursive: true })

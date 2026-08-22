@@ -8,6 +8,7 @@ import {
   getChip,
   karnaugh,
   listChips,
+  circuitTruthTable,
   MAX_SIMULATION_TICKS,
   normalForms,
   simplifyExpression,
@@ -187,6 +188,36 @@ const customChipComponents = [
 ]
 
 const customChips = [{ id: 7, definition: buildCustomChipDefinition(customChipDefinition(), 'NOT MCP') }]
+const customChipCircuit: CircuitDocument = {
+  ...createCircuitDocument('Circuito NOT MCP'),
+  nodes: [
+    { id: 'input', type: 'input', position: { x: 0, y: 0 }, label: 'Entrada' },
+    { id: 'chip', type: 'custom-chip', position: { x: 120, y: 0 }, label: 'NOT', options: { customChipId: 7 } },
+    { id: 'output', type: 'output', position: { x: 240, y: 0 }, label: 'Resultado' },
+  ],
+  connections: [
+    { source: { node: 'input' }, target: { node: 'chip', port: 0 } },
+    { source: { node: 'chip' }, target: { node: 'output', port: 0 } },
+  ],
+}
+
+describe('circuit_truth_table', () => {
+  it('gera tabela determinística para instância customizada', () => {
+    const result = circuitTruthTable({ document: customChipCircuit, customChips })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('| Entrada | Resultado |')
+    expect(result.text).toContain('| 0 | 1 |')
+    expect(result.text).toContain('| 1 | 0 |')
+  })
+
+  it('recusa tabela de instância sem definição portátil', () => {
+    const result = circuitTruthTable({ document: customChipCircuit })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('definição local')
+  })
+})
 
 describe('simulate_circuit', () => {
   it('devolve o diagrama de tempo de um contador', () => {

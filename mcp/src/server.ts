@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import {
+  circuitTruthTable,
   debugAlgorithm,
   evaluateExpression,
   evaluateLogicCase,
@@ -179,6 +180,28 @@ server.registerTool(
 )
 
 const RUNTIME_VALUE = z.union([z.boolean(), z.number(), z.string(), z.null()])
+
+server.registerTool(
+  'circuit_truth_table',
+  {
+    title: 'Tabela verdade de circuito',
+    description:
+      'Gera a tabela verdade de um CircuitDocument combinacional. Aceita instâncias custom-chip ' +
+      'quando suas definições veritas-custom-chip são enviadas em custom_chips.',
+    inputSchema: {
+      document: z.unknown().describe('CircuitDocument serializável do formato veritas-circuit'),
+      output_id: z.string().min(1).optional().describe('ID da saída a ser destacada; por padrão, usa a primeira'),
+      max_rows: z.number().int().min(1).max(4096).default(256).describe('Teto de linhas na resposta'),
+      custom_chips: z
+        .array(z.object({ id: z.number().int().min(1), definition: z.unknown() }))
+        .max(128)
+        .default([])
+        .describe('Definições veritas-custom-chip usadas pelas instâncias custom-chip'),
+    },
+  },
+  async ({ document, output_id, max_rows, custom_chips }) =>
+    guard(() => circuitTruthTable({ document, outputId: output_id, maxRows: max_rows, customChips: custom_chips })),
+)
 
 server.registerTool(
   'debug_algorithm',
