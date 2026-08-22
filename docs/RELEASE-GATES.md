@@ -41,7 +41,7 @@ SMOKE_URL=https://veritas-opal-seven.vercel.app npm run smoke:release
 O comando [`npm run beta:preflight`](../scripts/beta-preflight.mjs) consolida versão candidata, árvore Git, suíte, typecheck, lint, build frontend, build MCP, smoke e a presença de um relatório RLS. Para uma promoção beta, execute-o com os gates externos obrigatórios:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.5 \
+BETA_EXPECTED_VERSION=0.9.0-rc.6 \
 SMOKE_URL=https://veritas-opal-seven.vercel.app \
 BETA_PREFLIGHT_REQUIRE_SMOKE=1 \
 BETA_PREFLIGHT_REQUIRE_RLS=1 \
@@ -64,7 +64,7 @@ Exemplo mínimo de estrutura, a ser preenchido somente com resultados reais:
 
 ```json
 {
-  "version": "0.9.0-rc.5",
+  "version": "0.9.0-rc.6",
   "generatedAt": "2026-08-21T02:00:00.000Z",
   "openP0": [],
   "openP1": [],
@@ -124,7 +124,7 @@ Os mesmos JSON de entrada devem ser executados pelo pacote MCP diretamente e por
 
 O workflow [`quality.yml`](../.github/workflows/quality.yml) roda em pull requests e pushes para `main`. Ele executa a suíte, constrói a aplicação, os bundles MCP stdio/HTTP, inicia o preview Vite, executa os runners MCP e executa `npm run smoke:release` contra `http://127.0.0.1:4173`.
 
-O workflow [`release.yml`](../.github/workflows/release.yml) aceita dois modos. No modo automático, o push de uma tag SemVer como `v0.9.0-rc.5` ou `v1.0.0` inicia validação, smoke e publicação; tags com hífen são marcadas como pre-release. No modo manual, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.9.0-rc.5` e marque `prerelease=true`. Em ambos os modos, o job de validação roda antes do job de publicação e `gh release create` gera as notas automaticamente. O workflow não cria tags automaticamente a partir de qualquer commit: a tag continua sendo o ponto explícito de promoção e rastreabilidade.
+O workflow [`release.yml`](../.github/workflows/release.yml) aceita dois modos. No modo automático, o push de uma tag SemVer como `v0.9.0-rc.6` ou `v1.0.0` inicia validação, smoke e publicação; tags com hífen são marcadas como pre-release. No modo manual, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.9.0-rc.6` e marque `prerelease=true`. Em ambos os modos, o job de validação roda antes do job de publicação e `gh release create` gera as notas automaticamente. O workflow não cria tags automaticamente a partir de qualquer commit: a tag continua sendo o ponto explícito de promoção e rastreabilidade.
 
 O arquivo [`release.yml`](../.github/release.yml) organiza as notas por labels `breaking-change`, `feature`, `bug`, `security`, `documentation` e `education`. PRs sem categoria caem em `Other changes`.
 

@@ -2,6 +2,19 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.6] — 2026-08-22
+
+### Adicionado
+
+- Rota local opt-in `/.well-known/oauth-protected-resource` integrada ao transporte HTTP do MCP para discovery controlada de Protected Resource Metadata.
+- Configuração por `VERITAS_MCP_HTTP_RESOURCE`, `VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS` e `VERITAS_MCP_HTTP_SCOPES`, com 404 por padrão e falha fechada para configuração parcial ou recurso remoto sem HTTPS.
+
+### Segurança e validação
+
+- A metadata exige Origin explicitamente permitida, não exige Bearer para a leitura de discovery, não emite tokens e não altera o Bearer obrigatório do endpoint `/mcp`.
+- O stdio permanece preservado; nenhum endpoint OAuth público, provider, login, PKCE ou deployment remoto foi habilitado.
+- Acceptance HTTP MCP-011 e MCP-013, com 14 checks PASS, além de regressões unitárias do contrato e do handler; RLS-001…RLS-022 e RT-001…RT-005 reais continuam pendentes e bloqueiam o beta público.
+
 ## [0.9.0-rc.5] — 2026-08-22
 
 ### Adicionado
