@@ -1,8 +1,8 @@
-# WASM-002 — contrato experimental de netlist
+# WASM-003 — contrato experimental de netlist
 
 ## Objetivo e fronteira
 
-O WASM-002 define a primeira ponte formal entre um `Netlist` combinacional já normalizado e o núcleo Rust compilado para `wasm32-unknown-unknown`. A etapa é uma prova de **paridade golden**, não uma migração do runtime: o navegador, o MCP, o plugin, o Supabase, o IndexedDB e o `CircuitDocument` continuam fora da ponte. O TypeScript permanece responsável pelo produto e pelo fallback local-first.
+O WASM-003 define a primeira ponte formal entre um `Netlist` combinacional já normalizado e o núcleo Rust compilado para `wasm32-unknown-unknown`. A etapa é uma prova de **paridade golden**, não uma migração do runtime: o navegador, o MCP, o plugin, o Supabase, o IndexedDB e o `CircuitDocument` continuam fora da ponte. O TypeScript permanece responsável pelo produto e pelo fallback local-first.
 
 O contrato recebe somente um subconjunto combinacional com largura uniforme de 1 a 64 bits: `input`, `constant`, `and`, `nand`, `or`, `nor`, `xor`, `xnor`, `not` e `output`. Componentes sequenciais, `custom-chip`, wireless, múltiplas larguras no mesmo documento, labels e posições não atravessam o ABI. A conversão de `CircuitDocument` para esse subconjunto continua sendo responsabilidade de um adaptador explícito e validado.
 
@@ -13,7 +13,7 @@ A variante experimental é compilada com a feature Rust `wasm-netlist-abi`. A AB
 | Export | Assinatura | Contrato |
 | --- | --- | --- |
 | `veritas_wasm_abi_version` | `() -> u32` | Retorna `1`. |
-| `veritas_wasm_capabilities` | `() -> u32` | Retorna `3` na variante WASM-002. |
+| `veritas_wasm_capabilities` | `() -> u32` | Retorna `3` na variante WASM-003. |
 | `veritas_wasm_buffer_ptr` | `() -> u32` | Endereço do buffer linear de entrada/saída. |
 | `veritas_wasm_buffer_capacity` | `() -> u32` | Retorna `65536` bytes. Payloads maiores falham. |
 | `veritas_wasm_evaluate` | `(input_len: u32) -> u32` | Lê o payload no buffer, avalia e substitui o buffer pelo resultado. Retorna o tamanho do resultado; `0` indica falha. |
@@ -58,8 +58,8 @@ A camada TypeScript reconstrói `BitVector` a partir da largura e dos valores, d
 
 Os códigos mínimos são `1` para magic inválido, `2` para versão inválida, `3` para largura/valor inválido, `4` para payload ou resultado fora do buffer, `5` para shape de nó inválido, `6` para referência/override inválido, `7` para erro do avaliador e `8` para resultado inconsistente. Uma falha retorna `0`, grava apenas o código em `veritas_wasm_last_error_code()` e não publica o buffer como resultado válido.
 
-O contrato é versionado pelo magic, pela versão do payload, pela versão da ABI e pelos bits de capabilities. Adicionar campos obrigatórios exige nova versão; o host não deve tentar interpretar um resultado com versão desconhecida. A feature WASM-002 permanece desabilitada no build de produção e não altera o gate WASM-001 padrão.
+O contrato é versionado pelo magic, pela versão do payload, pela versão da ABI e pelos bits de capabilities. Adicionar campos obrigatórios exige nova versão; o host não deve tentar interpretar um resultado com versão desconhecida. A feature WASM-003 permanece desabilitada no build de produção e não altera o gate WASM-001 padrão.
 
 ## Evidência exigida
 
-A prova deve usar um fixture público com netlist, overrides e resultado esperado independente. O teste TypeScript deve avaliar o `Netlist` com `evaluateVectorNetlist`, codificar e decodificar o contrato e comparar contra o golden. O runner Node deve instanciar o `.wasm` com zero imports, verificar os exports permitidos, executar os mesmos bytes e comparar o `VRES` ao golden. Divergência, payload inválido, export inesperado ou import externo encerra o gate. Tamanho e duração permanecem métricas informativas, nunca evidência de superioridade.
+A prova usa uma matriz pública versionada com quatro casos de netlist, overrides e resultados esperados independentes para 1, 8, 32 e 64 bits. O teste TypeScript avalia cada `Netlist` com `evaluateVectorNetlist`, codifica e decodifica o contrato e compara bytes, valores, saídas e ordem contra o golden. O runner Node instancia o `.wasm` com zero imports, verifica os exports permitidos, executa os mesmos bytes e compara cada `VRES` ao golden. Também exerce magic, versão, largura, truncamento, shape, referência, ciclo e capacidade inválidos; cada falha precisa retornar zero e o código estável correspondente. Divergência, export inesperado ou import externo encerra o gate. Tamanho e duração permanecem métricas informativas, nunca evidência de superioridade.

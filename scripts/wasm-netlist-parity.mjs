@@ -22,6 +22,16 @@ const expectedExports = new Set([
   'veritas_wasm_last_error_code',
   'veritas_wasm_evaluate',
 ])
+const expectedErrorCodes = {
+  invalid_magic: 1,
+  invalid_version: 2,
+  invalid_width: 3,
+  truncated_payload: 4,
+  invalid_shape: 5,
+  invalid_reference: 6,
+  cycle: 7,
+  buffer_overflow: 4,
+}
 
 fs.mkdirSync(artifactDir, { recursive: true })
 
@@ -39,13 +49,13 @@ function run(command, args) {
   }
 }
 
-function encodeFixture(fixture) {
-  const components = fixture.netlist.components
+function encodeFixture(testCase) {
+  const components = testCase.netlist.components
   const ids = components.map((component) => component.id)
   const indexes = new Map(ids.map((id, index) => [id, index]))
   const bytes = []
   pushAscii(bytes, 'VNET')
-  bytes.push(1, fixture.width)
+  bytes.push(1, testCase.width)
   pushU16(bytes, components.length)
   for (const component of components) {
     const kind = {
@@ -77,7 +87,7 @@ function encodeFixture(fixture) {
       pushU16(bytes, index)
     }
   }
-  const overrides = Object.entries(fixture.overrides)
+  const overrides = Object.entries(testCase.overrides)
   pushU16(bytes, overrides.length)
   for (const [id, literal] of overrides) {
     const index = indexes.get(id)
@@ -88,7 +98,7 @@ function encodeFixture(fixture) {
   return Uint8Array.from(bytes)
 }
 
-function decodeResult(bytes, fixture) {
+function decodeResult(bytes, testCase) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   let offset = 0
   const readU8 = () => view.getUint8(offset++)
@@ -103,24 +113,24 @@ function decodeResult(bytes, fixture) {
     return value
   }
   const magic = String.fromCharCode(readU8(), readU8(), readU8(), readU8())
-  if (magic !== 'VRES' || readU8() !== 1 || readU8() !== fixture.width) {
-    throw new Error('VRES header differs from the versioned contract')
+  if (magic !== 'VRES' || readU8() !== 1 || readU8() !== testCase.width) {
+    throw new Error(`VRES header differs from the versioned contract for ${testCase.name}`)
   }
   const nodeCount = readU16()
-  if (nodeCount !== fixture.netlist.components.length) throw new Error('VRES node count differs from fixture')
+  if (nodeCount !== testCase.netlist.components.length) throw new Error(`VRES node count differs for ${testCase.name}`)
   const values = {}
-  for (const component of fixture.netlist.components) values[component.id] = readU64()
+  for (const component of testCase.netlist.components) values[component.id] = readU64()
   const orderCount = readU16()
-  if (orderCount !== nodeCount) throw new Error('VRES order count differs from fixture')
+  if (orderCount !== nodeCount) throw new Error(`VRES order count differs for ${testCase.name}`)
   const order = []
   const seen = new Set()
   for (let index = 0; index < orderCount; index += 1) {
     const nodeIndex = readU16()
-    if (nodeIndex >= nodeCount || seen.has(nodeIndex)) throw new Error('VRES order is not a permutation')
+    if (nodeIndex >= nodeCount || seen.has(nodeIndex)) throw new Error(`VRES order is not a permutation for ${testCase.name}`)
     seen.add(nodeIndex)
-    order.push(fixture.netlist.components[nodeIndex].id)
+    order.push(testCase.netlist.components[nodeIndex].id)
   }
-  if (offset !== bytes.byteLength) throw new Error('VRES contains trailing bytes')
+  if (offset !== bytes.byteLength) throw new Error(`VRES contains trailing bytes for ${testCase.name}`)
   return { values, order }
 }
 
@@ -128,15 +138,88 @@ function bytesToHex(bytes) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function assertGolden(result, fixture) {
-  for (const [id, expected] of Object.entries(fixture.expected.values)) {
-    const actual = result.values[id]?.toString(16).toUpperCase().padStart(2, '0')
-    if (actual !== expected) throw new Error(`golden value differs for ${id}: expected ${expected}, got ${actual}`)
+function formatHex(value, width) {
+  return value.toString(16).toUpperCase().padStart(Math.ceil(width / 4), '0')
+}
+
+function assertGolden(result, testCase) {
+  for (const [id, expected] of Object.entries(testCase.expected.values)) {
+    const actual = formatHex(result.values[id], testCase.width)
+    if (actual !== expected) throw new Error(`golden value differs for ${testCase.name}/${id}: expected ${expected}, got ${actual}`)
   }
-  const expectedOrder = JSON.stringify(fixture.expected.order)
+  const expectedOrder = JSON.stringify(testCase.expected.order)
   if (JSON.stringify(result.order) !== expectedOrder) {
-    throw new Error(`golden order differs: expected ${expectedOrder}, got ${JSON.stringify(result.order)}`)
+    throw new Error(`golden order differs for ${testCase.name}: expected ${expectedOrder}, got ${JSON.stringify(result.order)}`)
   }
+}
+
+function nodeFieldOffsets(payload) {
+  const offsets = []
+  const nodeCount = payload[6] | (payload[7] << 8)
+  let offset = 8
+  for (let nodeIndex = 0; nodeIndex < nodeCount; nodeIndex += 1) {
+    const idLength = payload[offset]
+    const idStart = offset + 1
+    const id = new TextDecoder().decode(payload.slice(idStart, idStart + idLength))
+    const kindOffset = idStart + idLength
+    const inputCountOffset = kindOffset + 1 + 8
+    const inputStart = inputCountOffset + 1
+    const inputCount = payload[inputCountOffset]
+    offsets.push({ id, kindOffset, inputStart, inputCount })
+    offset = inputStart + inputCount * 2
+  }
+  return offsets
+}
+
+function copyToBuffer(instance, payload, capacity) {
+  const pointer = instance.exports.veritas_wasm_buffer_ptr()
+  if (payload.byteLength > capacity) return { pointer, overflow: true }
+  new Uint8Array(instance.exports.memory.buffer, pointer, payload.byteLength).set(payload)
+  return { pointer, overflow: false }
+}
+
+function assertRuntimeError(instance, payload, expectedCode, capacity) {
+  const { overflow } = copyToBuffer(instance, payload, capacity)
+  const length = instance.exports.veritas_wasm_evaluate(overflow ? capacity + 1 : payload.byteLength)
+  const actualCode = instance.exports.veritas_wasm_last_error_code()
+  if (length !== 0 || actualCode !== expectedCode) {
+    throw new Error(`expected WASM error ${expectedCode}, got length=${length}, code=${actualCode}`)
+  }
+}
+
+function checkNegativeBoundary(instance, testCase, capacity) {
+  const base = encodeFixture(testCase)
+  const cases = {
+    invalid_magic: Uint8Array.from(base),
+    invalid_version: Uint8Array.from(base),
+    invalid_width: Uint8Array.from(base),
+    truncated_payload: base.slice(0, -1),
+    invalid_shape: Uint8Array.from(base),
+    invalid_reference: Uint8Array.from(base),
+    cycle: Uint8Array.from(base),
+  }
+  cases.invalid_magic[0] = 0
+  cases.invalid_version[4] = 2
+  cases.invalid_width[5] = 0
+  const offsets = nodeFieldOffsets(base)
+  const firstGate = offsets.find((node) => node.inputCount > 0)
+  const notNode = offsets.find((node) => node.id === 'not')
+  cases.invalid_shape[firstGate.kindOffset] = 10
+  cases.invalid_reference[firstGate.inputStart] = 0xff
+  cases.invalid_reference[firstGate.inputStart + 1] = 0xff
+  const notIndex = testCase.netlist.components.findIndex((component) => component.id === 'not')
+  cases.cycle[notNode.inputStart] = notIndex & 0xff
+  cases.cycle[notNode.inputStart + 1] = (notIndex >>> 8) & 0xff
+
+  const errorCodes = {}
+  for (const [name, payload] of Object.entries(cases)) {
+    const expectedCode = expectedErrorCodes[name]
+    assertRuntimeError(instance, payload, expectedCode, capacity)
+    errorCodes[name] = expectedCode
+  }
+  assertRuntimeError(instance, new Uint8Array(capacity + 1), expectedErrorCodes.buffer_overflow, capacity)
+  errorCodes.buffer_overflow = expectedErrorCodes.buffer_overflow
+  return errorCodes
 }
 
 function pushAscii(bytes, value) {
@@ -160,6 +243,9 @@ function pushU64(bytes, value) {
 
 try {
   const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'))
+  if (fixture.schema !== 'veritas-wasm-netlist-golden-v1' || !Array.isArray(fixture.cases) || fixture.cases.length !== 4) {
+    throw new Error('WASM-003 fixture must contain exactly four versioned cases')
+  }
   const buildStarted = process.hrtime.bigint()
   run('cargo', [
     'build',
@@ -180,9 +266,9 @@ try {
   const exports = exportEntries.map((entry) => entry.name).sort()
   const missingExports = [...expectedExports].filter((name) => !exports.includes(name))
   const unexpectedExports = exports.filter((name) => !expectedExports.has(name))
-  if (imports.length !== 0) throw new Error(`WASM-002 module has ${imports.length} imports; expected zero`)
+  if (imports.length !== 0) throw new Error(`WASM-003 module has ${imports.length} imports; expected zero`)
   if (missingExports.length > 0 || unexpectedExports.length > 0) {
-    throw new Error(`WASM-002 exports mismatch; missing=${missingExports.join(',')} unexpected=${unexpectedExports.join(',')}`)
+    throw new Error(`WASM-003 exports mismatch; missing=${missingExports.join(',')} unexpected=${unexpectedExports.join(',')}`)
   }
 
   const { instance } = await WebAssembly.instantiate(wasmBytes)
@@ -190,27 +276,37 @@ try {
   const capabilities = instance.exports.veritas_wasm_capabilities()
   const capacity = instance.exports.veritas_wasm_buffer_capacity()
   if (abiVersion !== 1 || capabilities !== 3 || capacity !== 65_536) {
-    throw new Error(`unexpected WASM-002 markers: version=${abiVersion}, capabilities=${capabilities}, capacity=${capacity}`)
+    throw new Error(`unexpected WASM-003 markers: version=${abiVersion}, capabilities=${capabilities}, capacity=${capacity}`)
   }
-  const payload = encodeFixture(fixture)
-  if (bytesToHex(payload) !== fixture.payload_hex) {
-    throw new Error('VNET bytes differ from the registered golden fixture')
+  const cases = []
+  for (const testCase of fixture.cases) {
+    const payload = encodeFixture(testCase)
+    if (bytesToHex(payload) !== testCase.payload_hex) {
+      throw new Error(`VNET bytes differ from the registered golden fixture for ${testCase.name}`)
+    }
+    const { pointer, overflow } = copyToBuffer(instance, payload, capacity)
+    if (overflow) throw new Error(`fixture ${testCase.name} exceeds WASM-003 buffer capacity`)
+    const resultLength = instance.exports.veritas_wasm_evaluate(payload.byteLength)
+    if (resultLength === 0 || instance.exports.veritas_wasm_last_error_code() !== 0) {
+      throw new Error(`WASM-003 evaluation failed for ${testCase.name} with code ${instance.exports.veritas_wasm_last_error_code()}`)
+    }
+    const resultBytes = new Uint8Array(instance.exports.memory.buffer, pointer, resultLength)
+    if (bytesToHex(resultBytes) !== testCase.expected.result_hex) {
+      throw new Error(`VRES bytes differ from the registered golden fixture for ${testCase.name}`)
+    }
+    const result = decodeResult(resultBytes, testCase)
+    assertGolden(result, testCase)
+    cases.push({
+      name: testCase.name,
+      width: testCase.width,
+      payload_bytes: payload.byteLength,
+      result_bytes: resultLength,
+      order: result.order,
+    })
   }
-  const pointer = instance.exports.veritas_wasm_buffer_ptr()
-  if (payload.byteLength > capacity) throw new Error('fixture exceeds WASM-002 buffer capacity')
-  new Uint8Array(instance.exports.memory.buffer, pointer, payload.byteLength).set(payload)
-  const resultLength = instance.exports.veritas_wasm_evaluate(payload.byteLength)
-  if (resultLength === 0 || instance.exports.veritas_wasm_last_error_code() !== 0) {
-    throw new Error(`WASM-002 evaluation failed with code ${instance.exports.veritas_wasm_last_error_code()}`)
-  }
-  const resultBytes = new Uint8Array(instance.exports.memory.buffer, pointer, resultLength)
-  if (bytesToHex(resultBytes) !== fixture.expected.result_hex) {
-    throw new Error('VRES bytes differ from the registered golden fixture')
-  }
-  const result = decodeResult(resultBytes, fixture)
-  assertGolden(result, fixture)
+  const errorCodes = checkNegativeBoundary(instance, fixture.cases[1], capacity)
   const report = {
-    schema: 'veritas-wasm-netlist-parity-v1',
+    schema: 'veritas-wasm-netlist-parity-v2',
     status: 'PASS',
     target,
     feature,
@@ -221,34 +317,34 @@ try {
     abi_version: abiVersion,
     capabilities,
     buffer_capacity: capacity,
-    payload_bytes: payload.byteLength,
-    result_bytes: resultLength,
+    cases,
+    negative_error_codes: errorCodes,
     build_ms: Number(buildMs.toFixed(3)),
   }
   fs.writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`)
   fs.writeFileSync(reportPath, [
-    '# WASM-002 — adapter/netlist ABI e golden parity',
+    '# WASM-003 — matriz golden e hardening de fronteira',
     '',
     '- **Status:** PASS',
     `- **Target:** \`${target}\``,
     `- **Feature:** \`${feature}\``,
     `- **Fixture:** \`${report.fixture}\``,
+    `- **Casos golden:** ${report.cases.length} (${report.cases.map((testCase) => `${testCase.name}/${testCase.width} bits`).join(', ')})`,
     `- **Imports:** ${report.imports_count}`,
     `- **Exports:** ${report.exports.join(', ')}`,
     `- **ABI version:** ${report.abi_version}`,
     `- **Capabilities:** ${report.capabilities}`,
     `- **Buffer:** ${report.buffer_capacity} bytes`,
-    `- **Payload VNET:** ${report.payload_bytes} bytes`,
-    `- **Resultado VRES:** ${report.result_bytes} bytes`,
+    `- **Erros end-to-end:** ${Object.entries(report.negative_error_codes).map(([name, code]) => `${name}=${code}`).join(', ')}`,
     `- **Build:** ${report.build_ms.toFixed(3)} ms`,
     '',
-    'O mesmo fixture público foi codificado no payload VNET, executado pelo núcleo Rust/WASM e comparado ao resultado golden. A verificação conferiu zero imports, exports versionados, marcadores ABI, valores e ordem topológica.',
+    'A matriz independente cobriu 1, 8, 32 e 64 bits. Cada payload VNET e resultado VRES foi comparado byte a byte, e os valores, saídas e a ordem topológica foram conferidos contra o golden.',
     '',
-    'Esta é uma prova experimental fora do navegador, do MCP, do plugin e do build de produção. Ela não habilita execução de `CircuitDocument`, não usa rede, tokens, IndexedDB ou memória compartilhada e não declara superioridade de desempenho.',
+    'A fronteira também rejeitou magic/versão/largura inválidos, payload truncado, shape inválido, referência inválida, ciclo e buffer excedido com códigos estáveis. Esta prova continua fora do navegador, MCP, plugin e build produtivo.',
     '',
   ].join('\n'))
-  console.log(`WASM-002 PASS: golden parity validada; relatório em ${path.relative(repoRoot, reportPath)}`)
+  console.log(`WASM-003 PASS: ${cases.length} casos golden e erros de fronteira validados; relatório em ${path.relative(repoRoot, reportPath)}`)
 } catch (error) {
-  console.error(`WASM-002 FAIL: ${error instanceof Error ? error.message : String(error)}`)
+  console.error(`WASM-003 FAIL: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1
 }

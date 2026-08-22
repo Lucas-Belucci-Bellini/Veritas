@@ -675,3 +675,11 @@ A etapa WASM-002 implementa um contrato experimental de buffer para um subconjun
 A prova de paridade compara o mesmo fixture público nos caminhos TypeScript e Rust/WASM, incluindo bytes, valores, saídas e ordem topológica. Payload inválido, import externo, export desconhecido, código de erro instável ou divergência golden encerra o gate. O módulo expõe memória linear somente para o buffer experimental e não tem API de execução arbitrária, rede, tokens, IndexedDB ou memória compartilhada.
 
 Critérios realizados: contrato `VNET`/`VRES` versionado e documentado; adaptador TypeScript fail-closed; decoder Rust sem dependências externas; exports e capabilities explícitos; fixture golden com largura vetorial, overrides e bytes fixos; paridade TypeScript/Rust/WASM; testes negativos de truncamento, referências, aridades, widths, ciclos e overrides; relatório sanitizado; e TypeScript continua como runtime produtivo/fallback. A etapa não desbloqueia beta nem integração no navegador.
+
+## Implementação WASM-003 matriz golden e hardening de fronteira — 2026-08-22
+
+A etapa WASM-003 ampliou a evidência do contrato VNET/VRES sem ampliar a superfície de produto. O fixture cobre larguras de 1, 8, 32 e 64 bits, constantes, overrides, famílias de portas e ordem topológica estável. O mesmo conjunto é comparado no avaliador vetorial TypeScript, no crate Rust e no módulo WASM compilado com a feature opt-in.
+
+O runner também exercita a fronteira host/WASM com payloads truncados, magic/versão inválidos, referências e shape inválidos, largura inválida, ciclo e chamadas com buffer excedido. Cada falha retorna zero e um código estável, sem expor texto livre, memória fora do buffer, rede, tokens ou dados de usuário. A bridge continua fora do navegador, MCP, plugin, bundle produtivo e beta.
+
+Critérios realizados localmente: matriz golden multi-largura independente; paridade de bytes, valores, saídas e ordem; testes nativos e end-to-end dos códigos de erro; validação do limite de capacidade; relatório sanitizado; execução no Quality/Release pendente para este commit; nenhum aumento de capability sem revisão do contrato; e TypeScript preservado como runtime produtivo/fallback.

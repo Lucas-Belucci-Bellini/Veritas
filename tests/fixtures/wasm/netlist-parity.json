@@ -1,49 +1,797 @@
 {
-  "width": 8,
-  "netlist": {
-    "components": [
-      {
-        "id": "b",
-        "type": "input",
-        "options": { "width": 8, "initial": false }
+  "schema": "veritas-wasm-netlist-golden-v1",
+  "cases": [
+    {
+      "name": "scalar-1",
+      "width": 1,
+      "netlist": {
+        "components": [
+          {
+            "id": "const",
+            "type": "constant",
+            "options": {
+              "width": 1,
+              "value": false
+            }
+          },
+          {
+            "id": "b",
+            "type": "input",
+            "options": {
+              "width": 1,
+              "initial": false
+            }
+          },
+          {
+            "id": "a",
+            "type": "input",
+            "options": {
+              "width": 1,
+              "initial": false
+            }
+          },
+          {
+            "id": "and",
+            "type": "and",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nand",
+            "type": "nand",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "or",
+            "type": "or",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nor",
+            "type": "nor",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xor",
+            "type": "xor",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xnor",
+            "type": "xnor",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "not",
+            "type": "not",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "xor"
+              }
+            ]
+          },
+          {
+            "id": "out",
+            "type": "output",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "not"
+              }
+            ]
+          },
+          {
+            "id": "constOut",
+            "type": "output",
+            "options": {
+              "width": 1
+            },
+            "inputs": [
+              {
+                "node": "const"
+              }
+            ]
+          }
+        ]
       },
-      {
-        "id": "a",
-        "type": "input",
-        "options": { "width": 8, "initial": false }
+      "overrides": {
+        "a": "0b1",
+        "b": "0b0"
       },
-      {
-        "id": "and",
-        "type": "and",
-        "options": { "width": 8 },
-        "inputs": [{ "node": "a" }, { "node": "b" }]
-      },
-      {
-        "id": "not",
-        "type": "not",
-        "options": { "width": 8 },
-        "inputs": [{ "node": "and" }]
-      },
-      {
-        "id": "out",
-        "type": "output",
-        "options": { "width": 8 },
-        "inputs": [{ "node": "not" }]
+      "payload_hex": "564e455401010c0005636f6e73740100000000000000000001620000000000000000000001610000000000000000000003616e640200000000000000000202000100046e616e640300000000000000000202000100026f720400000000000000000202000100036e6f72050000000000000000020200010003786f72060000000000000000020200010004786e6f720700000000000000000202000100036e6f74080000000000000000010700036f757409000000000000000001090008636f6e73744f757409000000000000000001000002000200010000000000000001000000000000000000",
+      "expected": {
+        "values": {
+          "const": "0",
+          "b": "0",
+          "a": "1",
+          "and": "0",
+          "nand": "1",
+          "or": "1",
+          "nor": "0",
+          "xor": "1",
+          "xnor": "0",
+          "not": "0",
+          "out": "0",
+          "constOut": "0"
+        },
+        "outputs": {
+          "out": "0",
+          "constOut": "0"
+        },
+        "order": [
+          "a",
+          "b",
+          "and",
+          "const",
+          "constOut",
+          "nand",
+          "nor",
+          "or",
+          "xnor",
+          "xor",
+          "not",
+          "out"
+        ],
+        "result_hex": "5652455301010c000000000000000000000000000000000001000000000000000000000000000000010000000000000001000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000c0002000100030000000b000400060005000800070009000a00"
       }
-    ]
-  },
-  "overrides": { "a": "0xFF", "b": "0xF0" },
-  "payload_hex": "564e45540108050001620000000000000000000001610000000000000000000003616e640200000000000000000201000000036e6f74080000000000000000010200036f757409000000000000000001030002000100ff000000000000000000f000000000000000",
-  "expected": {
-    "values": {
-      "b": "F0",
-      "a": "FF",
-      "and": "F0",
-      "not": "0F",
-      "out": "0F"
     },
-    "outputs": { "out": "0F" },
-    "order": ["a", "b", "and", "not", "out"],
-    "result_hex": "5652455301080500f000000000000000ff00000000000000f0000000000000000f000000000000000f00000000000000050001000000020003000400"
-  }
+    {
+      "name": "byte-8",
+      "width": 8,
+      "netlist": {
+        "components": [
+          {
+            "id": "const",
+            "type": "constant",
+            "options": {
+              "width": 8,
+              "value": false
+            }
+          },
+          {
+            "id": "b",
+            "type": "input",
+            "options": {
+              "width": 8,
+              "initial": false
+            }
+          },
+          {
+            "id": "a",
+            "type": "input",
+            "options": {
+              "width": 8,
+              "initial": false
+            }
+          },
+          {
+            "id": "and",
+            "type": "and",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nand",
+            "type": "nand",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "or",
+            "type": "or",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nor",
+            "type": "nor",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xor",
+            "type": "xor",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xnor",
+            "type": "xnor",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "not",
+            "type": "not",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "xor"
+              }
+            ]
+          },
+          {
+            "id": "out",
+            "type": "output",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "not"
+              }
+            ]
+          },
+          {
+            "id": "constOut",
+            "type": "output",
+            "options": {
+              "width": 8
+            },
+            "inputs": [
+              {
+                "node": "const"
+              }
+            ]
+          }
+        ]
+      },
+      "overrides": {
+        "a": "0xFF",
+        "b": "0xF0"
+      },
+      "payload_hex": "564e455401080c0005636f6e73740100000000000000000001620000000000000000000001610000000000000000000003616e640200000000000000000202000100046e616e640300000000000000000202000100026f720400000000000000000202000100036e6f72050000000000000000020200010003786f72060000000000000000020200010004786e6f720700000000000000000202000100036e6f74080000000000000000010700036f757409000000000000000001090008636f6e73744f757409000000000000000001000002000200ff000000000000000100f000000000000000",
+      "expected": {
+        "values": {
+          "const": "00",
+          "b": "F0",
+          "a": "FF",
+          "and": "F0",
+          "nand": "0F",
+          "or": "FF",
+          "nor": "00",
+          "xor": "0F",
+          "xnor": "F0",
+          "not": "F0",
+          "out": "F0",
+          "constOut": "00"
+        },
+        "outputs": {
+          "out": "F0",
+          "constOut": "00"
+        },
+        "order": [
+          "a",
+          "b",
+          "and",
+          "const",
+          "constOut",
+          "nand",
+          "nor",
+          "or",
+          "xnor",
+          "xor",
+          "not",
+          "out"
+        ],
+        "result_hex": "5652455301080c000000000000000000f000000000000000ff00000000000000f0000000000000000f00000000000000ff0000000000000000000000000000000f00000000000000f000000000000000f000000000000000f00000000000000000000000000000000c0002000100030000000b000400060005000800070009000a00"
+      }
+    },
+    {
+      "name": "word-32",
+      "width": 32,
+      "netlist": {
+        "components": [
+          {
+            "id": "const",
+            "type": "constant",
+            "options": {
+              "width": 32,
+              "value": false
+            }
+          },
+          {
+            "id": "b",
+            "type": "input",
+            "options": {
+              "width": 32,
+              "initial": false
+            }
+          },
+          {
+            "id": "a",
+            "type": "input",
+            "options": {
+              "width": 32,
+              "initial": false
+            }
+          },
+          {
+            "id": "and",
+            "type": "and",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nand",
+            "type": "nand",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "or",
+            "type": "or",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nor",
+            "type": "nor",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xor",
+            "type": "xor",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xnor",
+            "type": "xnor",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "not",
+            "type": "not",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "xor"
+              }
+            ]
+          },
+          {
+            "id": "out",
+            "type": "output",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "not"
+              }
+            ]
+          },
+          {
+            "id": "constOut",
+            "type": "output",
+            "options": {
+              "width": 32
+            },
+            "inputs": [
+              {
+                "node": "const"
+              }
+            ]
+          }
+        ]
+      },
+      "overrides": {
+        "a": "0xFFFFFFFF",
+        "b": "0x13579BDF"
+      },
+      "payload_hex": "564e455401200c0005636f6e73740100000000000000000001620000000000000000000001610000000000000000000003616e640200000000000000000202000100046e616e640300000000000000000202000100026f720400000000000000000202000100036e6f72050000000000000000020200010003786f72060000000000000000020200010004786e6f720700000000000000000202000100036e6f74080000000000000000010700036f757409000000000000000001090008636f6e73744f757409000000000000000001000002000200ffffffff000000000100df9b571300000000",
+      "expected": {
+        "values": {
+          "const": "00000000",
+          "b": "13579BDF",
+          "a": "FFFFFFFF",
+          "and": "13579BDF",
+          "nand": "ECA86420",
+          "or": "FFFFFFFF",
+          "nor": "00000000",
+          "xor": "ECA86420",
+          "xnor": "13579BDF",
+          "not": "13579BDF",
+          "out": "13579BDF",
+          "constOut": "00000000"
+        },
+        "outputs": {
+          "out": "13579BDF",
+          "constOut": "00000000"
+        },
+        "order": [
+          "a",
+          "b",
+          "and",
+          "const",
+          "constOut",
+          "nand",
+          "nor",
+          "or",
+          "xnor",
+          "xor",
+          "not",
+          "out"
+        ],
+        "result_hex": "5652455301200c000000000000000000df9b571300000000ffffffff00000000df9b5713000000002064a8ec00000000ffffffff0000000000000000000000002064a8ec00000000df9b571300000000df9b571300000000df9b57130000000000000000000000000c0002000100030000000b000400060005000800070009000a00"
+      }
+    },
+    {
+      "name": "qword-64",
+      "width": 64,
+      "netlist": {
+        "components": [
+          {
+            "id": "const",
+            "type": "constant",
+            "options": {
+              "width": 64,
+              "value": false
+            }
+          },
+          {
+            "id": "b",
+            "type": "input",
+            "options": {
+              "width": 64,
+              "initial": false
+            }
+          },
+          {
+            "id": "a",
+            "type": "input",
+            "options": {
+              "width": 64,
+              "initial": false
+            }
+          },
+          {
+            "id": "and",
+            "type": "and",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nand",
+            "type": "nand",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "or",
+            "type": "or",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "nor",
+            "type": "nor",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xor",
+            "type": "xor",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "xnor",
+            "type": "xnor",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
+          },
+          {
+            "id": "not",
+            "type": "not",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "xor"
+              }
+            ]
+          },
+          {
+            "id": "out",
+            "type": "output",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "not"
+              }
+            ]
+          },
+          {
+            "id": "constOut",
+            "type": "output",
+            "options": {
+              "width": 64
+            },
+            "inputs": [
+              {
+                "node": "const"
+              }
+            ]
+          }
+        ]
+      },
+      "overrides": {
+        "a": "0xFFFFFFFFFFFFFFFF",
+        "b": "0x0F0F0F0F0F0F0F0F"
+      },
+      "payload_hex": "564e455401400c0005636f6e73740100000000000000000001620000000000000000000001610000000000000000000003616e640200000000000000000202000100046e616e640300000000000000000202000100026f720400000000000000000202000100036e6f72050000000000000000020200010003786f72060000000000000000020200010004786e6f720700000000000000000202000100036e6f74080000000000000000010700036f757409000000000000000001090008636f6e73744f757409000000000000000001000002000200ffffffffffffffff01000f0f0f0f0f0f0f0f",
+      "expected": {
+        "values": {
+          "const": "0000000000000000",
+          "b": "0F0F0F0F0F0F0F0F",
+          "a": "FFFFFFFFFFFFFFFF",
+          "and": "0F0F0F0F0F0F0F0F",
+          "nand": "F0F0F0F0F0F0F0F0",
+          "or": "FFFFFFFFFFFFFFFF",
+          "nor": "0000000000000000",
+          "xor": "F0F0F0F0F0F0F0F0",
+          "xnor": "0F0F0F0F0F0F0F0F",
+          "not": "0F0F0F0F0F0F0F0F",
+          "out": "0F0F0F0F0F0F0F0F",
+          "constOut": "0000000000000000"
+        },
+        "outputs": {
+          "out": "0F0F0F0F0F0F0F0F",
+          "constOut": "0000000000000000"
+        },
+        "order": [
+          "a",
+          "b",
+          "and",
+          "const",
+          "constOut",
+          "nand",
+          "nor",
+          "or",
+          "xnor",
+          "xor",
+          "not",
+          "out"
+        ],
+        "result_hex": "5652455301400c0000000000000000000f0f0f0f0f0f0f0fffffffffffffffff0f0f0f0f0f0f0f0ff0f0f0f0f0f0f0f0ffffffffffffffff0000000000000000f0f0f0f0f0f0f0f00f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f00000000000000000c0002000100030000000b000400060005000800070009000a00"
+      }
+    }
+  ]
 }
