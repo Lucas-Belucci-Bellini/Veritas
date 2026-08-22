@@ -51,8 +51,14 @@ jobs:
       - name: Build MCP bundle
         run: npm run build:mcp
 
+      - name: Build MCP HTTP bundle
+        run: npm run build:mcp:http
+
       - name: MCP interoperability acceptance
         run: npm run beta:mcp
+
+      - name: MCP HTTP interoperability acceptance
+        run: npm run beta:mcp:http
 
       - name: HDL acceptance
         env:

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import {
   circuitTruthTable,
@@ -62,16 +61,22 @@ function guard(run: () => ToolResult) {
   }
 }
 
-const server = new McpServer(
-  { name: 'veritas', version: '0.9.0-rc.1' },
-  {
-    instructions:
-      'Motor de lógica booleana do Veritas. Use estas ferramentas em vez de calcular tabelas verdade ' +
-      'ou simplificações de cabeça: elas são exatas. A biblioteca de chips vem de circuitos reais ' +
-      'feitos no Digital Logic Sim.',
-  },
-)
+export const VERITAS_MCP_VERSION = '0.9.0-rc.4'
+export const VERITAS_MCP_INSTRUCTIONS =
+  'Motor de lógica booleana do Veritas. Use estas ferramentas em vez de calcular tabelas verdade ' +
+  'ou simplificações de cabeça: elas são exatas. A biblioteca de chips vem de circuitos reais ' +
+  'feitos no Digital Logic Sim.'
 
+export function createVeritasServer(): McpServer {
+  const server = new McpServer(
+    { name: 'veritas', version: VERITAS_MCP_VERSION },
+    { instructions: VERITAS_MCP_INSTRUCTIONS },
+  )
+  registerVeritasTools(server)
+  return server
+}
+
+export function registerVeritasTools(server: McpServer): void {
 server.registerTool(
   'truth_table',
   {
@@ -402,4 +407,4 @@ server.registerTool(
   async ({ name }) => guard(() => getChip(name)),
 )
 
-await server.connect(new StdioServerTransport())
+}

@@ -131,6 +131,12 @@ jobs:
       - name: Build MCP
         run: npm run build:mcp
 
+      - name: Build MCP HTTP
+        run: npm run build:mcp:http
+
+      - name: MCP HTTP interoperability acceptance
+        run: npm run beta:mcp:http
+
       - name: Preview and smoke test
         run: |
           npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/veritas-release-preview.log" 2>&1 &

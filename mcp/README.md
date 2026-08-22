@@ -79,6 +79,30 @@ Em `claude_desktop_config.json`:
 
 A instalação stdio atende clientes que iniciam processos locais. Para Claude API e ChatGPT web, o servidor precisa ser exposto por um endpoint Streamable HTTP HTTPS autenticado; consulte [`docs/MCP-INTEROPERABILITY.md`](../docs/MCP-INTEROPERABILITY.md). Não exponha `mcp/dist/server.js` diretamente à internet e não coloque tokens no frontend.
 
+### MCP-011: transporte HTTP local protegido
+
+O MCP-011 adiciona uma entrada HTTP **somente para execução local/controlada**. Ela não cria deployment público, não usa token fixo no frontend e não substitui o stdio. O servidor exige um Bearer fornecido pelo ambiente, uma allowlist explícita de Origin e os headers `Accept: application/json, text/event-stream`, `Content-Type: application/json` e `MCP-Protocol-Version: 2025-11-25`. O endpoint aceita `POST` em `/mcp`; `GET` é rejeitado nesta fatia para não misturar o contrato atual com transporte legado.
+
+```bash
+npm run build:mcp
+npm run build:mcp:http
+VERITAS_MCP_HTTP_BEARER_TOKEN='defina-fora-do-repositorio' \
+VERITAS_MCP_HTTP_ALLOWED_ORIGINS='https://allowed.example' \
+VERITAS_MCP_HTTP_HOST='127.0.0.1' \
+npm run mcp:http
+```
+
+A porta padrão é `8787`; use `VERITAS_MCP_HTTP_PORT` para escolher outra. O processo retorna `401` sem Bearer, `403` para Origin fora da allowlist, `400` para versão/headers incompatíveis, `405` para método não permitido e `413` para payload acima de 1 MiB. O token deve existir apenas no ambiente do processo; nunca o registre em documentação, bundle web, Git ou chat.
+
+Para repetir a aceitação determinística sem rede pública:
+
+```bash
+npm run build:mcp:http
+npm run beta:mcp:http
+```
+
+O runner usa localhost, token efêmero do processo e dados sintéticos. A aprovação do MCP-011 não é autorização para publicar um endpoint remoto. A etapa pública continua condicionada à escolha de um provedor OAuth/resource server, metadata de recurso, validação de audience/resource, PKCE, HTTPS, rate limiting, observabilidade sanitizada e smoke externo.
+
 ## Exemplo
 
 ```
@@ -159,9 +183,10 @@ Falta fechar 1 parêntese.
 ## Como está montado
 
 `mcp/src/tools.ts` tem a lógica das ferramentas, sem nada de MCP — é o que os
-testes exercitam direto. `mcp/src/server.ts` só cuida do transporte e dos
-esquemas. O build empacota o motor do Veritas junto e deixa o SDK do MCP de
-fora, como dependência declarada.
+ testes exercitam direto. `mcp/src/server.ts` registra schemas e expõe a fábrica
+ compartilhada `createVeritasServer`; `mcp/src/stdio.ts` conecta essa fábrica ao
+ stdio e `mcp/src/http-entry.ts` ao adaptador HTTP local. O build empacota o motor
+ do Veritas junto e deixa o SDK do MCP de fora, como dependência declarada.
 
 ## Exemplo de custom-chip portátil
 

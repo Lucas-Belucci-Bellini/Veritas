@@ -90,7 +90,7 @@ A arquitetura recomendada é:
 OpenClaw, Manus local              Codex remoto, outros
 ```
 
-O adaptador HTTP deve usar `StreamableHTTPServerTransport` do SDK oficial, validar `Origin`, exigir autenticação, limitar payload/tempo e bindar em localhost quando usado apenas localmente. A especificação MCP exige um endpoint que aceite POST e GET, e recomenda validação de Origin e autenticação [1].
+O adaptador HTTP local do MCP-011 usa `StreamableHTTPServerTransport` do SDK oficial, valida `Origin`, exige Bearer de ambiente, limita payload/tempo e faz bind em localhost por padrão. O contrato adotado pela implementação é `2025-11-25`, que a SDK instalada suporta; a entrada local aceita apenas POST em `/mcp`, retorna JSON e não cria sessão. O endpoint público OAuth ainda não foi implementado. A revisão oficial consultada mais recente descreve mudanças adicionais de transporte e deverá ser fixada em uma etapa própria antes de qualquer deploy público [1] [5].
 
 Não se deve duplicar as ferramentas para o segundo transporte. Extraia um `createVeritasServer()` que registre as mesmas ferramentas e injete o transport escolhido:
 
@@ -106,7 +106,7 @@ export function createVeritasServer() {
 }
 ```
 
-O entrypoint stdio chama `createVeritasServer().connect(new StdioServerTransport())`. O entrypoint HTTP cria uma sessão `StreamableHTTPServerTransport` e chama `createVeritasServer().connect(transport)` por sessão. A autenticação deve ficar fora das ferramentas, em middleware, e nunca deve ser simulada no frontend.
+O entrypoint stdio chama `createVeritasServer().connect(new StdioServerTransport())`. O entrypoint HTTP local cria um `StreamableHTTPServerTransport` stateless por request e chama `createVeritasServer().connect(transport)`. A autenticação fica fora das ferramentas, no handler HTTP, e nunca deve ser simulada no frontend.
 
 ## Compatibilidade por cliente
 
@@ -128,9 +128,11 @@ A primeira superfície remota deve ser read-only/determinística. `debug_algorit
 
 Também é importante manter `instructions` curto e operacional: explicar que o servidor é fonte exata para lógica, que há limites de linhas/tiques/passos e que documentos inválidos devem ser corrigidos antes de tentar exportar. O Codex lê esse campo e o usa como orientação global do servidor [3].
 
-## Próxima implementação recomendada
+## Estado do MCP-011 e próxima etapa
 
-A próxima fatia MCP deve extrair o registro comum de ferramentas para `mcp/src/registerTools.ts`, criar `mcp/src/http-server.ts` com `StreamableHTTPServerTransport`, adicionar autenticação Bearer/OAuth configurável por ambiente e testar o endpoint com o MCP Inspector. O servidor stdio atual deve permanecer inalterado para não quebrar clientes locais.
+A implementação inicial foi entregue como MCP-011: a fábrica comum vive em `mcp/src/server.ts`, o stdio em `mcp/src/stdio.ts`, o entrypoint HTTP em `mcp/src/http-entry.ts` e o handler em `mcp/src/http-server.ts`. O runner `beta:mcp:http` testa autenticação Bearer local, allowlist de Origin, headers de protocolo, HeaderMismatch, limite de payload e equivalência com o golden stdio.
+
+A próxima etapa pública não é habilitada automaticamente por esta fatia. Antes de expor uma URL remota, será necessário escolher o authorization server, implementar Protected Resource Metadata, resource indicator/audience, PKCE, validação de escopo, HTTPS, rate limiting, logs sanitizados e smoke remoto. O servidor stdio deve permanecer inalterado para não quebrar clientes locais.
 
 ### Referências
 
@@ -138,3 +140,4 @@ A próxima fatia MCP deve extrair o registro comum de ferramentas para `mcp/src/
 [2]: https://platform.claude.com/docs/en/agents-and-tools/mcp-connector "Anthropic — MCP connector"
 [3]: https://developers.openai.com/codex/mcp "OpenAI — Codex MCP"
 [4]: https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt "OpenAI — Developer mode and MCP apps in ChatGPT"
+[5]: https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http "MCP — Streamable HTTP (2026-07-28)"

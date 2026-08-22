@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.4] — 2026-08-22
+
+### Adicionado
+
+- Primeira camada do MCP-011: fábrica comum de ferramentas, entrypoint stdio preservado e transporte HTTP local stateless baseado na SDK oficial.
+- Build separado `build:mcp:http`, comando `mcp:http` e binário `veritas-mcp-http-server` para execução controlada em localhost.
+- Aceitação HTTP com Bearer obrigatório, allowlist de Origin, headers de protocolo, HeaderMismatch, limite de payload, rejeição de GET e equivalência com os goldens stdio.
+
+### Segurança e documentação
+
+- O transporte HTTP exige configuração por ambiente, faz bind em `127.0.0.1` por padrão e não publica HTTPS, não acessa Supabase e não coloca tokens no frontend.
+- Quality e release workflows agora executam o build/acceptance HTTP além da matriz MCP stdio MCP-001…MCP-010.
+- O transporte remoto OAuth continua fora desta RC até haver provedor aprovado, metadata de recurso, audience/resource, PKCE, HTTPS, rate limiting, threat model e smoke externo.
+
 ## [0.9.0-rc.3] — 2026-08-22
 
 ### Corrigido

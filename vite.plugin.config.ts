@@ -26,7 +26,7 @@ export default defineConfig({
     outDir: 'plugins/veritas-logic',
     emptyOutDir: false,
     minify: false,
-    ssr: 'mcp/src/server.ts',
+    ssr: 'mcp/src/stdio.ts',
     target: 'node22',
     rollupOptions: {
       external: [/^node:/],

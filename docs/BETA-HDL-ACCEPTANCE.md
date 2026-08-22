@@ -1,7 +1,7 @@
 # Aceitação Beta — Exportação HDL
 
 **Produto:** Veritas  
-**Versão candidata:** `0.9.0-rc.3`
+**Versão candidata:** `0.9.0-rc.4`
 **Objetivo:** provar que o exportador combinacional gera texto determinístico equivalente em Verilog e VHDL, rejeita circuitos inválidos pelo validador canônico e compila fixtures públicas com toolchains de referência.
 
 ## 1. Escopo do gate
@@ -56,7 +56,7 @@ O workflow `.github/workflows/quality.yml` instala `iverilog` e `ghdl` e executa
 Para anexar o relatório ao manifesto beta, use `BETA_HDL_REPORT`:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.3 \
+BETA_EXPECTED_VERSION=0.9.0-rc.4 \
 BETA_HDL_REPORT=artifacts/hdl-acceptance.md \
 BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
 npm run beta:evidence
