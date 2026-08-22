@@ -9,6 +9,7 @@ import {
   karnaugh,
   listChips,
   circuitTruthTable,
+  circuitVectorTruthTable,
   exportCircuitTool,
   MAX_SIMULATION_TICKS,
   normalForms,
@@ -201,6 +202,56 @@ const customChipCircuit: CircuitDocument = {
     { source: { node: 'chip' }, target: { node: 'output', port: 0 } },
   ],
 }
+
+function vectorAndCircuit(width = 4): CircuitDocument {
+  return {
+    ...createCircuitDocument('AND vetorial MCP'),
+    nodes: [
+      { id: 'a', type: 'input', position: { x: 0, y: 0 }, options: { width } },
+      { id: 'b', type: 'input', position: { x: 0, y: 100 }, options: { width } },
+      { id: 'gate', type: 'and', position: { x: 180, y: 50 }, options: { width } },
+      { id: 'out', type: 'output', position: { x: 360, y: 50 }, options: { width } },
+    ],
+    connections: [
+      { source: { node: 'a' }, target: { node: 'gate', port: 0 } },
+      { source: { node: 'b' }, target: { node: 'gate', port: 1 } },
+      { source: { node: 'gate' }, target: { node: 'out', port: 0 } },
+    ],
+  }
+}
+
+describe('circuit_vector_truth_table', () => {
+  it('gera linhas binárias determinísticas para AND de quatro bits', () => {
+    const result = circuitVectorTruthTable({ document: vectorAndCircuit(), maxRows: 4 })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('| a[3:0] | b[3:0] | out[3:0] |')
+    expect(result.text).toContain('| 0000 | 0000 | 0000 |')
+    expect(result.text).toContain('Bits de entrada: 8')
+    expect(result.text).toContain('Exibindo 4 de 256 combinações.')
+  })
+
+  it('respeita output_id e max_bits sem expor valores não solicitados', () => {
+    const result = circuitVectorTruthTable({ document: vectorAndCircuit(), outputId: 'out', maxBits: 8, maxRows: 1 })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('Combinações geradas: 1 de 256')
+  })
+
+  it('recusa largura total acima do limite vetorial', () => {
+    const result = circuitVectorTruthTable({ document: vectorAndCircuit(8) })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('limite seguro é 12')
+  })
+
+  it('recusa documento inválido com erro MCP controlado', () => {
+    const result = circuitVectorTruthTable({ document: { format: 'invalid' } })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('formato veritas-circuit')
+  })
+})
 
 describe('circuit_truth_table', () => {
   it('gera tabela determinística para instância customizada', () => {

@@ -20,6 +20,7 @@ import {
 import type { ChipCatalog, ChipEntry } from '../../src/chips/types'
 import {
   buildCircuitTruthTable,
+  buildCircuitVectorTruthTable,
   buildCustomChipDefinition,
   elaborateCustomChipDocument,
   exportCircuit,
@@ -482,6 +483,44 @@ export function circuitTruthTable(query: CircuitTruthTableToolQuery): ToolResult
   } catch (error) {
     return { isError: true, text: error instanceof Error ? error.message : 'Falha ao gerar a tabela verdade do circuito.' }
   }
+}
+
+export interface CircuitVectorTruthTableToolQuery {
+  document: unknown
+  maxBits?: number
+  maxRows?: number
+  outputId?: string
+  customChips?: readonly CustomChipToolDefinition[]
+}
+
+export function circuitVectorTruthTable(query: CircuitVectorTruthTableToolQuery): ToolResult {
+  try {
+    if (!isCircuitDocumentShape(query.document)) return { isError: true, text: 'O documento não possui o formato veritas-circuit esperado.' }
+    const customChips = normalizeCustomChipLibrary(query.customChips)
+    const table = buildCircuitVectorTruthTable(query.document, {
+      maxBits: query.maxBits,
+      maxRows: query.maxRows,
+      outputId: query.outputId,
+      customChips,
+    })
+    const header = `| ${table.columns.map((column) => vectorColumnLabel(column.label, column.width)).join(' | ')} |`
+    const divider = `| ${table.columns.map(() => '---').join(' | ')} |`
+    const rows = table.rows.map((row) => `| ${row.join(' | ')} |`)
+    const notes = [
+      `Bits de entrada: ${table.totalInputBits}`,
+      `Combinações geradas: ${table.generatedRows} de ${table.totalRows}`,
+      `Linhas com algum bit ativo: ${table.activeCount}`,
+      `Classificação: ${table.classification}`,
+    ]
+    if (table.truncated) notes.push(`Exibindo ${table.generatedRows} de ${table.totalRows} combinações.`)
+    return { text: [header, divider, ...rows, '', ...notes].join('\n') }
+  } catch (error) {
+    return { isError: true, text: error instanceof Error ? error.message : 'Falha ao gerar a tabela verdade vetorial do circuito.' }
+  }
+}
+
+function vectorColumnLabel(label: string, width: number): string {
+  return width > 1 ? `${label}[${width - 1}:0]` : label
 }
 
 export interface CustomChipToolDefinition {

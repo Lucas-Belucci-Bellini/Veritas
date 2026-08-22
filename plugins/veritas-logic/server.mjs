@@ -20803,8 +20803,8 @@ function buildKarnaughMap(ast, notation = "math") {
 		variables,
 		rowVariables,
 		columnVariables,
-		rowLabels: rowCodes.map((code) => toBinary(code, rowBits)),
-		columnLabels: columnCodes.map((code) => toBinary(code, columnBits)),
+		rowLabels: rowCodes.map((code) => toBinary$1(code, rowBits)),
+		columnLabels: columnCodes.map((code) => toBinary$1(code, columnBits)),
 		values,
 		minterms,
 		groups: buildGroups(column, variables, positionOf, notation)
@@ -20825,7 +20825,7 @@ function buildGroups(column, variables, positionOf, notation) {
 function grayCode(bits) {
 	return Array.from({ length: 2 ** bits }, (_, index) => index ^ index >> 1);
 }
-function toBinary(value, bits) {
+function toBinary$1(value, bits) {
 	return bits === 0 ? "" : value.toString(2).padStart(bits, "0");
 }
 function buildNormalForms(ast, notation = "math") {
@@ -20937,6 +20937,97 @@ function isSumOfProducts(node) {
 function isProductOfSums(node) {
 	if (node.kind === "binary" && node.op === "and") return isProductOfSums(node.left) && isProductOfSums(node.right);
 	return isSumTerm(node);
+}
+var BitVectorError = class extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "BitVectorError";
+	}
+};
+function bitVector(width, value = 0) {
+	assertWidth(width);
+	const bits = typeof value === "string" ? parseLiteralBits(value, width) : isBooleanArray$1(value) ? normalizeBits(value, width) : bitsFromBigInt(toBigIntValue(value), width);
+	return freezeVector({
+		width,
+		bits: Object.freeze(bits)
+	});
+}
+function toBinary(vector, grouped = false) {
+	assertVector(vector);
+	const binary = vector.bits.map((bit) => bit ? "1" : "0").join("");
+	return grouped ? group(binary, 4) : binary;
+}
+function bitwiseAnd(left, right) {
+	return binaryOperation(left, right, (a, b) => a && b);
+}
+function bitwiseOr(left, right) {
+	return binaryOperation(left, right, (a, b) => a || b);
+}
+function bitwiseXor(left, right) {
+	return binaryOperation(left, right, (a, b) => a !== b);
+}
+function bitwiseNot(vector) {
+	assertVector(vector);
+	return bitVector(vector.width, vector.bits.map((bit) => !bit));
+}
+function parseBusLiteral(literal, width) {
+	const cleaned = literal.trim().replace(/_/g, "");
+	if (!cleaned) throw new BitVectorError("Literal de barramento vazio.");
+	const inferredWidth = cleaned.startsWith("0b") || cleaned.startsWith("0B") ? cleaned.slice(2).length : cleaned.startsWith("0x") || cleaned.startsWith("0X") ? cleaned.slice(2).length * 4 : cleaned.length;
+	return bitVector(width ?? Math.max(1, inferredWidth), cleaned);
+}
+function toBigIntValue(value) {
+	if (typeof value === "bigint") return value;
+	if (!Number.isSafeInteger(value)) throw new BitVectorError("O valor numérico precisa ser um inteiro seguro.");
+	return BigInt(value);
+}
+function binaryOperation(left, right, operation) {
+	assertVector(left);
+	assertVector(right);
+	if (left.width !== right.width) throw new BitVectorError(`Barramentos incompatíveis: ${left.width} e ${right.width} bits.`);
+	return bitVector(left.width, left.bits.map((bit, index) => operation(bit, right.bits[index])));
+}
+function parseLiteralBits(value, width) {
+	const cleaned = value.trim().replace(/_/g, "");
+	if (!cleaned) throw new BitVectorError("Literal de barramento vazio.");
+	const isBinary = cleaned.startsWith("0b") || cleaned.startsWith("0B");
+	const isHex = cleaned.startsWith("0x") || cleaned.startsWith("0X");
+	const digits = isBinary || isHex ? cleaned.slice(2) : cleaned;
+	if (!digits) throw new BitVectorError("Literal de barramento sem dígitos.");
+	if (isBinary && !/^[01]+$/.test(digits)) throw new BitVectorError("Literal binário inválido.");
+	if (isHex && !/^[0-9a-f]+$/i.test(digits)) throw new BitVectorError("Literal hexadecimal inválido.");
+	if (!isBinary && !isHex && !/^[01]+$/.test(digits)) throw new BitVectorError("Literal sem prefixo deve conter apenas 0 e 1.");
+	return bitsFromBigInt(isHex ? BigInt(`0x${digits}`) : BigInt(`0b${digits}`), width);
+}
+function bitsFromBigInt(value, width) {
+	if (value < 0n) throw new BitVectorError("Barramentos não aceitam valores negativos nesta versão.");
+	if (value > (1n << BigInt(width)) - 1n) throw new BitVectorError(`O valor não cabe em ${width} bits.`);
+	return Array.from({ length: width }, (_, index) => {
+		return (value & 1n << BigInt(width - index - 1)) !== 0n;
+	});
+}
+function isBooleanArray$1(value) {
+	return Array.isArray(value);
+}
+function normalizeBits(bits, width) {
+	if (bits.length !== width || bits.some((bit) => typeof bit !== "boolean")) throw new BitVectorError(`Esperados exatamente ${width} bits booleanos.`);
+	return [...bits];
+}
+function assertVector(vector) {
+	if (!vector || !isValidWidth(vector.width) || vector.bits.length !== vector.width || vector.bits.some((bit) => typeof bit !== "boolean")) throw new BitVectorError("Valor de barramento inválido.");
+}
+function assertWidth(width) {
+	if (!isValidWidth(width)) throw new BitVectorError(`A largura deve ser um inteiro entre 1 e 64.`);
+}
+function isValidWidth(width) {
+	return Number.isInteger(width) && width >= 1 && width <= 64;
+}
+function freezeVector(vector) {
+	return Object.freeze(vector);
+}
+function group(value, size) {
+	const first = value.length % size || size;
+	return [value.slice(0, first), ...value.slice(first).match(new RegExp(`.{1,${size}}`, "g")) ?? []].join("_");
 }
 //#endregion
 //#region src/simulation/components.ts
@@ -21479,6 +21570,12 @@ function compareIds(left, right) {
 function evaluateCircuit(document, inputs = {}, options = {}) {
 	return evaluateNetlist(toNetlist(normalizeCircuitDocument(document), { customChips: options.customChips }), inputs, options);
 }
+function evaluateCircuitVectors(document, inputs = {}, options = {}) {
+	return evaluateVectorNetlist(toNetlist(normalizeCircuitDocument(document), {
+		allowBuses: true,
+		customChips: options.customChips
+	}), inputs, options);
+}
 /**
 * Avalia apenas netlists combinacionais. A função é independente de React e do
 * DOM para ser compartilhada pelo editor, pelos testes e futuramente pelo MCP.
@@ -21504,6 +21601,29 @@ function evaluateNetlist(netlist, inputs = {}, options = {}, depth = 0) {
 		order
 	};
 }
+function evaluateVectorNetlist(netlist, inputs, options, depth = 0) {
+	const components = /* @__PURE__ */ new Map();
+	for (const component of netlist.components) {
+		if (components.has(component.id)) throw new Error(`Componente duplicado: "${component.id}".`);
+		components.set(component.id, component);
+	}
+	const order = topologicalOrder([...components.values()]);
+	const values = {};
+	for (const id of order) {
+		const component = components.get(id);
+		const componentInputs = (component.inputs ?? []).map((input) => readVectorPort(values, input));
+		values[id] = component.type === "custom-chip" ? evaluateCustomVectorComponent(component, componentInputs, options, depth) : evaluateVectorComponent(component, componentInputs, inputs, options);
+	}
+	const outputs = {};
+	for (const component of components.values()) if (component.type === "output") outputs[component.id] = readVectorPort(values, { node: component.id });
+	const publicValues = {};
+	for (const [id, value] of Object.entries(values)) publicValues[id] = Array.isArray(value) ? value[0] : value;
+	return {
+		values: publicValues,
+		outputs,
+		order
+	};
+}
 function evaluateCustomComponent(component, componentInputs, options, depth) {
 	assertCustomChipDepth(depth);
 	const definition = resolveCustomChipDefinition({
@@ -21514,6 +21634,59 @@ function evaluateCustomComponent(component, componentInputs, options, depth) {
 	const nestedInputs = Object.fromEntries(definition.inputs.map((port, index) => [port.id, componentInputs[index] ?? false]));
 	const nested = evaluateNetlist(toNetlist(definition.document, { customChips: options.customChips }), nestedInputs, options, depth + 1);
 	return definition.outputs.map((port) => nested.outputs[port.id] ?? false);
+}
+function evaluateCustomVectorComponent(component, componentInputs, options, depth) {
+	assertCustomChipDepth(depth);
+	const definition = resolveCustomChipDefinition({
+		id: component.id,
+		type: "custom-chip",
+		options: component.options
+	}, options.customChips);
+	const nestedInputs = Object.fromEntries(definition.inputs.map((port, index) => [port.id, componentInputs[index] ?? bitVector(port.width, 0)]));
+	const nested = evaluateVectorNetlist(toNetlist(definition.document, {
+		allowBuses: true,
+		customChips: options.customChips
+	}), nestedInputs, options, depth + 1);
+	return definition.outputs.map((port) => nested.outputs[port.id] ?? bitVector(port.width, 0));
+}
+function evaluateVectorComponent(component, componentInputs, inputs, options) {
+	const width = component.options?.width ?? componentInputs[0]?.width ?? 1;
+	switch (component.type) {
+		case "input": return coerceVector(inputs[component.id] ?? options.defaultInput ?? 0, width);
+		case "constant": return coerceVector(component.options?.value ?? false, width);
+		case "output":
+		case "transmitter":
+		case "receiver": return componentInputs[0] ?? bitVector(width, 0);
+		case "and": return foldVectors(componentInputs, width, bitwiseAnd);
+		case "or": return foldVectors(componentInputs, width, bitwiseOr);
+		case "xor": return foldVectors(componentInputs, width, bitwiseXor);
+		case "not": return bitwiseNot(componentInputs[0] ?? bitVector(width, 0));
+		default: throw new Error(`O componente "${component.id}" não é suportado no avaliador vetorial.`);
+	}
+}
+function foldVectors(values, width, operation) {
+	if (values.length === 0) return bitVector(width, 0);
+	return values.slice(1).reduce((left, right) => operation(left, right), values[0]);
+}
+function coerceVector(value, width) {
+	if (typeof value === "object" && value !== null && "bits" in value) {
+		const vector = value;
+		if (vector.width !== width) throw new Error(`A entrada vetorial espera ${width} bits, mas recebeu ${vector.width}.`);
+		return vector;
+	}
+	if (typeof value === "string") return parseBusLiteral(value, width);
+	return bitVector(width, typeof value === "boolean" ? value ? 1n : 0n : value);
+}
+function readVectorPort(values, reference) {
+	const source = values[reference.node];
+	if (!source) throw new Error(`A saída de "${reference.node}" ainda não está disponível.`);
+	if (Array.isArray(source)) {
+		const value = source[reference.port ?? 0];
+		if (!value) throw new Error(`A porta vetorial ${reference.port ?? 0} não existe em "${reference.node}".`);
+		return value;
+	}
+	if (reference.port !== void 0 && reference.port !== 0) throw new Error(`A porta vetorial ${reference.port} não existe em "${reference.node}".`);
+	return source;
 }
 function evaluateComponent(component, componentInputs, inputs, options) {
 	switch (component.type) {
@@ -21598,6 +21771,88 @@ function buildCircuitTruthTable(document, options = {}) {
 		classification: generatedRows < totalRows ? "contingencia" : classify(trueCount, generatedRows),
 		formula: selectedOutput.label ?? selectedOutput.id
 	};
+}
+function buildCircuitVectorTruthTable(document, options = {}) {
+	const normalized = normalizeCircuitDocument(document);
+	const issues = validateCircuit(normalized, {
+		allowBuses: true,
+		customChips: options.customChips
+	});
+	if (issues.length > 0) throw new Error(issues[0].message);
+	const inputs = normalized.nodes.filter((node) => node.type === "input");
+	const outputs = normalized.nodes.filter((node) => node.type === "output");
+	if (outputs.length === 0) throw new Error("O circuito precisa de pelo menos uma saída.");
+	const totalInputBits = inputs.map((node) => node.options?.width ?? 1).reduce((total, width) => total + width, 0);
+	const maxBits = options.maxBits ?? 12;
+	if (totalInputBits > maxBits) throw new RangeError(`A tabela vetorial teria ${totalInputBits} bits de entrada; o limite seguro é ${maxBits}.`);
+	const selectedOutput = outputs.find((node) => node.id === options.outputId) ?? outputs[0];
+	const totalRows = 2 ** totalInputBits;
+	const maxRows = Math.max(1, Math.min(options.maxRows ?? 4096, 2 ** maxBits));
+	const generatedRows = Math.min(totalRows, maxRows);
+	const columns = [
+		...inputs.map((node) => ({
+			key: `input:${node.id}`,
+			label: node.label ?? node.id,
+			width: node.options?.width ?? 1,
+			type: "variable"
+		})),
+		...outputs.filter((node) => node.id !== selectedOutput.id).map((node) => ({
+			key: `output:${node.id}`,
+			label: node.label ?? node.id,
+			width: node.options?.width ?? 1,
+			type: "step"
+		})),
+		{
+			key: `output:${selectedOutput.id}`,
+			label: selectedOutput.label ?? selectedOutput.id,
+			width: selectedOutput.options?.width ?? 1,
+			type: "result"
+		}
+	];
+	const rows = [];
+	let activeCount = 0;
+	let allZero = true;
+	let allOnes = true;
+	for (let index = 0; index < generatedRows; index += 1) {
+		const assignment = vectorAssignment(inputs, index, totalInputBits);
+		const evaluation = evaluateCircuitVectors(normalized, assignment, { customChips: options.customChips });
+		const selectedValue = evaluation.outputs[selectedOutput.id] ?? bitVector(selectedOutput.options?.width ?? 1, 0);
+		const active = selectedValue.bits.some(Boolean);
+		const maximum = selectedValue.bits.every(Boolean);
+		if (active) activeCount += 1;
+		if (active) allZero = false;
+		if (!maximum) allOnes = false;
+		rows.push([
+			...inputs.map((node) => toBinary(assignment[node.id])),
+			...outputs.filter((node) => node.id !== selectedOutput.id).map((node) => toBinary(evaluation.outputs[node.id] ?? bitVector(node.options?.width ?? 1, 0))),
+			toBinary(selectedValue)
+		]);
+	}
+	return {
+		variables: inputs.map((node) => node.id),
+		columns,
+		rows,
+		totalRows,
+		generatedRows,
+		totalInputBits,
+		truncated: generatedRows < totalRows,
+		activeCount,
+		classification: generatedRows < totalRows ? "contingencia" : allOnes ? "tautologia" : allZero ? "contradicao" : "contingencia",
+		formula: selectedOutput.label ?? selectedOutput.id
+	};
+}
+function vectorAssignment(nodes, index, totalBits) {
+	const assignment = {};
+	let consumed = 0;
+	for (const node of nodes.filter((candidate) => candidate.type === "input")) {
+		const width = node.options?.width ?? 1;
+		const shift = totalBits - consumed - width;
+		const mask = (1n << BigInt(width)) - 1n;
+		const value = BigInt(index) >> BigInt(Math.max(0, shift)) & mask;
+		assignment[node.id] = bitVector(width, value);
+		consumed += width;
+	}
+	return assignment;
 }
 function classify(trueCount, rowCount) {
 	if (trueCount === rowCount) return "tautologia";
@@ -23163,6 +23418,46 @@ function circuitTruthTable(query) {
 		};
 	}
 }
+function circuitVectorTruthTable(query) {
+	try {
+		if (!isCircuitDocumentShape(query.document)) return {
+			isError: true,
+			text: "O documento não possui o formato veritas-circuit esperado."
+		};
+		const customChips = normalizeCustomChipLibrary(query.customChips);
+		const table = buildCircuitVectorTruthTable(query.document, {
+			maxBits: query.maxBits,
+			maxRows: query.maxRows,
+			outputId: query.outputId,
+			customChips
+		});
+		const header = `| ${table.columns.map((column) => vectorColumnLabel(column.label, column.width)).join(" | ")} |`;
+		const divider = `| ${table.columns.map(() => "---").join(" | ")} |`;
+		const rows = table.rows.map((row) => `| ${row.join(" | ")} |`);
+		const notes = [
+			`Bits de entrada: ${table.totalInputBits}`,
+			`Combinações geradas: ${table.generatedRows} de ${table.totalRows}`,
+			`Linhas com algum bit ativo: ${table.activeCount}`,
+			`Classificação: ${table.classification}`
+		];
+		if (table.truncated) notes.push(`Exibindo ${table.generatedRows} de ${table.totalRows} combinações.`);
+		return { text: [
+			header,
+			divider,
+			...rows,
+			"",
+			...notes
+		].join("\n") };
+	} catch (error) {
+		return {
+			isError: true,
+			text: error instanceof Error ? error.message : "Falha ao gerar a tabela verdade vetorial do circuito."
+		};
+	}
+}
+function vectorColumnLabel(label, width) {
+	return width > 1 ? `${label}[${width - 1}:0]` : label;
+}
 function normalizeCustomChipLibrary(entries = []) {
 	if (entries.length > 128) throw new Error(`A biblioteca MCP aceita no máximo 128 chips customizados por chamada.`);
 	const ids = /* @__PURE__ */ new Set();
@@ -23473,6 +23768,26 @@ server.registerTool("circuit_truth_table", {
 }, async ({ document, output_id, max_rows, custom_chips }) => guard(() => circuitTruthTable({
 	document,
 	outputId: output_id,
+	maxRows: max_rows,
+	customChips: custom_chips
+})));
+server.registerTool("circuit_vector_truth_table", {
+	title: "Tabela verdade vetorial de circuito",
+	description: "Gera uma tabela verdade determinística para um CircuitDocument com barramentos de até 12 bits. Instâncias custom-chip exigem suas definições veritas-custom-chip em custom_chips.",
+	inputSchema: {
+		document: unknown().describe("CircuitDocument serializável do formato veritas-circuit"),
+		output_id: string().min(1).optional().describe("ID da saída a ser destacada; por padrão, usa a primeira"),
+		max_bits: number().int().min(1).max(12).default(12).describe("Limite total de bits de entrada"),
+		max_rows: number().int().min(1).max(4096).default(256).describe("Teto de combinações na resposta"),
+		custom_chips: array(object({
+			id: number().int().min(1),
+			definition: unknown()
+		})).max(128).default([]).describe("Definições veritas-custom-chip usadas pelas instâncias custom-chip")
+	}
+}, async ({ document, output_id, max_bits, max_rows, custom_chips }) => guard(() => circuitVectorTruthTable({
+	document,
+	outputId: output_id,
+	maxBits: max_bits,
 	maxRows: max_rows,
 	customChips: custom_chips
 })));

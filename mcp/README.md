@@ -21,7 +21,8 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `karnaugh_map` | Mapa de Karnaugh de 1 a 4 variáveis com os agrupamentos |
 | `normal_forms` | SOP e POS, canônicas e mínimas, e a classificação da expressão dada |
 | `simulate_circuit` | Roda um circuito com clock, flip-flops, atrasos, canais wireless e instâncias `custom-chip`; devolve o diagrama de tempo |
-| `circuit_truth_table` | Gera a tabela verdade de um `CircuitDocument`, incluindo instâncias `custom-chip` com definições explícitas |
+| `circuit_truth_table` | Gera a tabela verdade escalar de um `CircuitDocument`, incluindo instâncias `custom-chip` com definições explícitas |
+| `circuit_vector_truth_table` | Gera tabela verdade determinística para barramentos de até 12 bits de entrada |
 | `export_circuit_hdl` | Exporta um `CircuitDocument` validado para Verilog ou VHDL, incluindo chips customizados elaborados |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
@@ -105,6 +106,39 @@ A instalação stdio atende clientes que iniciam processos locais. Para Claude A
              BIT       = (NOT A AND NOT B AND C) OR ...
              Carry Out = (B AND C) OR (A AND C) OR (A AND B)
 ```
+
+## Tabela verdade vetorial
+
+A ferramenta `circuit_vector_truth_table` recebe o mesmo `CircuitDocument` serializável usado pelo editor, mas permite barramentos com `options.width`. O contrato limita a enumeração a 12 bits de entrada e 4096 linhas na resposta. `max_rows` pode reduzir a saída sem alterar `totalRows` ou `truncated`; `custom_chips` deve conter as definições completas de todas as instâncias customizadas.
+
+```json
+{
+  "name": "circuit_vector_truth_table",
+  "arguments": {
+    "document": {
+      "format": "veritas-circuit",
+      "version": 1,
+      "name": "AND vetorial MCP",
+      "nodes": [
+        { "id": "a", "type": "input", "position": { "x": 0, "y": 0 }, "options": { "width": 4 } },
+        { "id": "b", "type": "input", "position": { "x": 0, "y": 100 }, "options": { "width": 4 } },
+        { "id": "gate", "type": "and", "position": { "x": 180, "y": 50 }, "options": { "width": 4 } },
+        { "id": "out", "type": "output", "position": { "x": 360, "y": 50 }, "options": { "width": 4 } }
+      ],
+      "connections": [
+        { "source": { "node": "a" }, "target": { "node": "gate", "port": 0 } },
+        { "source": { "node": "b" }, "target": { "node": "gate", "port": 1 } },
+        { "source": { "node": "gate" }, "target": { "node": "out", "port": 0 } }
+      ]
+    },
+    "output_id": "out",
+    "max_bits": 12,
+    "max_rows": 4
+  }
+}
+```
+
+A resposta começa com `| a[3:0] | b[3:0] | out[3:0] |` e contém linhas binárias como `| 0000 | 0000 | 0000 |`, além de bits totais, cardinalidade, truncamento e classificação. Erros de documento, largura total acima do limite e circuito incompatível são retornados como erro controlado, sem fazer acesso à nuvem.
 
 ## Erros
 

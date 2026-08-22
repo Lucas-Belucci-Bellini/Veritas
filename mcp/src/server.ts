@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import {
   circuitTruthTable,
+  circuitVectorTruthTable,
   debugAlgorithm,
   exportCircuitTool,
   evaluateExpression,
@@ -223,6 +224,35 @@ server.registerTool(
   },
   async ({ document, output_id, max_rows, custom_chips }) =>
     guard(() => circuitTruthTable({ document, outputId: output_id, maxRows: max_rows, customChips: custom_chips })),
+)
+
+server.registerTool(
+  'circuit_vector_truth_table',
+  {
+    title: 'Tabela verdade vetorial de circuito',
+    description:
+      'Gera uma tabela verdade determinística para um CircuitDocument com barramentos de até 12 bits. ' +
+      'Instâncias custom-chip exigem suas definições veritas-custom-chip em custom_chips.',
+    inputSchema: {
+      document: z.unknown().describe('CircuitDocument serializável do formato veritas-circuit'),
+      output_id: z.string().min(1).optional().describe('ID da saída a ser destacada; por padrão, usa a primeira'),
+      max_bits: z.number().int().min(1).max(12).default(12).describe('Limite total de bits de entrada'),
+      max_rows: z.number().int().min(1).max(4096).default(256).describe('Teto de combinações na resposta'),
+      custom_chips: z
+        .array(z.object({ id: z.number().int().min(1), definition: z.unknown() }))
+        .max(128)
+        .default([])
+        .describe('Definições veritas-custom-chip usadas pelas instâncias custom-chip'),
+    },
+  },
+  async ({ document, output_id, max_bits, max_rows, custom_chips }) =>
+    guard(() => circuitVectorTruthTable({
+      document,
+      outputId: output_id,
+      maxBits: max_bits,
+      maxRows: max_rows,
+      customChips: custom_chips,
+    })),
 )
 
 server.registerTool(
