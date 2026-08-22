@@ -73,7 +73,7 @@ jobs:
 
       - name: Rollback acceptance
         env:
-          ROLLBACK_CURRENT_TAG: v0.9.0-rc.6
+          ROLLBACK_CURRENT_TAG: v0.9.0-rc.7
         run: npm run beta:rollback
 
       - name: Onboarding acceptance
