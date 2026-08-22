@@ -122,6 +122,7 @@ export function CircuitEditor() {
   const [selectedOutputId, setSelectedOutputId] = useState<string | undefined>()
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
   const [selectedVectorRow, setSelectedVectorRow] = useState<number | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [valueStyle, setValueStyle] = useState<ValueStyle>('vf')
   const [hydrated, setHydrated] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -196,6 +197,7 @@ export function CircuitEditor() {
     setEdges(flow.edges)
     setProjectName(message.document.name)
     setSelectedRow(null)
+    setSelectedNodeId(null)
     setNotice(`Alteração remota v${message.baseVersion} aplicada de outro colaborador.`)
     return true
   }, [setEdges, setNodes])
@@ -251,6 +253,10 @@ export function CircuitEditor() {
     () => nodes.filter((node) => node.data.componentType === 'output'),
     [nodes],
   )
+  const selectedWirelessNode = useMemo(
+    () => nodes.find((node) => node.id === selectedNodeId && (node.data.componentType === 'transmitter' || node.data.componentType === 'receiver')),
+    [nodes, selectedNodeId],
+  )
 
   useEffect(() => {
     if (!user || !cloudProjectId) {
@@ -285,6 +291,11 @@ export function CircuitEditor() {
     if (selectedOutputId && outputNodes.some((node) => node.id === selectedOutputId)) return
     setSelectedOutputId(outputNodes[0]?.id)
   }, [outputNodes, selectedOutputId])
+
+  useEffect(() => {
+    if (selectedNodeId && nodes.some((node) => node.id === selectedNodeId)) return
+    setSelectedNodeId(null)
+  }, [nodes, selectedNodeId])
 
   useEffect(() => {
     if (!storage.ready || hydrated) return
@@ -527,6 +538,20 @@ export function CircuitEditor() {
     })
   }
 
+  const updateWirelessChannel = (channel: string) => {
+    if (!selectedNodeId) return
+    if (readOnlyCollaboration) {
+      setNotice('Você está conectado como visualizador e não pode editar este circuito.')
+      return
+    }
+    const normalized = normalizeWirelessChannel(channel)
+    setNodes((current) => current.map((node) => {
+      if (node.id !== selectedNodeId || (node.data.componentType !== 'transmitter' && node.data.componentType !== 'receiver')) return node
+      return { ...node, data: { ...node.data, channel: normalized } }
+    }))
+    setNotice(`Canal wireless do componente "${selectedNodeId}" atualizado para "${normalized || 'sem canal'}".`)
+  }
+
   const reset = () => {
     const nextNodes = createDemoNodes()
     const nextEdges = createDemoEdges()
@@ -537,6 +562,7 @@ export function CircuitEditor() {
     setProjectName('Circuito AND')
     setActiveProjectId(null)
     setSelectedRow(null)
+    setSelectedNodeId(null)
     setNotice('Exemplo de AND carregado. Salve-o localmente quando quiser preservá-lo.')
   }
 
@@ -895,6 +921,30 @@ export function CircuitEditor() {
               </button>
             ))}
           </div>
+          {selectedWirelessNode && (
+            <section className="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-3 dark:border-cyan-900/70 dark:bg-cyan-950/30" aria-labelledby="wireless-channel-editor-title">
+              <h3 id="wireless-channel-editor-title" className="text-xs font-semibold tracking-wide text-cyan-800 uppercase dark:text-cyan-200">
+                Editar canal wireless
+              </h3>
+              <p className="mt-1 text-[11px] text-cyan-700 dark:text-cyan-300">
+                {selectedWirelessNode.data.componentType === 'transmitter' ? 'Transmissor' : 'Receptor'} · {selectedWirelessNode.id}
+              </p>
+              <label className="mt-2 block text-xs font-medium text-cyan-900 dark:text-cyan-100" htmlFor="selected-wireless-channel">
+                Canal
+              </label>
+              <input
+                id="selected-wireless-channel"
+                value={selectedWirelessNode.data.channel ?? ''}
+                onChange={(event) => updateWirelessChannel(event.target.value)}
+                maxLength={64}
+                disabled={readOnlyCollaboration}
+                className="mt-1 w-full rounded-lg border border-cyan-300 bg-white px-2 py-1.5 text-xs text-slate-900 dark:border-cyan-800 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <p className="mt-1 text-[11px] text-cyan-700 dark:text-cyan-300">
+                Espaços são convertidos em hífens e letras em minúsculas.
+              </p>
+            </section>
+          )}
         </aside>
 
         <div>
@@ -906,6 +956,8 @@ export function CircuitEditor() {
               onNodesChange={readOnlyCollaboration ? undefined : onNodesChange}
               onEdgesChange={readOnlyCollaboration ? undefined : onEdgesChange}
               onConnect={readOnlyCollaboration ? undefined : onConnect}
+              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              onPaneClick={() => setSelectedNodeId(null)}
               nodesDraggable={!readOnlyCollaboration}
               nodesConnectable={!readOnlyCollaboration}
               fitView

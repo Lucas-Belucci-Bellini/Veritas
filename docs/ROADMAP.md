@@ -517,3 +517,9 @@ A fundação wireless agora atravessa o modelo canônico: `transmitter` e `recei
 O CircuitEditor oferece o campo `Canal`, exibe TX/RX com canal e largura, restaura os nós wireless ao abrir documentos e mostra canais ativos no status de validação. IndexedDB, cloud, Realtime e IA continuam usando o documento canônico existente. Verilog e VHDL exportam os endpoints como sinais internos, sem inventar portas físicas para o canal.
 
 A fatia não inclui latência, arbitragem, tri-state, sinais `X/Z`, edição inline de canal em nó existente ou radio físico. O canal atual é um túnel lógico combinacional determinístico com um transmissor por canal.
+
+## Planejamento WIRELESS-002 — edição de canal no nó — 2026-08-22
+
+Após a integração inicial, o principal gap de usabilidade é que o campo `Canal` da toolbar só define novos nós; documentos importados ou nós já criados não podem corrigir o canal sem serem recriados. A próxima fatia será vertical e limitada: selecionar um nó wireless, editar seu canal em um painel acessível, normalizar o valor, refletir a alteração no canvas/documento e manter os gates existentes bloqueando canais inválidos.
+
+Critérios de aceite: seleção de transmitter/receiver sem alterar seleção de tabela, edição somente para nós wireless, canal vazio e acima de 64 caracteres com feedback em português, histórico undo/redo preservado, persistência local/cloud usando o documento canônico e regressão de acessibilidade sem alterar a semântica de canais ou conexões convencionais.

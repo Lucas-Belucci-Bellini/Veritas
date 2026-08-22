@@ -1,6 +1,6 @@
 # Canais wireless — WIRELESS-001
 
-**Status:** integração vertical inicial
+**Status:** integração vertical inicial + edição inline de canal
 **Formato do documento:** `veritas-circuit` v1
 **Data:** 22 de agosto de 2026
 
@@ -26,6 +26,8 @@ A avaliação escalar e vetorial trata os dois tipos como pass-throughs. O simul
 
 A paleta do `CircuitEditor` possui **Transmissor** e **Receptor**, e a toolbar oferece o campo **Canal** para os próximos nós wireless. O canvas exibe `TX`/`RX`, canal, largura e estado observado. O transmissor tem handle de entrada à esquerda e saída à direita; o receptor tem somente saída visual, porque a alimentação vem do canal.
 
+Ao selecionar um transmitter ou receiver no canvas, o painel **Editar canal wireless** permite corrigir o canal do nó existente. O valor é normalizado durante a edição, o histórico undo/redo continua observando a alteração e viewers em colaboração não podem editar o campo.
+
 Ao abrir um documento, o canvas normaliza nomes, IDs, referências e canais antes de reconstruir os nós. Ao salvar em IndexedDB, sincronizar com Supabase ou transmitir colaboração, a validação canônica continua sendo aplicada pelos consumidores existentes.
 
 ## Exportação HDL
@@ -45,7 +47,7 @@ npm run typecheck
 
 ## Limites atuais
 
-A integração não adiciona ainda edição inline do canal em um nó já criado, múltiplos transmissores redundantes, arbitragem de canais, latência wireless configurável, tri-state, sinais `X/Z`, impedância, rádio físico ou semântica de clock-domain crossing. O canal é um túnel lógico determinístico; no `Simulator` e no MCP ele observa a latência de propagação por tique já definida pelo runtime.
+A integração não adiciona ainda múltiplos transmissores redundantes, arbitragem de canais, latência wireless configurável, tri-state, sinais `X/Z`, impedância, rádio físico ou semântica de clock-domain crossing. O canal é um túnel lógico determinístico; no `Simulator` e no MCP ele observa a latência de propagação por tique já definida pelo runtime.
 
 A colaboração Realtime, RLS, a Edge Function e os exportadores continuam sujeitos aos seus próprios gates. A presença de um nó wireless não substitui autenticação, autorização, RLS por `auth.uid()` ou validação server-side.
 
