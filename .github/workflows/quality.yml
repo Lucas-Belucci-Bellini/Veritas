@@ -39,6 +39,9 @@ jobs:
       - name: Unit and integration tests
         run: npm test -- --run
 
+      - name: Rust engine acceptance
+        run: npm run beta:rust
+
       - name: Typecheck frontend and MCP
         run: npm run typecheck
 

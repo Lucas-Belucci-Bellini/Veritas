@@ -254,8 +254,10 @@ npm test           # testes (motor, armazenamento e ferramentas MCP)
 npm run lint       # oxlint
 npm run typecheck  # TypeScript do site e do servidor MCP
 npm run build      # build de produção em dist/
-npm run build:mcp  # servidor MCP em mcp/dist/
-npm run smoke:release  # smoke HTTP/PWA contra SMOKE_URL ou a URL padrão
+  npm run build:mcp  # servidor MCP em mcp/dist/
+  npm run test:rust  # testes nativos do núcleo Rust experimental
+  npm run beta:rust  # acceptance Rust com relatório sanitizado
+  npm run smoke:release  # smoke HTTP/PWA contra SMOKE_URL ou a URL padrão
 ```
 
 ## Como o código está organizado
@@ -285,15 +287,21 @@ plugins/veritas-logic/
   server.mjs             servidor empacotado (gerado, versionado)
 scripts/
   import-dls-chips.mjs   importador da biblioteca de chips
+engine-rs/
+  src/lib.rs             núcleo Rust combinacional experimental
+  tests/golden.rs        contrato golden compartilhado
 ```
 
 O `engine/` não depende de React nem do DOM — e é justamente por isso que o
 servidor MCP e o importador de chips conseguem usar o mesmo código do site, sem
-nenhuma cópia paralela.
+nenhuma cópia paralela. O `engine-rs/` é uma trilha experimental separada: ele ainda
+não substitui o avaliador TypeScript e não é carregado pelo navegador. O contrato,
+a estratégia de fallback e os critérios para uma futura integração WASM estão em
+[`docs/RUST-ENGINE.md`](./docs/RUST-ENGINE.md).
 
 ## Stack
 
-React 19 · TypeScript · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexie.js · Supabase Auth · Supabase Edge Functions · Workbox · Vitest · oxlint
+React 19 · TypeScript · Rust experimental · Vite · Tailwind CSS v4 · React Flow · Dagre · Dexie.js · Supabase Auth · Supabase Edge Functions · Workbox · Vitest · oxlint
 
 ## Testes derivados dos materiais didáticos
 

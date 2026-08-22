@@ -119,6 +119,9 @@ jobs:
       - name: Test suite
         run: npm test -- --run
 
+      - name: Rust engine acceptance
+        run: npm run beta:rust
+
       - name: Typecheck
         run: npm run typecheck
 

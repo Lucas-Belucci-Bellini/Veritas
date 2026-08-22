@@ -641,3 +641,13 @@ O contrato do editor agora inclui `nand`, `nor` e `xnor` no `EditorComponentType
 A avaliação escalar e vetorial foi alinhada ao domínio: NAND aplica NOT ao AND, NOR aplica NOT ao OR e XNOR aplica NOT ao XOR, preservando widths e a ordem topológica. Verilog e VHDL emitem as expressões negadas correspondentes. O MCP continua aceitando o union completo sem narrowing impossível, e documentos v1 existentes permanecem compatíveis.
 
 Critérios realizados: regressão de modelo com 12 testes, exportação HDL com 9 testes, avaliação vetorial com 7 testes; conjunto focado com 28 PASS, typecheck e lint aprovados. A etapa não altera persistência, Supabase, Realtime ou transporte MCP e não habilita OAuth remoto.
+
+## Implementação RUST-001 — núcleo combinacional experimental — 2026-08-22
+
+A primeira fatia do motor Rust foi criada em `engine-rs/` como crate sem dependências externas. Ela oferece `Signal` de 1 a 64 bits, operações AND/NAND/OR/NOR/XOR/XNOR/NOT, nós `Input`/`Constant`/`Output`, avaliação de netlist e ordenação topológica determinística por ID. Ciclos, dependências ausentes, IDs duplicados, widths inválidos e valores fora da máscara são rejeitados explicitamente.
+
+O núcleo Rust não substitui o avaliador TypeScript, não é carregado pelo navegador e não altera IndexedDB, MCP, Supabase ou exportadores HDL. O fixture `tests/fixtures/rust-engine/gates.tsv` é compartilhado por `engine-rs/tests/golden.rs` e `src/circuit/rustEngineParity.test.ts` para comparar as operações bitwise em 1, 8, 32 e 64 bits. A documentação de arquitetura, fallback e integração WASM futura está em `docs/RUST-ENGINE.md`.
+
+O acceptance `npm run beta:rust` executa `cargo fmt --check` e `cargo test --offline`; a primeira execução produziu RUST-001 e RUST-002 em PASS. Os testes Rust nativos e o teste Vitest de paridade também passaram. Isso comprova o contrato coberto, mas ainda não comprova superioridade de desempenho nem autoriza trocar o runtime: o próximo critério é benchmark controlado e decisão explícita sobre WASM.
+
+A análise do Digital Logic Sim foi somente leitura. O projeto de referência é uma aplicação Unity publicada sob MIT, com módulos separados de simulação, gráficos e persistência; nenhuma implementação, asset ou binário foi copiado. O Veritas preserva seu núcleo TypeScript e o modo local-first enquanto a hipótese Rust é medida de forma independente.
