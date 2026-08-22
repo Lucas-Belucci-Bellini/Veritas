@@ -115,7 +115,9 @@ const metadata = buildProtectedResourceMetadata({
 })
 ```
 
-A metadata não contém tokens. Antes de publicar `.well-known/oauth-protected-resource`, ainda é obrigatório aprovar o provedor OAuth, resource indicator/audience, PKCE, HTTPS, rate limiting, threat model e smoke remoto.
+A metadata não contém tokens. Para habilitar a rota somente durante uma execução local controlada, defina `VERITAS_MCP_HTTP_RESOURCE`, `VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS` e, opcionalmente, `VERITAS_MCP_HTTP_SCOPES`. Se apenas parte da configuração estiver presente, o processo falha sem iniciar. Com a configuração ausente, `GET /.well-known/oauth-protected-resource` retorna `404`; com configuração completa, retorna o JSON validado e continua exigindo Origin permitida.
+
+Antes de publicar `.well-known/oauth-protected-resource` fora do localhost, ainda é obrigatório aprovar o provedor OAuth, resource indicator/audience, PKCE, HTTPS, rate limiting, threat model e smoke remoto.
 
 ## Exemplo
 

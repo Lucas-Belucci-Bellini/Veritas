@@ -23,9 +23,10 @@ npm run typecheck
 npm run lint
 npm run build
 npm run build:mcp
+npm run build:mcp:http
 ```
 
-Os testes devem cobrir a tabela verdade canônica, leis de De Morgan, implicação, equivalência, contrapositiva, Modus Ponens, Modus Tollens, validação de circuitos, DFS de ciclos, avaliação topológica, exportação Verilog/VHDL, IndexedDB, sincronização remota, RLS simulada, Edge Function mockada, While, Step/Run/Continue, breakpoints, Watch, BranchTrace, limites `maxSteps` e as três ferramentas MCP.
+Os testes devem cobrir a tabela verdade canônica, leis de De Morgan, implicação, equivalência, contrapositiva, Modus Ponens, Modus Tollens, validação de circuitos, DFS de ciclos, avaliação topológica, exportação Verilog/VHDL, IndexedDB, sincronização remota, RLS simulada, Edge Function mockada, While, Step/Run/Continue, breakpoints, Watch, BranchTrace, limites `maxSteps` e as ferramentas MCP stdio/HTTP, incluindo a metadata local opt-in.
 
 A asserção de determinismo deve comparar duas execuções com o mesmo documento e entradas, removendo apenas campos não determinísticos como timestamp ou identificador de sessão. O documento, trace, estado final, pausa e erro devem ser idênticos.
 
@@ -109,7 +110,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
   | node mcp/dist/server.js
 ```
 
-Depois, a suíte MCP deve chamar `tools/list` e cada ferramenta com vetores golden:
+Depois, a suíte MCP deve chamar `tools/list` e cada ferramenta com vetores golden. Para o transporte HTTP, `npm run beta:mcp:http` deve ser executado separadamente e reportar MCP-011-HTTP-001…009 e MCP-013-HTTP-001…005 como PASS; isso valida apenas localhost/controlado e não constitui aprovação de OAuth remoto.
 
 | Ferramenta | Golden response |
 | --- | --- |
@@ -121,7 +122,7 @@ Os mesmos JSON de entrada devem ser executados pelo pacote MCP diretamente e por
 
 ## 6. Workflow GitHub Actions
 
-O workflow [`quality.yml`](../.github/workflows/quality.yml) roda em pull requests e pushes para `main`. Ele executa a suíte, constrói a aplicação e o MCP, inicia o preview Vite e executa `npm run smoke:release` contra `http://127.0.0.1:4173`.
+O workflow [`quality.yml`](../.github/workflows/quality.yml) roda em pull requests e pushes para `main`. Ele executa a suíte, constrói a aplicação, os bundles MCP stdio/HTTP, inicia o preview Vite, executa os runners MCP e executa `npm run smoke:release` contra `http://127.0.0.1:4173`.
 
 O workflow [`release.yml`](../.github/workflows/release.yml) aceita dois modos. No modo automático, o push de uma tag SemVer como `v0.9.0-rc.5` ou `v1.0.0` inicia validação, smoke e publicação; tags com hífen são marcadas como pre-release. No modo manual, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.9.0-rc.5` e marque `prerelease=true`. Em ambos os modos, o job de validação roda antes do job de publicação e `gh release create` gera as notas automaticamente. O workflow não cria tags automaticamente a partir de qualquer commit: a tag continua sendo o ponto explícito de promoção e rastreabilidade.
 

@@ -41,6 +41,7 @@ A recomendação é usar SemVer e manter os artefatos publicados imutáveis: cor
 | `v0.9.0-rc.3` | Release candidate de endurecimento do CI | Testadores convidados e mantenedores | Rollback determinístico com histórico/tags, quality workflow verde, smoke local/externo e nenhum P0/P1 novo; beta continua condicionado aos gates reais. |
 | `v0.9.0-rc.4` | Release candidate MCP-011 HTTP local | Testadores convidados e mantenedores | stdio preservado, HTTP local protegido, 9 checks HTTP PASS, quality/release workflows verdes e endpoint público ainda bloqueado até OAuth/HTTPS. |
 | `v0.9.0-rc.5` | Release candidate MCP-012 metadata OAuth local | Testadores convidados e mantenedores | Contrato puro validado, URLs/escopos inseguros rejeitados, regressão MCP-011 verde e nenhuma rota OAuth pública habilitada. |
+| `v0.9.0-rc.6` | Release candidate MCP-013 metadata local opt-in | Testadores convidados e mantenedores | Rota 404 por padrão, metadata configurada validada, Origin obrigatório, configuração parcial/HTTP remoto rejeitados, 14 checks HTTP/stdio relacionados verdes e nenhuma rota OAuth pública habilitada. |
 | `v0.9.0-beta.1` | Beta público sequencial | Estudantes/professores convidados | Manifesto de evidências completo, RLS/Realtime/HDL/mobile/acessibilidade/rollback aprovados e zero P0/P1. |
 | `v0.8.x` | Correções de beta/RC | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
 | `v1.0.0` | Lançamento estável | Público geral | API/documento público estável, política de dados, suporte básico e critérios P0/P1 encerrados. |
@@ -60,7 +61,7 @@ O `v1.0.0` deve conter apenas capacidades que consigam ser explicadas, testadas 
 | Colaboração Realtime rotulada como beta, com viewer/editor. | Promessa de merge automático ou colaboração CRDT. |
 | Exportação Verilog/VHDL validada por fixtures e compiladores no CI. | Garantia de síntese para qualquer ferramenta industrial. |
 | ALGO-001/002/003 para execução didática segura. | Arquivos, rede, turtle graphics, plugins arbitrários ou execução de código externo. |
-| MCP local `stdio` com ferramentas read-only e determinísticas. | MCP HTTP público sem autenticação, rate limit e observabilidade. |
+| MCP local `stdio` com ferramentas read-only e determinísticas; metadata HTTP local opt-in explicitamente documentada. | MCP HTTP público sem autenticação, rate limit e observabilidade; OAuth remoto sem provedor aprovado. |
 
 ## 5. Quality gates obrigatórios
 
@@ -72,6 +73,7 @@ npm run typecheck
 npm run lint
 npm run build
 npm run build:mcp
+npm run build:mcp:http
 ```
 
 O checklist funcional deve complementar os comandos automatizados:
@@ -85,7 +87,7 @@ O checklist funcional deve complementar os comandos automatizados:
 | HDL | Gerar fixtures e executar Verilog com Icarus/Verilator e VHDL com GHDL em CI; comparar arquivos determinísticos. |
 | ALGO | Exercitar `Step`, `Run`, `Continue`, `While`, breakpoint, `awaiting-input`, `BranchTrace` e `maxSteps`. |
 | Realtime | Isolar tópicos, testar viewer/editor, presença, snapshot inválido, reconexão e edição concorrente documentada. |
-| MCP | Rodar `tools/list` e golden responses de `logic_case`, `propositional_truth_table` e `debug_algorithm`. |
+| MCP | Rodar `tools/list` e golden responses de `logic_case`, `propositional_truth_table` e `debug_algorithm`; executar MCP-011-HTTP-001…009 e MCP-013-HTTP-001…005. |
 | PWA | Testar carregamento offline, atualização de service worker e migração IndexedDB sem perda de documentos. |
 | Observabilidade | Confirmar que falha de telemetria de IA não interrompe análise, exportação ou execução. |
 | Acessibilidade | Navegação por teclado, foco visível, labels, contraste e mensagens de erro em português claro. |

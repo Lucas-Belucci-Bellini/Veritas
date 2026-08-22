@@ -51,6 +51,9 @@ function normalizeHttpsOrLocalUrl(value: string, field: string): string {
 
 function normalizeScopes(scopes: readonly string[] | undefined): string[] | undefined {
   if (scopes === undefined) return undefined
+  if (scopes.length === 0) {
+    throw new Error('scopes_supported deve conter pelo menos um escopo quando informado.')
+  }
   const normalized = scopes.map((scope) => scope.trim())
   if (normalized.some((scope) => !scope || /\s/.test(scope))) {
     throw new Error('scopes_supported deve conter tokens não vazios e sem espaços.')

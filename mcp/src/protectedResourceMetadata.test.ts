@@ -67,6 +67,9 @@ describe('MCP-012 Protected Resource Metadata', () => {
       resource: 'https://veritas.example/mcp',
       authorization_servers: ['https://auth.example'],
     }
+    expect(() => buildProtectedResourceMetadata({ ...base, scopes_supported: [] })).toThrow(
+      'scopes_supported deve conter pelo menos um escopo quando informado.',
+    )
     expect(() => buildProtectedResourceMetadata({ ...base, scopes_supported: [''] })).toThrow(
       'scopes_supported deve conter tokens não vazios e sem espaços.',
     )

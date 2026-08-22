@@ -1,9 +1,14 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import {
+  protectedResourceMetadataSchema,
+  type ProtectedResourceMetadata,
+} from './protectedResourceMetadata'
 import { createVeritasServer } from './server'
 
 export const VERITAS_MCP_HTTP_PROTOCOL_VERSION = '2025-11-25'
 export const VERITAS_MCP_HTTP_DEFAULT_PATH = '/mcp'
+export const VERITAS_MCP_HTTP_METADATA_PATH = '/.well-known/oauth-protected-resource'
 export const VERITAS_MCP_HTTP_DEFAULT_MAX_BODY_BYTES = 1_048_576
 export const VERITAS_MCP_HTTP_DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 
@@ -15,6 +20,7 @@ export interface VeritasHttpServerOptions {
   allowedOrigins: readonly string[]
   maxBodyBytes?: number
   requestTimeoutMs?: number
+  protectedResourceMetadata?: ProtectedResourceMetadata
 }
 
 interface HttpConfig {
@@ -22,6 +28,7 @@ interface HttpConfig {
   bearerToken: string
   allowedOrigins: readonly string[]
   maxBodyBytes: number
+  protectedResourceMetadata?: ProtectedResourceMetadata
 }
 
 class HttpRequestError extends Error {
@@ -152,6 +159,41 @@ function assertHeaderMatchesBody(req: IncomingMessage, body: unknown): void {
   }
 }
 
+async function handleMetadataRequest(req: IncomingMessage, res: ServerResponse, config: HttpConfig): Promise<void> {
+  let origin: string | undefined
+  try {
+    origin = validateOrigin(req, config)
+    const responseHeaders = {
+      ...corsHeaders(origin),
+      'cache-control': 'no-store',
+    }
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, responseHeaders)
+      res.end()
+      return
+    }
+    if (req.method !== 'GET') {
+      errorResponse(res, 405, -32601, 'A rota de metadata aceita somente GET.', { allow: 'GET, OPTIONS', ...responseHeaders })
+      return
+    }
+    if (!config.protectedResourceMetadata) {
+      errorResponse(res, 404, -32601, 'Protected Resource Metadata não configurada.', responseHeaders)
+      return
+    }
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      ...responseHeaders,
+    })
+    res.end(JSON.stringify(config.protectedResourceMetadata))
+  } catch (error) {
+    if (error instanceof HttpRequestError) {
+      errorResponse(res, error.statusCode, error.errorCode, error.message, origin ? corsHeaders(origin) : undefined)
+      return
+    }
+    errorResponse(res, 500, -32603, 'Erro interno da rota de metadata.')
+  }
+}
+
 async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, config: HttpConfig): Promise<void> {
   let origin: string | undefined
   try {
@@ -196,6 +238,10 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, confi
 
 function normalizeOptions(options: VeritasHttpServerOptions): { config: HttpConfig; host: string; port: number; requestTimeoutMs: number } {
   const path = options.path ?? VERITAS_MCP_HTTP_DEFAULT_PATH
+  const metadataResult = options.protectedResourceMetadata
+    ? protectedResourceMetadataSchema.safeParse(options.protectedResourceMetadata)
+    : { success: true as const, data: undefined }
+  if (!metadataResult.success) throw new Error('Protected Resource Metadata inválida.')
   const bearerToken = options.bearerToken.trim()
   const allowedOrigins = options.allowedOrigins.map((origin) => origin.trim()).filter(Boolean)
   if (!path.startsWith('/')) throw new Error('O path MCP deve começar com /.')
@@ -208,6 +254,7 @@ function normalizeOptions(options: VeritasHttpServerOptions): { config: HttpConf
       bearerToken,
       allowedOrigins,
       maxBodyBytes: options.maxBodyBytes ?? VERITAS_MCP_HTTP_DEFAULT_MAX_BODY_BYTES,
+      protectedResourceMetadata: metadataResult.data,
     },
     host: options.host ?? '127.0.0.1',
     port: options.port ?? 8787,
@@ -219,6 +266,10 @@ export function createVeritasHttpServer(options: VeritasHttpServerOptions): Serv
   const normalized = normalizeOptions(options)
   const server = createServer((req, res) => {
     const requestPath = new URL(req.url ?? '/', 'http://veritas.local').pathname
+    if (requestPath === VERITAS_MCP_HTTP_METADATA_PATH) {
+      void handleMetadataRequest(req, res, normalized.config)
+      return
+    }
     if (requestPath !== normalized.config.path) {
       errorResponse(res, 404, -32601, 'Endpoint MCP não encontrado.')
       return

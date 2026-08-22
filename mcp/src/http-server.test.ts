@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { buildProtectedResourceMetadata } from './protectedResourceMetadata'
 import {
+  VERITAS_MCP_HTTP_METADATA_PATH,
   VERITAS_MCP_HTTP_PROTOCOL_VERSION,
   createVeritasHttpServer,
   httpServerAddress,
@@ -171,6 +173,51 @@ describe('MCP-011 Streamable HTTP local', () => {
     expect(oversized.status).toBe(413)
   })
 
+  it('mantém metadata 404 por padrão e serve JSON somente quando configurada', async () => {
+    const defaultUrl = await startServer()
+    const defaultMetadata = await fetch(defaultUrl.replace('/mcp', VERITAS_MCP_HTTP_METADATA_PATH), {
+      method: 'GET',
+      headers: { Origin: ORIGIN },
+    })
+    expect(defaultMetadata.status).toBe(404)
+
+    const metadata = buildProtectedResourceMetadata({
+      resource: 'http://127.0.0.1:8787/mcp',
+      authorization_servers: ['https://auth.example/realms/veritas'],
+      scopes_supported: ['circuit:read'],
+    })
+    const configuredUrl = await startServer({ protectedResourceMetadata: metadata })
+    const metadataUrl = configuredUrl.replace('/mcp', VERITAS_MCP_HTTP_METADATA_PATH)
+    const response = await fetch(metadataUrl, { method: 'GET', headers: { Origin: ORIGIN } })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('application/json')
+    expect(await response.json()).toEqual(metadata)
+
+    const options = await fetch(metadataUrl, { method: 'OPTIONS', headers: { Origin: ORIGIN } })
+    expect(options.status).toBe(204)
+
+    const missingBearerOnMcp = await fetch(configuredUrl, {
+      method: 'POST',
+      headers: { ...headers({ Authorization: '' }), 'Mcp-Method': 'initialize', 'Mcp-Name': 'veritas' },
+      body: JSON.stringify(initializeBody()),
+    })
+    expect(missingBearerOnMcp.status).toBe(401)
+  })
+
+  it('protege a rota de metadata com Origin e método explícitos', async () => {
+    const metadata = buildProtectedResourceMetadata({
+      resource: 'https://veritas.example/mcp',
+      authorization_servers: ['https://auth.example'],
+    })
+    const url = (await startServer({ protectedResourceMetadata: metadata })).replace('/mcp', VERITAS_MCP_HTTP_METADATA_PATH)
+
+    const missingOrigin = await fetch(url)
+    expect(missingOrigin.status).toBe(403)
+
+    const post = await fetch(url, { method: 'POST', headers: { Origin: ORIGIN } })
+    expect(post.status).toBe(405)
+  })
+
   it('exige configuração segura e nunca aceita token vazio ou Origin curinga', () => {
     expect(() => createVeritasHttpServer({ ...baseOptions, bearerToken: ' ' })).toThrow(
       'Bearer token MCP é obrigatório.',
@@ -178,5 +225,15 @@ describe('MCP-011 Streamable HTTP local', () => {
     expect(() => createVeritasHttpServer({ ...baseOptions, allowedOrigins: [] })).toThrow(
       'É necessária uma allowlist de Origin MCP.',
     )
+    expect(() =>
+      createVeritasHttpServer({
+        ...baseOptions,
+        protectedResourceMetadata: {
+          resource: 'https://veritas.example/mcp',
+          authorization_servers: ['https://auth.example'],
+          bearer_methods_supported: ['body'],
+        } as never,
+      }),
+    ).toThrow('Protected Resource Metadata inválida.')
   })
 })

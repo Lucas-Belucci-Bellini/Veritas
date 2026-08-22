@@ -136,6 +136,8 @@ A próxima etapa pública não é habilitada automaticamente por esta fatia. Ant
 
 O MCP-012 fornece apenas o construtor puro `buildProtectedResourceMetadata` em `mcp/src/protectedResourceMetadata.ts`. Ele valida e normaliza `resource`, `authorization_servers`, `scopes_supported` e `bearer_methods_supported` sem rede, login ou persistência. A metadata não é publicada por uma rota `.well-known` nesta etapa; isso evita transformar um contrato local em uma promessa de autorização remota incompleta.
 
+O MCP-013 integra essa metadata ao handler HTTP local apenas quando `VERITAS_MCP_HTTP_RESOURCE` e `VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS` são fornecidos explicitamente. Sem essas variáveis, a rota `/.well-known/oauth-protected-resource` retorna 404; com configuração completa, retorna o documento validado e mantém a allowlist de Origin. Essa integração continua limitada ao ambiente local/controlado e não habilita OAuth público.
+
 ### Referências
 
 [1]: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports "MCP — Transports"

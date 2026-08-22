@@ -5,7 +5,7 @@
 **Transportes validados:** MCP por stdio local e HTTP local controlado
 **Objetivo:** comprovar que clientes MCP locais conseguem negociar o servidor, descobrir ferramentas, chamar vetores golden e receber erros controlados sem depender de uma sessão específica de IA, além de validar a fronteira HTTP sem publicar um endpoint remoto.
 
-A superfície atual contém quatorze ferramentas; esta etapa adiciona `circuit_vector_truth_table` sem alterar os nomes ou argumentos obrigatórios das ferramentas existentes.
+A superfície atual contém quatorze ferramentas; o MCP-013 adiciona apenas discovery local opt-in de Protected Resource Metadata, sem alterar os nomes ou argumentos obrigatórios das ferramentas existentes.
 
 ## 1. Matriz golden
 
@@ -24,6 +24,7 @@ O comando `npm run beta:mcp` inicia `mcp/dist/server.js` como subprocesso Node e
 | MCP-009 | `export_circuit_hdl` com `custom-chip` | CircuitDocument com uma instância NOT devolve módulo Verilog com interface externa válida; definição ausente retorna erro controlado. |
 | MCP-010 | `circuit_vector_truth_table` | AND vetorial de quatro bits devolve cabeçalho e linhas binárias determinísticas; o limite de 12 bits e truncamento de linhas são respeitados; documento incompatível retorna erro controlado. |
 | MCP-011-HTTP-001…009 | `http-server.js` local | OPTIONS, Bearer, Origin allowlist, método, initialize `2025-11-25`, equivalência golden, HeaderMismatch, JSON inválido e limite de payload retornam os status esperados; nenhum token é persistido. |
+| MCP-013-HTTP-001…005 | `/.well-known/oauth-protected-resource` local | Sem configuração retorna 404; configuração opt-in retorna JSON determinístico; Origin ausente é rejeitada; configuração parcial e recurso remoto sem HTTPS são rejeitados no startup. |
 
 ## 2. Execução
 
@@ -45,7 +46,7 @@ BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
 npm run beta:evidence
 ```
 
-O gate `mcp` só fica `PASS` quando MCP-001 a MCP-010 possuem `PASS` explícito e o relatório está anexado. O gate HTTP-011 é separado e só fica `PASS` quando HTTP-001 a HTTP-009 possuem `PASS` explícito. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
+O gate `mcp` só fica `PASS` quando MCP-001 a MCP-010 possuem `PASS` explícito e o relatório está anexado. O gate HTTP-011 é separado e só fica `PASS` quando MCP-011-HTTP-001 a MCP-011-HTTP-009 possuem `PASS` explícito. O gate MCP-013 é separado e só fica `PASS` quando MCP-013-HTTP-001 a MCP-013-HTTP-005 possuem `PASS` explícito. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
 
 ## 3. Compatibilidade com clientes
 
@@ -82,4 +83,4 @@ Uma falha deve ser classificada por camada: domínio se o resultado lógico esti
 
 [4]: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports "MCP — transportes"
 
-[5]: ../mcp/src/http-server.test.ts "Veritas — testes HTTP MCP-011"
+[5]: ../mcp/src/http-server.test.ts "Veritas — testes HTTP MCP-011 e MCP-013"

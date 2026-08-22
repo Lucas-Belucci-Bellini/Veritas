@@ -47,7 +47,7 @@ function initializeBody(id = 1) {
   }
 }
 
-function startServer() {
+function startServer(envOverrides = {}) {
   const child = execFile('node', [HTTP_ENTRY], {
     cwd: process.cwd(),
     env: {
@@ -57,6 +57,7 @@ function startServer() {
       VERITAS_MCP_HTTP_PATH: '/mcp',
       VERITAS_MCP_HTTP_BEARER_TOKEN: TOKEN,
       VERITAS_MCP_HTTP_ALLOWED_ORIGINS: ORIGIN,
+      ...envOverrides,
     },
   })
 
@@ -88,6 +89,33 @@ function startServer() {
   })
 }
 
+function rejectsStartup(envOverrides) {
+  const child = execFile('node', [HTTP_ENTRY], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      VERITAS_MCP_HTTP_HOST: '127.0.0.1',
+      VERITAS_MCP_HTTP_PORT: '0',
+      VERITAS_MCP_HTTP_PATH: '/mcp',
+      VERITAS_MCP_HTTP_BEARER_TOKEN: TOKEN,
+      VERITAS_MCP_HTTP_ALLOWED_ORIGINS: ORIGIN,
+      ...envOverrides,
+    },
+  })
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      if (!child.killed) child.kill('SIGTERM')
+      resolve(value)
+    }
+    child.once('error', () => finish(true))
+    child.once('close', (code) => finish(code !== 0))
+    setTimeout(() => finish(false), 1500)
+  })
+}
+
 async function stopServer(child) {
   if (child.exitCode !== null) return
   child.kill('SIGTERM')
@@ -97,6 +125,7 @@ async function stopServer(child) {
 async function main() {
   mkdirSync(dirname(REPORT_PATH), { recursive: true })
   let server
+  let metadataServer
   try {
     server = await startServer()
 
@@ -166,14 +195,49 @@ async function main() {
       body: JSON.stringify({ ...initializeBody(4), padding: 'x'.repeat(1_050_000) }),
     })
     result('MCP-011-HTTP-009', oversized.status === 413 ? 'PASS' : 'FAIL', 'limite de payload', `payload excedente retorna ${oversized.status}`)
+
+    const metadataPath = '/.well-known/oauth-protected-resource'
+    const defaultMetadata = await fetch(server.url.replace('/mcp', metadataPath), {
+      method: 'GET',
+      headers: { Origin: ORIGIN },
+    })
+    result('MCP-013-HTTP-001', defaultMetadata.status === 404 ? 'PASS' : 'FAIL', 'metadata desabilitada por padrão', `rota padrão retorna ${defaultMetadata.status}`)
+
+    metadataServer = await startServer({
+      VERITAS_MCP_HTTP_RESOURCE: 'https://veritas.example/mcp',
+      VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS: 'https://auth.example/realms/veritas',
+      VERITAS_MCP_HTTP_SCOPES: 'circuit:read',
+    })
+    const metadataResponse = await fetch(metadataServer.url.replace('/mcp', metadataPath), {
+      method: 'GET',
+      headers: { Origin: ORIGIN },
+    })
+    const metadataJson = await metadataResponse.json()
+    const metadataOk = metadataResponse.status === 200 && metadataJson?.resource === 'https://veritas.example/mcp' && metadataJson?.authorization_servers?.[0] === 'https://auth.example/realms/veritas'
+    result('MCP-013-HTTP-002', metadataOk ? 'PASS' : 'FAIL', 'metadata opt-in', `status=${metadataResponse.status}, metadata=${metadataOk}`)
+
+    const metadataMissingOrigin = await fetch(metadataServer.url.replace('/mcp', metadataPath), { method: 'GET' })
+    result('MCP-013-HTTP-003', metadataMissingOrigin.status === 403 ? 'PASS' : 'FAIL', 'Origin da metadata', `Origin ausente retorna ${metadataMissingOrigin.status}`)
+
+    const partialMetadataRejected = await rejectsStartup({
+      VERITAS_MCP_HTTP_RESOURCE: 'https://veritas.example/mcp',
+    })
+    result('MCP-013-HTTP-004', partialMetadataRejected ? 'PASS' : 'FAIL', 'metadata parcial', 'processo rejeita configuração sem authorization servers')
+
+    const insecureMetadataRejected = await rejectsStartup({
+      VERITAS_MCP_HTTP_RESOURCE: 'http://veritas.example/mcp',
+      VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS: 'https://auth.example',
+    })
+    result('MCP-013-HTTP-005', insecureMetadataRejected ? 'PASS' : 'FAIL', 'metadata HTTPS', 'processo rejeita recurso remoto sem HTTPS')
   } catch (error) {
-    result('MCP-011-HTTP-010', 'FAIL', 'runner HTTP', error instanceof Error ? error.message : 'erro desconhecido')
+    result('MCP-013-HTTP-006', 'FAIL', 'runner HTTP', error instanceof Error ? error.message : 'erro desconhecido')
   } finally {
+    if (metadataServer) await stopServer(metadataServer.child)
     if (server) await stopServer(server.child)
   }
 
   const lines = [
-    `# MCP-011 HTTP acceptance ${new Date().toISOString()}`,
+    `# MCP-011 + MCP-013 HTTP acceptance ${new Date().toISOString()}`,
     '',
     'O ensaio usa somente localhost, token efêmero do processo, Origin allowlist e dados determinísticos; nenhum segredo é persistido.',
     '',
