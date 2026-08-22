@@ -20590,7 +20590,7 @@ function buildTruthTable(ast, options = {}) {
 		totalRows,
 		truncated: generatedRows < totalRows,
 		trueCount,
-		classification: classify(trueCount, rows.length),
+		classification: classify$1(trueCount, rows.length),
 		formula: formatAst(ast, notation)
 	};
 }
@@ -20611,7 +20611,7 @@ function assignmentForRow(variables, index) {
 	for (let i = 0; i < variables.length; i += 1) assignment[variables[i]] = (index >> lastBit - i & 1) === 1;
 	return assignment;
 }
-function classify(trueCount, rowCount) {
+function classify$1(trueCount, rowCount) {
 	if (rowCount === 0) return "contingencia";
 	if (trueCount === rowCount) return "tautologia";
 	if (trueCount === 0) return "contradicao";
@@ -21391,6 +21391,218 @@ function circuitNodeWidth(node) {
 }
 function isValidCircuitWidth(width) {
 	return Number.isInteger(width) && width >= 1 && width <= 64;
+}
+/** Converte o documento visual para o netlist consumido pelo simulador. */
+function toNetlist(document, options = {}) {
+	const normalized = normalizeCircuitDocument(document);
+	const issues = validateCircuit(normalized, options);
+	if (issues.length > 0) throw new CircuitValidationError(issues);
+	const inputsByNode = /* @__PURE__ */ new Map();
+	for (const connection of normalized.connections) {
+		const inputs = inputsByNode.get(connection.target.node) ?? [];
+		inputs[connection.target.port] = connection.source;
+		inputsByNode.set(connection.target.node, inputs);
+	}
+	const wirelessResolution = resolveWirelessChannels(normalized.nodes.filter((node) => node.type === "transmitter" || node.type === "receiver").map((node) => ({
+		nodeId: node.id,
+		channel: node.options?.channel ?? "",
+		kind: node.type,
+		width: circuitNodeWidth(node)
+	})));
+	if (wirelessResolution.issues.length > 0) throw new CircuitValidationError(validateCircuit(normalized, options));
+	const wirelessByReceiver = new Map(wirelessResolution.channels.flatMap((channel) => channel.receivers.map((receiver) => [receiver.nodeId, { node: channel.transmitter.nodeId }])));
+	return { components: normalized.nodes.map((node) => {
+		const inputs = node.type === "receiver" ? [wirelessByReceiver.get(node.id)] : inputsByNode.get(node.id);
+		return {
+			id: node.id,
+			type: node.type,
+			label: node.label,
+			options: node.options,
+			inputs: inputs && inputs.length > 0 ? inputs : void 0
+		};
+	}) };
+}
+function resolveCustomChipDefinition(node, customChips = []) {
+	const entry = customChips.find((candidate) => candidate.id === node.options?.customChipId);
+	if (!entry) throw new CircuitValidationError([{
+		code: "custom-chip-missing-definition",
+		nodeId: node.id,
+		message: `A instância de chip "${node.id}" não encontrou a definição local solicitada.`
+	}]);
+	return entry.definition;
+}
+function assertCustomChipDepth(depth) {
+	if (depth >= 8) throw new Error(`A hierarquia de chips excede o limite seguro de 8 níveis.`);
+}
+//#endregion
+//#region src/circuit/topology.ts
+function topologicalOrder(nodes) {
+	const byId = /* @__PURE__ */ new Map();
+	for (const node of nodes) {
+		if (byId.has(node.id)) throw new Error(`Componente duplicado: "${node.id}".`);
+		byId.set(node.id, node);
+	}
+	const dependencies = /* @__PURE__ */ new Map();
+	const dependents = /* @__PURE__ */ new Map();
+	for (const node of nodes) dependencies.set(node.id, 0);
+	for (const node of nodes) for (const input of node.inputs ?? []) {
+		if (!byId.has(input.node)) throw new Error(`O componente "${node.id}" está ligado em "${input.node}", que não existe.`);
+		dependencies.set(node.id, (dependencies.get(node.id) ?? 0) + 1);
+		const targets = dependents.get(input.node) ?? [];
+		targets.push(node.id);
+		dependents.set(input.node, targets);
+	}
+	const queue = [...nodes].filter((node) => dependencies.get(node.id) === 0).map((node) => node.id).sort(compareIds);
+	const order = [];
+	while (queue.length > 0) {
+		const id = queue.shift();
+		order.push(id);
+		for (const target of (dependents.get(id) ?? []).sort(compareIds)) {
+			const remaining = (dependencies.get(target) ?? 0) - 1;
+			dependencies.set(target, remaining);
+			if (remaining === 0) insertSorted(queue, target);
+		}
+	}
+	if (order.length !== nodes.length) throw new Error("O circuito contém um ciclo e não pode ser avaliado como combinacional.");
+	return order;
+}
+function insertSorted(values, value) {
+	let index = 0;
+	while (index < values.length && compareIds(values[index], value) <= 0) index += 1;
+	values.splice(index, 0, value);
+}
+function compareIds(left, right) {
+	return left.localeCompare(right);
+}
+//#endregion
+//#region src/circuit/evaluate.ts
+function evaluateCircuit(document, inputs = {}, options = {}) {
+	return evaluateNetlist(toNetlist(normalizeCircuitDocument(document), { customChips: options.customChips }), inputs, options);
+}
+/**
+* Avalia apenas netlists combinacionais. A função é independente de React e do
+* DOM para ser compartilhada pelo editor, pelos testes e futuramente pelo MCP.
+*/
+function evaluateNetlist(netlist, inputs = {}, options = {}, depth = 0) {
+	const components = /* @__PURE__ */ new Map();
+	for (const component of netlist.components) {
+		if (components.has(component.id)) throw new Error(`Componente duplicado: "${component.id}".`);
+		components.set(component.id, component);
+	}
+	const order = topologicalOrder([...components.values()]);
+	const values = {};
+	for (const id of order) {
+		const component = components.get(id);
+		const componentInputs = (component.inputs ?? []).map((input) => readPort(values, input));
+		values[id] = component.type === "custom-chip" ? evaluateCustomComponent(component, componentInputs, options, depth) : evaluateComponent(component, componentInputs, inputs, options);
+	}
+	const outputs = {};
+	for (const component of components.values()) if (component.type === "output") outputs[component.id] = values[component.id]?.[0] ?? false;
+	return {
+		values,
+		outputs,
+		order
+	};
+}
+function evaluateCustomComponent(component, componentInputs, options, depth) {
+	assertCustomChipDepth(depth);
+	const definition = resolveCustomChipDefinition({
+		id: component.id,
+		type: "custom-chip",
+		options: component.options
+	}, options.customChips);
+	const nestedInputs = Object.fromEntries(definition.inputs.map((port, index) => [port.id, componentInputs[index] ?? false]));
+	const nested = evaluateNetlist(toNetlist(definition.document, { customChips: options.customChips }), nestedInputs, options, depth + 1);
+	return definition.outputs.map((port) => nested.outputs[port.id] ?? false);
+}
+function evaluateComponent(component, componentInputs, inputs, options) {
+	switch (component.type) {
+		case "input": return [inputs[component.id] ?? component.options?.initial ?? options.defaultInput ?? false];
+		case "constant": return [component.options?.value ?? false];
+		case "output":
+		case "transmitter":
+		case "receiver": return [componentInputs[0] ?? false];
+		case "and":
+		case "or":
+		case "not":
+		case "xor": {
+			const result = combinationalResult(component.type, componentInputs);
+			if (result === null) throw new Error(`O componente "${component.id}" não é combinacional.`);
+			return [result];
+		}
+		default: throw new Error(`O componente "${component.id}" não é suportado no editor combinacional.`);
+	}
+}
+function readPort(values, reference) {
+	const source = values[reference.node];
+	if (!source) throw new Error(`A saída de "${reference.node}" ainda não está disponível.`);
+	return source[reference.port ?? 0] ?? false;
+}
+/**
+* Gera a tabela verdade diretamente do grafo visual.
+*
+* Os IDs das entradas são usados como chaves internas das atribuições; os
+* rótulos visuais aparecem nas colunas. Assim, dois componentes com rótulos
+* iguais continuam sendo variáveis distintas e o circuito não fica ambíguo.
+*/
+function buildCircuitTruthTable(document, options = {}) {
+	const normalized = normalizeCircuitDocument(document);
+	const issues = validateCircuit(normalized, { customChips: options.customChips });
+	if (issues.length > 0) throw new Error(issues[0].message);
+	const inputs = normalized.nodes.filter((node) => node.type === "input");
+	const outputs = normalized.nodes.filter((node) => node.type === "output");
+	if (outputs.length === 0) throw new Error("O circuito precisa de pelo menos uma saída.");
+	if (inputs.length > 16) throw new RangeError(`O circuito tem ${inputs.length} entradas; o limite da tabela é 16.`);
+	const selectedOutput = outputs.find((node) => node.id === options.outputId) ?? outputs[0];
+	const variables = inputs.map((node) => node.id);
+	const totalRows = 2 ** variables.length;
+	const maxRows = options.maxRows ?? 4096;
+	const generatedRows = Math.min(totalRows, Math.max(1, maxRows));
+	const columns = [
+		...inputs.map((node) => ({
+			key: `input:${node.id}`,
+			label: node.label ?? node.id,
+			type: "variable"
+		})),
+		...outputs.filter((node) => node.id !== selectedOutput.id).map((node) => ({
+			key: `output:${node.id}`,
+			label: node.label ?? node.id,
+			type: "step"
+		})),
+		{
+			key: `output:${selectedOutput.id}`,
+			label: selectedOutput.label ?? selectedOutput.id,
+			type: "result"
+		}
+	];
+	const rows = [];
+	let trueCount = 0;
+	for (let index = 0; index < generatedRows; index += 1) {
+		const assignment = assignmentForRow(variables, index);
+		const evaluation = evaluateCircuit(normalized, assignment, { customChips: options.customChips });
+		const row = [
+			...variables.map((id) => assignment[id]),
+			...outputs.filter((node) => node.id !== selectedOutput.id).map((node) => evaluation.outputs[node.id] ?? false),
+			evaluation.outputs[selectedOutput.id] ?? false
+		];
+		if (evaluation.outputs[selectedOutput.id]) trueCount += 1;
+		rows.push(row);
+	}
+	return {
+		variables,
+		columns,
+		rows,
+		totalRows,
+		truncated: generatedRows < totalRows,
+		trueCount,
+		classification: generatedRows < totalRows ? "contingencia" : classify(trueCount, generatedRows),
+		formula: selectedOutput.label ?? selectedOutput.id
+	};
+}
+function classify(trueCount, rowCount) {
+	if (trueCount === rowCount) return "tautologia";
+	if (trueCount === 0) return "contradicao";
+	return "contingencia";
 }
 /**
 * Converte um documento com nós `custom-chip` em um documento HDL-ready sem
@@ -22716,6 +22928,37 @@ function normalForms(expression, notation = "math") {
 		cheaper
 	].join("\n") };
 }
+function circuitTruthTable(query) {
+	try {
+		if (!isCircuitDocumentShape(query.document)) return {
+			isError: true,
+			text: "O documento não possui o formato veritas-circuit esperado."
+		};
+		const customChips = normalizeCustomChipLibrary(query.customChips);
+		const table = buildCircuitTruthTable(query.document, {
+			maxRows: query.maxRows,
+			outputId: query.outputId,
+			customChips
+		});
+		const header = `| ${table.columns.map((column) => column.label).join(" | ")} |`;
+		const divider = `| ${table.columns.map(() => "---").join(" | ")} |`;
+		const rows = table.rows.map((row) => `| ${row.map((value) => value ? "1" : "0").join(" | ")} |`);
+		const notes = [`Classificação: ${table.classification}`, `${table.trueCount} de ${table.rows.length} linhas verdadeiras`];
+		if (table.truncated) notes.push(`Exibindo ${table.rows.length} de ${table.totalRows} linhas.`);
+		return { text: [
+			header,
+			divider,
+			...rows,
+			"",
+			...notes
+		].join("\n") };
+	} catch (error) {
+		return {
+			isError: true,
+			text: error instanceof Error ? error.message : "Falha ao gerar a tabela verdade do circuito."
+		};
+	}
+}
 function normalizeCustomChipLibrary(entries = []) {
 	if (entries.length > 128) throw new Error(`A biblioteca MCP aceita no máximo 128 chips customizados por chamada.`);
 	const ids = /* @__PURE__ */ new Set();
@@ -22995,6 +23238,24 @@ var RUNTIME_VALUE = union([
 	string(),
 	_null()
 ]);
+server.registerTool("circuit_truth_table", {
+	title: "Tabela verdade de circuito",
+	description: "Gera a tabela verdade de um CircuitDocument combinacional. Aceita instâncias custom-chip quando suas definições veritas-custom-chip são enviadas em custom_chips.",
+	inputSchema: {
+		document: unknown().describe("CircuitDocument serializável do formato veritas-circuit"),
+		output_id: string().min(1).optional().describe("ID da saída a ser destacada; por padrão, usa a primeira"),
+		max_rows: number().int().min(1).max(4096).default(256).describe("Teto de linhas na resposta"),
+		custom_chips: array(object({
+			id: number().int().min(1),
+			definition: unknown()
+		})).max(128).default([]).describe("Definições veritas-custom-chip usadas pelas instâncias custom-chip")
+	}
+}, async ({ document, output_id, max_rows, custom_chips }) => guard(() => circuitTruthTable({
+	document,
+	outputId: output_id,
+	maxRows: max_rows,
+	customChips: custom_chips
+})));
 server.registerTool("debug_algorithm", {
 	title: "Depurar algoritmo",
 	description: "Executa um AlgorithmDocument do Veritas em modo step ou run, preservando estado, Watch, BranchTrace, breakpoints e razão de pausa. Não grava no banco nem executa código arbitrário.",
