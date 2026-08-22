@@ -31,6 +31,22 @@ describe('buildCircuitContext', () => {
     expect(first.tags).toContain('veritas')
   })
 
+  it('normaliza o documento antes de gerar hash e payload', () => {
+    const document = circuit()
+    document.name = '  Contexto AND  '
+    document.nodes[0].id = '  a  '
+    document.nodes[0].label = '  A  '
+    document.connections[0].source.node = '  a  '
+
+    const context = buildCircuitContext(document)
+
+    expect(context.circuitName).toBe('Contexto AND')
+    expect(context.payload.document.name).toBe('Contexto AND')
+    expect(context.payload.document.nodes[0].id).toBe('a')
+    expect(context.payload.document.connections[0].source.node).toBe('a')
+    expect(context.payload.truthTable.rows).toHaveLength(4)
+  })
+
   it('recusa circuito inválido', () => {
     const document = circuit()
     document.connections = []

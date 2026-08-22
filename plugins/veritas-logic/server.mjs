@@ -20263,7 +20263,7 @@ var DIGIT = /[0-9]/;
 * dicionário (letras, dígitos, símbolos lógicos, parênteses e espaços) trava a
 * análise imediatamente, com a posição exata do caractere ofensor.
 */
-function tokenize(source) {
+function tokenize$1(source) {
 	const tokens = [];
 	let i = 0;
 	while (i < source.length) {
@@ -20367,7 +20367,7 @@ function matchSymbol(source, index) {
 * variável" quando o usuário só esqueceu de fechar um parêntese é confuso.
 */
 function parse(source) {
-	const tokens = tokenize(source);
+	const tokens = tokenize$1(source);
 	if (tokens.length === 1) throw new VeritasError("empty", "Digite uma expressão para começar.", 0, 0);
 	checkParentheses(tokens);
 	const parser = new Parser(tokens);
@@ -21007,6 +21007,43 @@ var Simulator = class {
 		for (const [id, node] of this.nodes) result[id] = [...node.outputs];
 		return result;
 	}
+	exportState() {
+		const nodes = {};
+		for (const [id, node] of this.nodes) nodes[id] = {
+			outputs: [...node.outputs],
+			next: [...node.next],
+			lastClock: node.lastClock,
+			nextLastClock: node.nextLastClock,
+			queue: [...node.queue],
+			nextQueue: [...node.nextQueue],
+			counter: node.counter,
+			nextCounter: node.nextCounter
+		};
+		return {
+			tickCount: this.ticks,
+			nodes
+		};
+	}
+	restoreState(state) {
+		if (!Number.isInteger(state.tickCount) || state.tickCount < 0) throw new Error("O estado do simulador possui um contador de tiques inválido.");
+		const stateIds = Object.keys(state.nodes).sort();
+		const nodeIds = [...this.nodes.keys()].sort();
+		if (stateIds.join("|") !== nodeIds.join("|")) throw new Error("O estado do simulador não corresponde ao netlist atual.");
+		for (const [id, node] of this.nodes) {
+			const saved = state.nodes[id];
+			if (!saved || saved.outputs.length !== node.outputs.length || saved.next.length !== node.next.length) throw new Error(`O estado do componente "${id}" é incompatível com o netlist atual.`);
+			if (!isBooleanArray(saved.outputs) || !isBooleanArray(saved.next) || !isBooleanArray(saved.queue) || !isBooleanArray(saved.nextQueue)) throw new Error(`O estado do componente "${id}" contém valores inválidos.`);
+			node.outputs = [...saved.outputs];
+			node.next = [...saved.next];
+			node.lastClock = saved.lastClock;
+			node.nextLastClock = saved.nextLastClock;
+			node.queue = [...saved.queue];
+			node.nextQueue = [...saved.nextQueue];
+			node.counter = saved.counter;
+			node.nextCounter = saved.nextCounter;
+		}
+		this.ticks = state.tickCount;
+	}
 	tick(count = 1) {
 		for (let index = 0; index < count; index += 1) {
 			this.evaluate();
@@ -21134,6 +21171,9 @@ var Simulator = class {
 		return result;
 	}
 };
+function isBooleanArray(values) {
+	return values.every((value) => typeof value === "boolean");
+}
 function createState(spec) {
 	const size = outputCount(spec.type);
 	const initial = spec.options?.initial ?? false;
@@ -21156,7 +21196,670 @@ function createState(spec) {
 	};
 }
 //#endregion
+//#region src/algorithms/model.ts
+var ALGORITHM_DOCUMENT_FORMAT = "veritas-algorithm";
+function isRuntimeValueOfType(value, valueType) {
+	if (value === null) return true;
+	if (valueType === "boolean") return typeof value === "boolean";
+	if (valueType === "number") return typeof value === "number" && Number.isFinite(value);
+	return typeof value === "string";
+}
+//#endregion
+//#region src/algorithms/validate.ts
+function targetsForNode(node) {
+	switch (node.type) {
+		case "start":
+		case "declare":
+		case "assign":
+		case "input":
+		case "output": return [node.next];
+		case "if": return [node.thenNext, node.elseNext];
+		case "while": return [node.bodyNext, node.exitNext];
+		case "end": return [];
+	}
+}
+function validateAlgorithmDocument(document) {
+	const issues = [];
+	const nodes = /* @__PURE__ */ new Map();
+	if (document.format !== "veritas-algorithm") issues.push({
+		code: "invalid-format",
+		message: `Formato de algoritmo inválido: esperado "${ALGORITHM_DOCUMENT_FORMAT}".`,
+		severity: "error"
+	});
+	if (document.version > 1) issues.push({
+		code: "unsupported-version",
+		message: "O algoritmo foi salvo por uma versão mais nova do Veritas.",
+		severity: "error"
+	});
+	for (const node of document.nodes) {
+		if (!node.id.trim() || nodes.has(node.id)) {
+			issues.push({
+				code: "duplicate-node",
+				message: `O identificador do nó "${node.id}" está vazio ou duplicado.`,
+				nodeId: node.id,
+				severity: "error"
+			});
+			continue;
+		}
+		if (!Number.isFinite(node.position.x) || !Number.isFinite(node.position.y)) issues.push({
+			code: "invalid-position",
+			message: `A posição do nó "${node.id}" não é finita.`,
+			nodeId: node.id,
+			severity: "error"
+		});
+		nodes.set(node.id, node);
+	}
+	if (!nodes.has(document.entryNodeId)) issues.push({
+		code: "missing-entry",
+		message: `O nó de entrada "${document.entryNodeId}" não existe.`,
+		severity: "error"
+	});
+	const variableDeclarations = /* @__PURE__ */ new Map();
+	for (const node of nodes.values()) if (node.type === "declare") {
+		if (variableDeclarations.has(node.variable)) issues.push({
+			code: "duplicate-variable",
+			message: `A variável "${node.variable}" foi declarada mais de uma vez.`,
+			nodeId: node.id,
+			severity: "error"
+		});
+		variableDeclarations.set(node.variable, node.id);
+		if (!isRuntimeValueOfType(node.initialValue ?? null, node.valueType)) issues.push({
+			code: "invalid-initial-value",
+			message: `O valor inicial da variável "${node.variable}" não é compatível com ${node.valueType}.`,
+			nodeId: node.id,
+			severity: "error"
+		});
+	}
+	for (const node of nodes.values()) {
+		const targets = targetsForNode(node);
+		for (const target of targets) if (!nodes.has(target)) issues.push({
+			code: node.type === "if" ? "missing-branch" : "missing-target",
+			message: `O nó "${node.id}" aponta para "${target}", que não existe.`,
+			nodeId: node.id,
+			severity: "error"
+		});
+	}
+	const reachable = /* @__PURE__ */ new Set();
+	const visit = (id) => {
+		if (reachable.has(id)) return;
+		const node = nodes.get(id);
+		if (!node) return;
+		reachable.add(id);
+		for (const target of targetsForNode(node)) visit(target);
+	};
+	visit(document.entryNodeId);
+	for (const node of nodes.values()) if (!reachable.has(node.id)) issues.push({
+		code: "unreachable-node",
+		message: `O nó "${node.id}" não é alcançável a partir da entrada.`,
+		nodeId: node.id,
+		severity: "warning"
+	});
+	return issues;
+}
+function hasValidationErrors(issues) {
+	return issues.some((issue) => issue.severity === "error");
+}
+//#endregion
+//#region src/algorithms/expressions.ts
+function tokenize(source) {
+	const tokens = [];
+	let index = 0;
+	while (index < source.length) {
+		const character = source[index];
+		if (/\s/.test(character)) {
+			index += 1;
+			continue;
+		}
+		if (character === "(") {
+			tokens.push({ kind: "lparen" });
+			index += 1;
+			continue;
+		}
+		if (character === ")") {
+			tokens.push({ kind: "rparen" });
+			index += 1;
+			continue;
+		}
+		if (character === "\"" || character === "'") {
+			const quote = character;
+			let value = "";
+			index += 1;
+			while (index < source.length && source[index] !== quote) if (source[index] === "\\" && index + 1 < source.length) {
+				value += source[index + 1];
+				index += 2;
+			} else {
+				value += source[index];
+				index += 1;
+			}
+			if (source[index] !== quote) throw new Error("A string não foi encerrada.");
+			index += 1;
+			tokens.push({
+				kind: "string",
+				value
+			});
+			continue;
+		}
+		const number = source.slice(index).match(/^(?:\d+(?:\.\d+)?|\.\d+)/)?.[0];
+		if (number) {
+			tokens.push({
+				kind: "number",
+				value: Number(number)
+			});
+			index += number.length;
+			continue;
+		}
+		const operator = source.slice(index).match(/^(===|!==|==|!=|<=|>=|&&|\|\||[+\-*/<>!])/i)?.[0];
+		if (operator) {
+			tokens.push({
+				kind: "operator",
+				value: operator
+			});
+			index += operator.length;
+			continue;
+		}
+		const identifier = source.slice(index).match(/^[A-Za-z_][A-Za-z0-9_]*/)?.[0];
+		if (identifier) {
+			const upper = identifier.toUpperCase();
+			if ([
+				"AND",
+				"OR",
+				"NOT",
+				"XOR"
+			].includes(upper)) tokens.push({
+				kind: "operator",
+				value: upper
+			});
+			else if (upper === "TRUE" || upper === "VERDADEIRO") {
+				tokens.push({
+					kind: "number",
+					value: 1
+				});
+				tokens.push({
+					kind: "operator",
+					value: "TRUE_LITERAL"
+				});
+			} else if (upper === "FALSE" || upper === "FALSO") {
+				tokens.push({
+					kind: "number",
+					value: 0
+				});
+				tokens.push({
+					kind: "operator",
+					value: "FALSE_LITERAL"
+				});
+			} else tokens.push({
+				kind: "identifier",
+				value: identifier
+			});
+			index += identifier.length;
+			continue;
+		}
+		throw new Error(`Caractere inesperado na expressão: "${character}".`);
+	}
+	tokens.push({ kind: "eof" });
+	return tokens;
+}
+var ExpressionParser = class {
+	source;
+	variables;
+	index = 0;
+	tokens;
+	constructor(source, variables) {
+		this.source = source;
+		this.variables = variables;
+		this.tokens = tokenize(source);
+	}
+	parse() {
+		const result = this.parseOr();
+		if (this.current().kind !== "eof") throw new Error(`Token inesperado em "${this.source}".`);
+		return result;
+	}
+	current() {
+		return this.tokens[this.index];
+	}
+	take() {
+		const token = this.current();
+		this.index += 1;
+		return token;
+	}
+	matchOperator(...operators) {
+		const token = this.current();
+		if (token.kind !== "operator" || !operators.includes(token.value)) return false;
+		this.index += 1;
+		return true;
+	}
+	parseOr() {
+		let left = this.parseXor();
+		while (this.matchOperator("OR", "||")) left = this.booleanBinary(left, this.parseXor(), "OR");
+		return left;
+	}
+	parseXor() {
+		let left = this.parseAnd();
+		while (this.matchOperator("XOR")) left = this.booleanBinary(left, this.parseAnd(), "XOR");
+		return left;
+	}
+	parseAnd() {
+		let left = this.parseEquality();
+		while (this.matchOperator("AND", "&&")) left = this.booleanBinary(left, this.parseEquality(), "AND");
+		return left;
+	}
+	parseEquality() {
+		let left = this.parseRelational();
+		while (true) if (this.matchOperator("==", "===")) left = this.compare(left, this.parseRelational(), true);
+		else if (this.matchOperator("!=", "!==")) left = this.compare(left, this.parseRelational(), false);
+		else return left;
+	}
+	parseRelational() {
+		let left = this.parseAdd();
+		while (true) if (this.matchOperator("<")) left = this.order(left, this.parseAdd(), (a, b) => a < b);
+		else if (this.matchOperator("<=")) left = this.order(left, this.parseAdd(), (a, b) => a <= b);
+		else if (this.matchOperator(">")) left = this.order(left, this.parseAdd(), (a, b) => a > b);
+		else if (this.matchOperator(">=")) left = this.order(left, this.parseAdd(), (a, b) => a >= b);
+		else return left;
+	}
+	parseAdd() {
+		let left = this.parseMultiply();
+		while (true) if (this.matchOperator("+")) left = this.add(left, this.parseMultiply());
+		else if (this.matchOperator("-")) left = this.numeric(left, this.parseMultiply(), (a, b) => a - b, "-");
+		else return left;
+	}
+	parseMultiply() {
+		let left = this.parseUnary();
+		while (true) if (this.matchOperator("*")) left = this.numeric(left, this.parseUnary(), (a, b) => a * b, "*");
+		else if (this.matchOperator("/")) {
+			const right = this.parseUnary();
+			if (right === 0) throw new Error("Divisão por zero não é permitida.");
+			left = this.numeric(left, right, (a, b) => a / b, "/");
+		} else return left;
+	}
+	parseUnary() {
+		if (this.matchOperator("!", "NOT")) {
+			const value = this.parseUnary();
+			if (typeof value !== "boolean") throw new Error("NOT exige uma expressão booleana.");
+			return !value;
+		}
+		if (this.matchOperator("-")) {
+			const value = this.parseUnary();
+			if (typeof value !== "number") throw new Error("O sinal - exige um número.");
+			return -value;
+		}
+		return this.parsePrimary();
+	}
+	parsePrimary() {
+		const token = this.take();
+		if (token.kind === "number") {
+			const marker = this.current();
+			if (marker.kind === "operator" && (marker.value === "TRUE_LITERAL" || marker.value === "FALSE_LITERAL")) {
+				this.take();
+				return marker.value === "TRUE_LITERAL";
+			}
+			return token.value;
+		}
+		if (token.kind === "string") return token.value;
+		if (token.kind === "identifier") {
+			if (!(token.value in this.variables)) throw new Error(`A variável "${token.value}" não foi declarada.`);
+			return this.variables[token.value];
+		}
+		if (token.kind === "lparen") {
+			const value = this.parseOr();
+			if (this.current().kind !== "rparen") throw new Error("Parêntese de fechamento ausente.");
+			this.take();
+			return value;
+		}
+		throw new Error("Era esperada uma constante, variável ou parêntese.");
+	}
+	booleanBinary(left, right, operator) {
+		if (typeof left !== "boolean" || typeof right !== "boolean") throw new Error(`${operator} exige operandos booleanos.`);
+		if (operator === "AND") return left && right;
+		if (operator === "OR") return left || right;
+		return left !== right;
+	}
+	compare(left, right, equal) {
+		const result = left === right;
+		return equal ? result : !result;
+	}
+	order(left, right, operation) {
+		if (typeof left !== "number" && typeof left !== "string" || typeof right !== "number" && typeof right !== "string" || typeof left !== typeof right) throw new Error("Comparações relacionais exigem dois números ou duas strings.");
+		if (typeof left === "number" && typeof right === "number") return operation(left, right);
+		if (typeof left === "string" && typeof right === "string") return operation(left, right);
+		throw new Error("Comparação relacional incompatível.");
+	}
+	add(left, right) {
+		if (typeof left === "number" && typeof right === "number") return left + right;
+		if (typeof left === "string" || typeof right === "string") return String(left) + String(right);
+		throw new Error("O operador + exige números ou strings.");
+	}
+	numeric(left, right, operation, operator) {
+		if (typeof left !== "number" || typeof right !== "number") throw new Error(`O operador ${operator} exige operandos numéricos.`);
+		const result = operation(left, right);
+		if (!Number.isFinite(result)) throw new Error("O resultado numérico não é finito.");
+		return result;
+	}
+};
+function evaluateExpression$1(source, variables) {
+	if (!source.trim()) throw new Error("A expressão não pode ser vazia.");
+	return new ExpressionParser(source, variables).parse();
+}
+//#endregion
+//#region src/algorithms/executor.ts
+var AlgorithmExecutionError = class extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "AlgorithmExecutionError";
+	}
+};
+var DEFAULT_MAX_STEPS = 1e4;
+function cloneState(state) {
+	return {
+		...state,
+		variables: { ...state.variables },
+		variableTypes: { ...state.variableTypes },
+		inputQueues: Object.fromEntries(Object.entries(state.inputQueues).map(([key, values]) => [key, [...values]])),
+		inputCursors: { ...state.inputCursors },
+		output: [...state.output],
+		trace: [...state.trace],
+		watch: state.watch.map((entry) => ({ ...entry })),
+		branches: state.branches.map((entry) => ({
+			...entry,
+			operands: { ...entry.operands }
+		})),
+		debug: {
+			...state.debug,
+			breakpoints: [...state.debug.breakpoints]
+		}
+	};
+}
+function fail(state, message, reason = "error") {
+	const next = cloneState(state);
+	next.status = "error";
+	next.error = message;
+	next.debug.lastPauseReason = reason;
+	return next;
+}
+function requireNext(node) {
+	if (node.type === "if" || node.type === "while") throw new AlgorithmExecutionError("O nó condicional exige uma branch escolhida.");
+	if (node.type === "end") throw new AlgorithmExecutionError("O nó final não possui sucessor.");
+	return node.next;
+}
+function ensureDeclared(state, variable) {
+	if (!(variable in state.variableTypes)) throw new AlgorithmExecutionError(`A variável "${variable}" não foi declarada.`);
+}
+function recordWatchChange(state, variable, value, step) {
+	const existing = state.watch.find((entry) => entry.name === variable);
+	state.watch = [...state.watch.filter((entry) => entry.name !== variable), {
+		name: variable,
+		type: state.variableTypes[variable],
+		value,
+		previousValue: existing?.value,
+		changedAtStep: step,
+		scope: "global"
+	}].sort((left, right) => left.name.localeCompare(right.name));
+}
+function executeNode(state, node, step) {
+	switch (node.type) {
+		case "start":
+			state.activeNodeId = requireNext(node);
+			return;
+		case "end":
+			state.activeNodeId = null;
+			state.status = "finished";
+			return;
+		case "declare": {
+			if (node.variable in state.variableTypes) throw new AlgorithmExecutionError(`A variável "${node.variable}" já foi declarada.`);
+			const value = node.initialValue ?? null;
+			if (!isRuntimeValueOfType(value, node.valueType)) throw new AlgorithmExecutionError(`O valor inicial de "${node.variable}" é incompatível com ${node.valueType}.`);
+			state.variableTypes[node.variable] = node.valueType;
+			state.variables[node.variable] = value;
+			recordWatchChange(state, node.variable, value, step);
+			state.activeNodeId = node.next;
+			return;
+		}
+		case "assign": {
+			ensureDeclared(state, node.variable);
+			const value = evaluateExpression$1(node.expression, state.variables);
+			const valueType = state.variableTypes[node.variable];
+			if (!isRuntimeValueOfType(value, valueType)) throw new AlgorithmExecutionError(`A atribuição para "${node.variable}" exige ${valueType}.`);
+			state.variables[node.variable] = value;
+			recordWatchChange(state, node.variable, value, step);
+			state.activeNodeId = node.next;
+			return;
+		}
+		case "if": {
+			const condition = evaluateExpression$1(node.condition, state.variables);
+			if (typeof condition !== "boolean") throw new AlgorithmExecutionError("A condição do IF precisa produzir verdadeiro ou falso.");
+			state.branches.push({
+				nodeId: node.id,
+				expression: node.condition,
+				operands: { ...state.variables },
+				result: condition,
+				selectedBranch: condition ? "then" : "else",
+				step
+			});
+			state.activeNodeId = condition ? node.thenNext : node.elseNext;
+			return;
+		}
+		case "while": {
+			const condition = evaluateExpression$1(node.condition, state.variables);
+			if (typeof condition !== "boolean") throw new AlgorithmExecutionError("A condição do WHILE precisa produzir verdadeiro ou falso.");
+			state.branches.push({
+				nodeId: node.id,
+				expression: node.condition,
+				operands: { ...state.variables },
+				result: condition,
+				selectedBranch: condition ? "then" : "else",
+				step
+			});
+			state.activeNodeId = condition ? node.bodyNext : node.exitNext;
+			return;
+		}
+		case "input": {
+			ensureDeclared(state, node.variable);
+			const cursor = state.inputCursors[node.variable] ?? 0;
+			const queue = state.inputQueues[node.variable] ?? [];
+			if (cursor >= queue.length) {
+				state.status = "awaiting-input";
+				return;
+			}
+			const value = queue[cursor];
+			const valueType = state.variableTypes[node.variable];
+			if (!isRuntimeValueOfType(value, valueType)) throw new AlgorithmExecutionError(`A entrada para "${node.variable}" exige ${valueType}.`);
+			state.inputCursors[node.variable] = cursor + 1;
+			state.variables[node.variable] = value;
+			recordWatchChange(state, node.variable, value, step);
+			state.activeNodeId = node.next;
+			return;
+		}
+		case "output":
+			state.output.push(evaluateExpression$1(node.expression, state.variables));
+			state.activeNodeId = node.next;
+			return;
+	}
+}
+function createExecutionState(document, options = {}) {
+	const issues = validateAlgorithmDocument(document);
+	if (hasValidationErrors(issues)) throw new AlgorithmExecutionError(issues.filter((issue) => issue.severity === "error").map((issue) => issue.message).join(" "));
+	return {
+		status: "ready",
+		activeNodeId: document.entryNodeId,
+		variables: {},
+		variableTypes: {},
+		inputQueues: Object.fromEntries(Object.entries(options.inputQueues ?? {}).map(([key, values]) => [key, [...values]])),
+		inputCursors: {},
+		output: [],
+		trace: [],
+		watch: [],
+		branches: [],
+		debug: {
+			breakpoints: [...options.breakpoints ?? []],
+			lastPauseReason: null
+		},
+		stepIndex: 0,
+		error: null
+	};
+}
+function stepAlgorithm(document, state, options = {}) {
+	if (state.status === "finished" || state.status === "error") return cloneState(state);
+	if (state.status === "awaiting-input") return cloneState(state);
+	if (!state.activeNodeId) return fail(state, "O estado não possui um nó ativo.");
+	const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
+	if (state.stepIndex >= maxSteps) return fail(state, `O algoritmo excedeu o limite de ${maxSteps} passos.`, "max-steps");
+	const node = document.nodes.find((candidate) => candidate.id === state.activeNodeId);
+	if (!node) return fail(state, `O nó ativo "${state.activeNodeId}" não existe.`);
+	const next = cloneState(state);
+	try {
+		executeNode(next, node, next.stepIndex + 1);
+		if (next.status === "awaiting-input") {
+			next.debug.lastPauseReason = "input";
+			return next;
+		}
+		next.stepIndex += 1;
+		next.trace.push({
+			step: next.stepIndex,
+			nodeId: node.id,
+			nodeType: node.type,
+			status: next.status,
+			outputLength: next.output.length
+		});
+		if (next.status !== "finished") {
+			next.status = "paused";
+			next.debug.lastPauseReason = "step";
+		} else next.debug.lastPauseReason = "finished";
+		return next;
+	} catch (error) {
+		return fail(next, error instanceof Error ? error.message : "Falha desconhecida na execução.");
+	}
+}
+function runAlgorithm(document, initialState, options = {}) {
+	let state = initialState ? initialState.status === "ready" ? initialState : cloneState(initialState) : createExecutionState(document, options);
+	const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
+	let skipBreakpointNodeId = state.debug.lastPauseReason === "breakpoint" ? state.activeNodeId : null;
+	while (state.status !== "finished" && state.status !== "error" && state.status !== "awaiting-input") {
+		if (state.activeNodeId && state.debug.breakpoints.includes(state.activeNodeId) && state.activeNodeId !== skipBreakpointNodeId) {
+			const paused = cloneState(state);
+			paused.status = "paused";
+			paused.debug.lastPauseReason = "breakpoint";
+			return paused;
+		}
+		skipBreakpointNodeId = null;
+		state = stepAlgorithm(document, state, {
+			...options,
+			maxSteps
+		});
+	}
+	return state;
+}
+//#endregion
+//#region src/algorithms/logicCases.ts
+var LOGIC_TEST_CASES = [
+	{
+		id: "tautology-excluded-middle",
+		title: "Lei do terceiro excluído",
+		source: "Algebra de Boole",
+		kind: "tautology",
+		variables: ["P"],
+		expression: "P OR NOT P"
+	},
+	{
+		id: "equivalence-de-morgan",
+		title: "De Morgan: negação da conjunção",
+		source: "Algebra de Boole",
+		kind: "equivalence",
+		variables: ["P", "Q"],
+		expression: "NOT (P AND Q)",
+		equivalentExpression: "NOT P OR NOT Q"
+	},
+	{
+		id: "equivalence-contrapositive",
+		title: "Implicação e contrapositiva",
+		source: "Algebra de Boole",
+		kind: "equivalence",
+		variables: ["P", "Q"],
+		expression: "NOT P OR Q",
+		equivalentExpression: "Q OR NOT P"
+	},
+	{
+		id: "implication-counterexample",
+		title: "Implicação material",
+		source: "Algebra de Boole",
+		kind: "implication",
+		variables: ["P", "Q"],
+		expression: "NOT P OR Q"
+	},
+	{
+		id: "modus-ponens",
+		title: "Modus Ponens",
+		source: "Argumentos",
+		kind: "argument",
+		variables: ["P", "Q"],
+		premises: ["NOT P OR Q", "P"],
+		conclusion: "Q"
+	},
+	{
+		id: "modus-tollens",
+		title: "Modus Tollens",
+		source: "Argumentos",
+		kind: "argument",
+		variables: ["P", "Q"],
+		premises: ["NOT P OR Q", "NOT Q"],
+		conclusion: "NOT P"
+	}
+];
+function booleanValue(value, expression) {
+	if (typeof value !== "boolean") throw new Error(`A expressão "${expression}" não produziu booleano.`);
+	return value;
+}
+function enumerateBooleanAssignments(variables) {
+	return Array.from({ length: 2 ** variables.length }, (_, index) => Object.fromEntries(variables.map((variable, variableIndex) => [variable, Boolean(index & 1 << variables.length - variableIndex - 1)])));
+}
+function evaluateLogicTestCase(testCase) {
+	return enumerateBooleanAssignments(testCase.variables).map((assignment) => {
+		const values = (expressions) => expressions.map((expression) => booleanValue(evaluateExpression$1(expression, assignment), expression));
+		if (testCase.kind === "equivalence") {
+			const [expressionValue, equivalentValue] = values([testCase.expression, testCase.equivalentExpression]);
+			return {
+				assignment,
+				expressionValue,
+				equivalentValue,
+				passes: expressionValue === equivalentValue
+			};
+		}
+		if (testCase.kind === "argument") {
+			const premiseValues = values(testCase.premises ?? []);
+			const conclusionValue = booleanValue(evaluateExpression$1(testCase.conclusion, assignment), testCase.conclusion);
+			return {
+				assignment,
+				premiseValues,
+				conclusionValue,
+				passes: !premiseValues.every(Boolean) || conclusionValue
+			};
+		}
+		const expressionValue = booleanValue(evaluateExpression$1(testCase.expression, assignment), testCase.expression);
+		return {
+			assignment,
+			expressionValue,
+			passes: testCase.kind === "tautology" || testCase.kind === "implication" ? expressionValue : true
+		};
+	});
+}
+function logicCaseIsValid(testCase) {
+	return evaluateLogicTestCase(testCase).every((row) => row.passes);
+}
+/**
+* Usa a mesma parser/avaliador da aplicação principal para cobrir todos os
+* conectivos proposicionais: AND, NAND, OR, NOR, XOR, XNOR, -> e <->.
+*/
+function buildFullPropositionalTruthTable(expression, options = {}) {
+	return buildTruthTable(parse(expression), {
+		notation: options.notation ?? "math",
+		includeSteps: options.includeSteps ?? true,
+		maxRows: options.maxRows ?? 4096
+	});
+}
+//#endregion
 //#region mcp/src/tools.ts
+function jsonResult(value) {
+	return { text: JSON.stringify(value, null, 2) };
+}
 var here = dirname(fileURLToPath(import.meta.url));
 var catalog = null;
 /** O catálogo só é lido do disco quando alguma ferramenta de chip é chamada. */
@@ -21268,6 +21971,75 @@ function karnaugh(expression, notation = "math") {
 		groups.length > 0 ? "Agrupamentos:" : "Sem agrupamentos: a função é constante.",
 		...groups
 	].join("\n") };
+}
+function evaluateLogicCase(caseId) {
+	const testCase = LOGIC_TEST_CASES.find((item) => item.id === caseId);
+	if (!testCase) return {
+		isError: true,
+		text: `Caso "${caseId}" não encontrado. Disponíveis: ${LOGIC_TEST_CASES.map((item) => item.id).join(", ")}.`
+	};
+	const rows = evaluateLogicTestCase(testCase);
+	const variables = testCase.variables;
+	const header = `| ${variables.join(" | ")} | resultado | passa |`;
+	const divider = `| ${variables.map(() => "---").join(" | ")} | --- | --- |`;
+	const body = rows.map((row) => {
+		const result = row.expressionValue ?? row.conclusionValue ?? row.premiseValues?.every(Boolean) ?? false;
+		return `| ${variables.map((variable) => row.assignment[variable] ? "V" : "F").join(" | ")} | ${result ? "V" : "F"} | ${row.passes ? "sim" : "não"} |`;
+	});
+	return { text: [
+		`# ${testCase.title}`,
+		`Origem: ${testCase.source}`,
+		`Tipo: ${testCase.kind}`,
+		"",
+		...body.length > 0 ? [
+			header,
+			divider,
+			...body
+		] : [],
+		"",
+		`Caso válido: ${logicCaseIsValid(testCase) ? "sim" : "não"}`
+	].join("\n") };
+}
+function fullPropositionalTable(expression, options = {}) {
+	const table = buildFullPropositionalTruthTable(expression, options);
+	return { text: [
+		`| ${table.columns.map((column) => column.label).join(" | ")} |`,
+		`| ${table.columns.map(() => "---").join(" | ")} |`,
+		...table.rows.map((row) => `| ${row.map((value) => value ? "1" : "0").join(" | ")} |`),
+		"",
+		`Classificação: ${table.classification}`,
+		`${table.trueCount} de ${table.rows.length} linhas verdadeiras`
+	].join("\n") };
+}
+function normalizeDebugState(state) {
+	return {
+		...state,
+		debug: {
+			breakpoints: [...state.debug?.breakpoints ?? []],
+			lastPauseReason: state.debug?.lastPauseReason ?? null
+		}
+	};
+}
+function debugAlgorithm(query) {
+	try {
+		let state = query.state ? normalizeDebugState(query.state) : createExecutionState(query.document, {
+			inputQueues: query.inputQueues,
+			breakpoints: query.breakpoints
+		});
+		if (query.breakpoints && query.state) state = {
+			...state,
+			debug: {
+				...state.debug,
+				breakpoints: [...query.breakpoints].sort()
+			}
+		};
+		return jsonResult(query.mode === "step" ? stepAlgorithm(query.document, state, { maxSteps: query.maxSteps }) : runAlgorithm(query.document, state, { maxSteps: query.maxSteps }));
+	} catch (error) {
+		return {
+			isError: true,
+			text: error instanceof Error ? error.message : "Falha ao depurar algoritmo."
+		};
+	}
 }
 function listChips(options = {}) {
 	const { chips } = loadCatalog();
@@ -21436,7 +22208,7 @@ function guard(run) {
 }
 var server = new McpServer({
 	name: "veritas",
-	version: "0.6.0"
+	version: "0.9.0-rc.1"
 }, { instructions: "Motor de lógica booleana do Veritas. Use estas ferramentas em vez de calcular tabelas verdade ou simplificações de cabeça: elas são exatas. A biblioteca de chips vem de circuitos reais feitos no Digital Logic Sim." });
 server.registerTool("truth_table", {
 	title: "Tabela verdade",
@@ -21476,6 +22248,50 @@ server.registerTool("normal_forms", {
 		notation: NOTATION
 	}
 }, async ({ expression, notation }) => guard(() => normalForms(expression, notation)));
+server.registerTool("logic_case", {
+	title: "Caso lógico didático",
+	description: "Avalia um exercício de Álgebra de Boole ou Argumentos do catálogo do Veritas e devolve todas as linhas, contraexemplos e validade do caso.",
+	inputSchema: { case_id: string().min(1).describe("ID do caso, por exemplo tautology-excluded-middle ou modus-ponens") }
+}, async ({ case_id }) => guard(() => evaluateLogicCase(case_id)));
+server.registerTool("propositional_truth_table", {
+	title: "Tabela proposicional completa",
+	description: "Gera uma tabela verdade completa usando a engine do Veritas. Aceita AND, NAND, OR, NOR, XOR, XNOR, NOT, implicação -> e bicondicional <->.",
+	inputSchema: {
+		expression: EXPRESSION,
+		include_steps: boolean().default(true),
+		notation: NOTATION,
+		max_rows: number().int().min(2).max(4096).default(4096)
+	}
+}, async ({ expression, include_steps, notation, max_rows }) => guard(() => fullPropositionalTable(expression, {
+	includeSteps: include_steps,
+	notation,
+	maxRows: max_rows
+})));
+var RUNTIME_VALUE = union([
+	boolean(),
+	number(),
+	string(),
+	_null()
+]);
+server.registerTool("debug_algorithm", {
+	title: "Depurar algoritmo",
+	description: "Executa um AlgorithmDocument do Veritas em modo step ou run, preservando estado, Watch, BranchTrace, breakpoints e razão de pausa. Não grava no banco nem executa código arbitrário.",
+	inputSchema: {
+		document: unknown().describe("AlgorithmDocument serializável do formato veritas-algorithm"),
+		state: unknown().optional().describe("ExecutionState retornado por uma chamada anterior"),
+		mode: _enum(["step", "run"]).default("run"),
+		max_steps: number().int().min(1).max(1e5).default(1e4),
+		input_queues: record(string(), array(RUNTIME_VALUE)).optional(),
+		breakpoints: array(string()).default([])
+	}
+}, async ({ document, state, mode, max_steps, input_queues, breakpoints }) => guard(() => debugAlgorithm({
+	document,
+	state,
+	mode,
+	maxSteps: max_steps,
+	inputQueues: input_queues,
+	breakpoints
+})));
 server.registerTool("karnaugh_map", {
 	title: "Mapa de Karnaugh",
 	description: "Monta o mapa de Karnaugh (1 a 4 variáveis) em código Gray, com os agrupamentos que geram a expressão mínima.",

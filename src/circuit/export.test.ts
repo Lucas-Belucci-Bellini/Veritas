@@ -42,6 +42,25 @@ describe('exportCircuit', () => {
     expect(output).toContain('end architecture rtl;')
   })
 
+  it('normaliza nome, IDs e referências antes de exportar', () => {
+    const spaced = {
+      ...document,
+      name: '  Somador simples  ',
+      nodes: document.nodes.map((node) => ({
+        ...node,
+        id: `  ${node.id}  `,
+      })),
+      connections: document.connections.map((connection) => ({
+        source: { ...connection.source, node: `  ${connection.source.node}  ` },
+        target: { ...connection.target, node: `  ${connection.target.node}  ` },
+      })),
+    }
+
+    expect(exportVerilog(spaced)).toContain('module Somador_simples (')
+    expect(exportVerilog(spaced)).toContain('assign A_B = A & B;')
+    expect(exportVhdl(spaced)).toContain('entity Somador_simples is')
+  })
+
   it('recusa exportar circuito inválido', () => {
     const invalid = { ...document, connections: [] }
 

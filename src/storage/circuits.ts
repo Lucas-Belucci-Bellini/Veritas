@@ -1,4 +1,4 @@
-import { isEditorComponentType, validateCircuit, type CircuitDocument } from '../circuit'
+import { isEditorComponentType, normalizeCircuitDocument, validateCircuit, type CircuitDocument } from '../circuit'
 import { db, type CircuitProject, type NewCircuitProject } from './db'
 import { MAX_BUS_WIDTH } from '../bus'
 import type { ComponentType } from '../simulation/components'
@@ -26,6 +26,7 @@ export async function createCircuitProject(input: NewCircuitProject): Promise<nu
   return db.circuitProjects.add({
     ...input,
     name: input.name.trim() || input.document.name.trim() || 'Circuito sem nome',
+    document: normalizeCircuitDocument(input.document),
     createdAt: now,
     updatedAt: now,
   } as CircuitProject)
@@ -37,6 +38,7 @@ export async function updateCircuitProject(
 ): Promise<void> {
   const clean = { ...patch }
   if (clean.name !== undefined) clean.name = clean.name.trim() || 'Circuito sem nome'
+  if (clean.document !== undefined) clean.document = normalizeCircuitDocument(clean.document)
   await db.circuitProjects.update(id, { ...clean, updatedAt: Date.now() })
 }
 
@@ -76,7 +78,7 @@ export function parseCircuitFile(text: string): NewCircuitProject[] {
 
   const projects = data.projects.filter(isCircuitProjectLike).map((project) => ({
     name: project.name.trim() || project.document.name.trim() || 'Circuito sem nome',
-    document: project.document,
+    document: normalizeCircuitDocument(project.document),
   }))
 
   if (projects.length === 0) {
@@ -95,6 +97,7 @@ export async function importCircuitProjects(
       ({
         ...project,
         name: project.name.trim() || project.document.name.trim() || 'Circuito sem nome',
+        document: normalizeCircuitDocument(project.document),
         createdAt: now + index,
         updatedAt: now + index,
       }) as CircuitProject,

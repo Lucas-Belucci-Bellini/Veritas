@@ -1,4 +1,5 @@
 import { CircuitValidationError, editorInputCount, validateCircuit, type CircuitDocument, type CircuitNode } from './editorModel'
+import { normalizeCircuitDocument } from './documentContract'
 
 export type CircuitExportFormat = 'verilog' | 'vhdl'
 
@@ -7,9 +8,10 @@ export function exportCircuit(document: CircuitDocument, format: CircuitExportFo
 }
 
 export function exportVerilog(document: CircuitDocument): string {
-  assertValid(document)
-  const model = buildExportModel(document)
-  const moduleName = sanitizeIdentifier(document.name, 'veritas_circuit')
+  const normalized = normalizeCircuitDocument(document)
+  assertValid(normalized)
+  const model = buildExportModel(normalized)
+  const moduleName = sanitizeIdentifier(normalized.name, 'veritas_circuit')
   const ports = [
     ...model.inputs.map((node) => `${verilogDirection(node, 'input', model)}`),
     ...model.outputs.map((node) => `${verilogDirection(node, 'output', model)}`),
@@ -36,9 +38,10 @@ export function exportVerilog(document: CircuitDocument): string {
 }
 
 export function exportVhdl(document: CircuitDocument): string {
-  assertValid(document)
-  const model = buildExportModel(document)
-  const entityName = sanitizeIdentifier(document.name, 'veritas_circuit')
+  const normalized = normalizeCircuitDocument(document)
+  assertValid(normalized)
+  const model = buildExportModel(normalized)
+  const entityName = sanitizeIdentifier(normalized.name, 'veritas_circuit')
   const ports = [
     ...model.inputs.map((node) => `    ${model.names.get(node.id)} : in ${vhdlType(node)}`),
     ...model.outputs.map((node) => `    ${model.names.get(node.id)} : out ${vhdlType(node)}`),

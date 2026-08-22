@@ -63,6 +63,26 @@ const GUIDANCE: Record<CircuitIssue['code'], Pick<CircuitIssueGuidance, 'title' 
     title: 'Larguras incompatíveis',
     action: 'Ajuste os componentes conectados para usar a mesma largura de sinal.',
   },
+  'invalid-document-name': {
+    title: 'Nome de circuito inválido',
+    action: 'Use um nome entre 1 e 200 caracteres para o circuito.',
+  },
+  'document-too-many-nodes': {
+    title: 'Limite de componentes atingido',
+    action: 'Reduza a quantidade de componentes ou divida o projeto em subcircuitos.',
+  },
+  'document-too-many-connections': {
+    title: 'Limite de conexões atingido',
+    action: 'Reduza conexões redundantes ou divida o projeto em subcircuitos.',
+  },
+  'node-label-too-long': {
+    title: 'Rótulo muito longo',
+    action: 'Reduza o rótulo do componente para no máximo 120 caracteres.',
+  },
+  'document-too-large': {
+    title: 'Documento muito grande',
+    action: 'Reduza o circuito ou divida-o em projetos menores antes de salvar.',
+  },
 }
 
 export function buildCircuitIssueGuidance(issues: readonly CircuitIssue[]): CircuitIssueGuidance[] {

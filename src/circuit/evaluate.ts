@@ -10,6 +10,7 @@ import {
   type CircuitDocument,
   type EditorComponentType,
 } from './editorModel'
+import { topologicalOrder } from './topology'
 
 export interface CircuitEvaluation {
   /** Valores de todas as saídas, indexados pelo ID do componente. */
@@ -71,45 +72,7 @@ export function evaluateNetlist(
     components.set(component.id, component)
   }
 
-  const dependencies = new Map<string, number>()
-  const dependents = new Map<string, string[]>()
-  for (const component of components.values()) {
-    dependencies.set(component.id, 0)
-  }
-
-  for (const component of components.values()) {
-    for (const input of component.inputs ?? []) {
-      if (!input) continue
-      if (!components.has(input.node)) {
-        throw new Error(
-          `O componente "${component.id}" está ligado em "${input.node}", que não existe.`,
-        )
-      }
-      const targets = dependents.get(input.node) ?? []
-      targets.push(component.id)
-      dependents.set(input.node, targets)
-      dependencies.set(component.id, (dependencies.get(component.id) ?? 0) + 1)
-    }
-  }
-
-  const queue = [...components.values()]
-    .filter((component) => dependencies.get(component.id) === 0)
-    .map((component) => component.id)
-  const order: string[] = []
-
-  while (queue.length > 0) {
-    const id = queue.shift()!
-    order.push(id)
-    for (const target of dependents.get(id) ?? []) {
-      const remaining = (dependencies.get(target) ?? 0) - 1
-      dependencies.set(target, remaining)
-      if (remaining === 0) queue.push(target)
-    }
-  }
-
-  if (order.length !== components.size) {
-    throw new Error('O circuito contém um ciclo e não pode ser avaliado como combinacional.')
-  }
+  const order = topologicalOrder([...components.values()])
 
   const values: Record<string, boolean[]> = {}
   for (const id of order) {
@@ -138,32 +101,7 @@ function evaluateVectorNetlist(
     components.set(component.id, component)
   }
 
-  const dependencies = new Map<string, number>()
-  const dependents = new Map<string, string[]>()
-  for (const component of components.values()) dependencies.set(component.id, 0)
-  for (const component of components.values()) {
-    for (const input of component.inputs ?? []) {
-      if (!input) continue
-      if (!components.has(input.node)) throw new Error(`O componente "${component.id}" está ligado em "${input.node}", que não existe.`)
-      const targets = dependents.get(input.node) ?? []
-      targets.push(component.id)
-      dependents.set(input.node, targets)
-      dependencies.set(component.id, (dependencies.get(component.id) ?? 0) + 1)
-    }
-  }
-
-  const queue = [...components.values()].filter((component) => dependencies.get(component.id) === 0).map((component) => component.id)
-  const order: string[] = []
-  while (queue.length > 0) {
-    const id = queue.shift()!
-    order.push(id)
-    for (const target of dependents.get(id) ?? []) {
-      const remaining = (dependencies.get(target) ?? 0) - 1
-      dependencies.set(target, remaining)
-      if (remaining === 0) queue.push(target)
-    }
-  }
-  if (order.length !== components.size) throw new Error('O circuito contém um ciclo e não pode ser avaliado como combinacional.')
+  const order = topologicalOrder([...components.values()])
 
   const values: Record<string, BitVector> = {}
   for (const id of order) {

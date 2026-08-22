@@ -1,5 +1,5 @@
 import type { CircuitDocument } from '../circuit'
-import { buildCircuitContext } from '../circuit'
+import { buildCircuitContext, isCircuitDocumentShape, validateCircuit } from '../circuit'
 import { supabase } from '../lib/supabase'
 
 export interface CloudCircuitProject {
@@ -42,11 +42,12 @@ export async function upsertCloudCircuitProject(
   const client = requireSupabase()
   const user = await currentUser()
   const context = buildCircuitContext(document)
+  const normalizedDocument = context.payload.document
   const row = {
     ...(id ? { id } : {}),
     user_id: user.id,
-    name: name.trim() || document.name || 'Circuito sem nome',
-    document,
+    name: name.trim() || context.circuitName || 'Circuito sem nome',
+    document: normalizedDocument,
     content_hash: context.contentHash,
   }
 
@@ -94,26 +95,5 @@ function toCloudProject(row: CloudCircuitRow): CloudCircuitProject | null {
 }
 
 function isCircuitDocument(value: unknown): value is CircuitDocument {
-  if (!isRecord(value) || value.format !== 'veritas-circuit' || value.version !== 1) return false
-  if (typeof value.name !== 'string' || !Array.isArray(value.nodes) || !Array.isArray(value.connections)) return false
-  return value.nodes.every(isCircuitNode) && value.connections.every(isCircuitConnection)
-}
-
-function isCircuitNode(value: unknown): boolean {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.type !== 'string') return false
-  if (!isRecord(value.position) || !isFiniteNumber(value.position.x) || !isFiniteNumber(value.position.y)) return false
-  return value.label === undefined || typeof value.label === 'string'
-}
-
-function isCircuitConnection(value: unknown): boolean {
-  if (!isRecord(value) || !isRecord(value.source) || !isRecord(value.target)) return false
-  return typeof value.source.node === 'string' && typeof value.target.node === 'string' && Number.isInteger(value.target.port)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
+  return isCircuitDocumentShape(value) && validateCircuit(value, { allowBuses: true }).length === 0
 }

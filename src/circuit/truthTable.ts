@@ -7,6 +7,7 @@ import {
 import { bitVector, toBinary, type BitVector } from '../bus'
 import { evaluateCircuit, evaluateCircuitVectors } from './evaluate'
 import { validateCircuit, type CircuitDocument } from './editorModel'
+import { normalizeCircuitDocument } from './documentContract'
 
 export interface CircuitTruthTableOptions {
   maxRows?: number
@@ -53,11 +54,12 @@ export function buildCircuitTruthTable(
   document: CircuitDocument,
   options: CircuitTruthTableOptions = {},
 ): TruthTable {
-  const issues = validateCircuit(document)
+  const normalized = normalizeCircuitDocument(document)
+  const issues = validateCircuit(normalized)
   if (issues.length > 0) throw new Error(issues[0].message)
 
-  const inputs = document.nodes.filter((node) => node.type === 'input')
-  const outputs = document.nodes.filter((node) => node.type === 'output')
+  const inputs = normalized.nodes.filter((node) => node.type === 'input')
+  const outputs = normalized.nodes.filter((node) => node.type === 'output')
   if (outputs.length === 0) throw new Error('O circuito precisa de pelo menos uma saída.')
   if (inputs.length > MAX_CIRCUIT_VARIABLES) {
     throw new RangeError(
@@ -94,7 +96,7 @@ export function buildCircuitTruthTable(
   let trueCount = 0
   for (let index = 0; index < generatedRows; index += 1) {
     const assignment = assignmentForRow(variables, index)
-    const evaluation = evaluateCircuit(document, assignment)
+    const evaluation = evaluateCircuit(normalized, assignment)
     const row = [
       ...variables.map((id) => assignment[id]),
       ...outputs
@@ -125,11 +127,12 @@ export function buildCircuitVectorTruthTable(
   document: CircuitDocument,
   options: CircuitVectorTruthTableOptions = {},
 ): CircuitVectorTruthTable {
-  const issues = validateCircuit(document, { allowBuses: true })
+  const normalized = normalizeCircuitDocument(document)
+  const issues = validateCircuit(normalized, { allowBuses: true })
   if (issues.length > 0) throw new Error(issues[0].message)
 
-  const inputs = document.nodes.filter((node) => node.type === 'input')
-  const outputs = document.nodes.filter((node) => node.type === 'output')
+  const inputs = normalized.nodes.filter((node) => node.type === 'input')
+  const outputs = normalized.nodes.filter((node) => node.type === 'output')
   if (outputs.length === 0) throw new Error('O circuito precisa de pelo menos uma saída.')
   const widths = inputs.map((node) => node.options?.width ?? 1)
   const totalInputBits = widths.reduce((total, width) => total + width, 0)
@@ -171,7 +174,7 @@ export function buildCircuitVectorTruthTable(
   let allOnes = true
   for (let index = 0; index < generatedRows; index += 1) {
     const assignment = vectorAssignment(inputs, index, totalInputBits)
-    const evaluation = evaluateCircuitVectors(document, assignment)
+    const evaluation = evaluateCircuitVectors(normalized, assignment)
     const selectedValue = evaluation.outputs[selectedOutput.id] ?? bitVector(selectedOutput.options?.width ?? 1, 0)
     const active = selectedValue.bits.some(Boolean)
     const maximum = selectedValue.bits.every(Boolean)

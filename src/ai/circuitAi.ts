@@ -1,5 +1,5 @@
 import type { CircuitDocument } from '../circuit'
-import { buildCircuitContext } from '../circuit'
+import { buildCircuitContext, isCircuitDocumentShape, validateCircuit } from '../circuit'
 import { supabase } from '../lib/supabase'
 import { recordAiMetric } from '../metrics/aiMetrics'
 
@@ -63,21 +63,9 @@ function isCircuitAiResult(value: unknown): value is CircuitAiResult {
 }
 
 function isCircuitDocument(value: unknown): value is CircuitDocument {
-  if (!isRecord(value) || value.format !== 'veritas-circuit' || value.version !== 1) return false
-  if (typeof value.name !== 'string' || !Array.isArray(value.nodes) || !Array.isArray(value.connections)) return false
-  return value.nodes.every((node) => {
-    if (!isRecord(node) || typeof node.id !== 'string' || typeof node.type !== 'string') return false
-    return isRecord(node.position) && isFiniteNumber(node.position.x) && isFiniteNumber(node.position.y)
-  }) && value.connections.every((connection) => {
-    if (!isRecord(connection) || !isRecord(connection.source) || !isRecord(connection.target)) return false
-    return typeof connection.source.node === 'string' && typeof connection.target.node === 'string' && Number.isInteger(connection.target.port)
-  })
+  return isCircuitDocumentShape(value) && validateCircuit(value, { allowBuses: true }).length === 0
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
 }

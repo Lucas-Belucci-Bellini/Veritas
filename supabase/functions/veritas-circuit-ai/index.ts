@@ -34,6 +34,25 @@ type AiResult = {
   confidence: number;
 };
 
+const COMPONENT_TYPES = new Set([
+  "input",
+  "output",
+  "constant",
+  "and",
+  "or",
+  "not",
+  "xor",
+  "clock",
+  "dff",
+  "tff",
+  "delay",
+]);
+const MAX_CIRCUIT_NODES = 256;
+const MAX_CIRCUIT_CONNECTIONS = 512;
+const MAX_CIRCUIT_NAME_LENGTH = 200;
+const MAX_CIRCUIT_LABEL_LENGTH = 120;
+const MAX_CIRCUIT_SERIALIZED_BYTES = 500_000;
+
 const schema = {
   type: "object",
   properties: {
@@ -48,6 +67,9 @@ const schema = {
 
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "Use POST." }, 405);
+  if (!request.headers.get("Authorization")?.startsWith("Bearer ")) {
+    return json({ error: "Autenticação necessária." }, 401);
+  }
 
   try {
     const body = await request.json() as { action?: Action; context?: CircuitContext; instruction?: string };
@@ -164,9 +186,31 @@ function isContext(value: unknown): value is CircuitContext {
 }
 
 function isDocument(value: unknown): value is CircuitDocument {
-  if (!isRecord(value) || value.format !== "veritas-circuit" || value.version !== 1 || typeof value.name !== "string") return false;
-  if (!Array.isArray(value.nodes) || !Array.isArray(value.connections)) return false;
-  return value.nodes.every((node) => isRecord(node) && typeof node.id === "string" && typeof node.type === "string" && isRecord(node.position) && Number.isFinite(node.position.x) && Number.isFinite(node.position.y)) && value.connections.every((connection) => isRecord(connection) && isRecord(connection.source) && isRecord(connection.target) && typeof connection.source.node === "string" && typeof connection.target.node === "string" && Number.isInteger(connection.target.port));
+  if (!isRecord(value) || value.format !== "veritas-circuit" || value.version !== 1 || !isBoundedText(value.name, 1, MAX_CIRCUIT_NAME_LENGTH)) return false;
+  if (!Array.isArray(value.nodes) || value.nodes.length > MAX_CIRCUIT_NODES || !Array.isArray(value.connections) || value.connections.length > MAX_CIRCUIT_CONNECTIONS) return false;
+  if (new TextEncoder().encode(JSON.stringify(value)).length > MAX_CIRCUIT_SERIALIZED_BYTES) return false;
+  return value.nodes.every((node) => {
+    if (!isRecord(node) || !isBoundedText(node.id, 1) || typeof node.type !== "string" || !COMPONENT_TYPES.has(node.type)) return false;
+    if (!isRecord(node.position) || !Number.isFinite(node.position.x) || !Number.isFinite(node.position.y)) return false;
+    if (node.label !== undefined && !isBoundedText(node.label, 0, MAX_CIRCUIT_LABEL_LENGTH)) return false;
+    if (node.options !== undefined) {
+      if (!isRecord(node.options)) return false;
+      if (node.options.width !== undefined && (!Number.isInteger(node.options.width) || node.options.width < 1 || node.options.width > 64)) return false;
+      if (node.options.value !== undefined && typeof node.options.value !== "boolean") return false;
+      if (node.options.initial !== undefined && typeof node.options.initial !== "boolean") return false;
+    }
+    return true;
+  }) && value.connections.every((connection) => {
+    if (!isRecord(connection) || !isRecord(connection.source) || !isRecord(connection.target)) return false;
+    return isBoundedText(connection.source.node, 1) &&
+      (connection.source.port === undefined || (Number.isInteger(connection.source.port) && connection.source.port >= 0)) &&
+      isBoundedText(connection.target.node, 1) &&
+      Number.isInteger(connection.target.port) && connection.target.port >= 0;
+  });
+}
+
+function isBoundedText(value: unknown, minimum: number, maximum = Number.POSITIVE_INFINITY): value is string {
+  return typeof value === "string" && value.trim().length >= minimum && value.length <= maximum;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,4 +1,5 @@
-import type { CircuitDocument } from '../circuit'
+import type { CircuitDocument } from '../circuit/editorModel'
+import { normalizeCircuitDocument } from '../circuit/documentContract'
 
 export interface CircuitChangeSummary {
   nameChanged: boolean
@@ -25,30 +26,32 @@ export function compareCircuitDocuments(
   before: CircuitDocument | null,
   after: CircuitDocument,
 ): CircuitDiff {
-  const beforeNodes = new Map((before?.nodes ?? []).map((node) => [node.id, stableNode(node)]))
-  const afterNodes = new Map(after.nodes.map((node) => [node.id, stableNode(node)]))
+  const normalizedBefore = before ? normalizeCircuitDocument(before) : null
+  const normalizedAfter = normalizeCircuitDocument(after)
+  const beforeNodes = new Map((normalizedBefore?.nodes ?? []).map((node) => [node.id, stableNode(node)]))
+  const afterNodes = new Map(normalizedAfter.nodes.map((node) => [node.id, stableNode(node)]))
   const addedNodeIds = [...afterNodes.keys()].filter((id) => !beforeNodes.has(id)).sort()
   const removedNodeIds = [...beforeNodes.keys()].filter((id) => !afterNodes.has(id)).sort()
   const changedNodeIds = [...afterNodes.keys()]
     .filter((id) => beforeNodes.has(id) && beforeNodes.get(id) !== afterNodes.get(id))
     .sort()
 
-  const beforeConnections = new Set((before?.connections ?? []).map(connectionKey))
-  const afterConnections = new Set(after.connections.map(connectionKey))
+  const beforeConnections = new Set((normalizedBefore?.connections ?? []).map(connectionKey))
+  const afterConnections = new Set(normalizedAfter.connections.map(connectionKey))
   const addedConnections = [...afterConnections].filter((key) => !beforeConnections.has(key)).sort()
   const removedConnections = [...beforeConnections].filter((key) => !afterConnections.has(key)).sort()
 
   return {
-    nameChanged: before === null ? false : before.name !== after.name,
+    nameChanged: normalizedBefore === null ? false : normalizedBefore.name !== normalizedAfter.name,
     nodesAdded: addedNodeIds.length,
     nodesRemoved: removedNodeIds.length,
     nodesChanged: changedNodeIds.length,
     connectionsAdded: addedConnections.length,
     connectionsRemoved: removedConnections.length,
-    totalNodesBefore: before?.nodes.length ?? 0,
-    totalNodesAfter: after.nodes.length,
-    totalConnectionsBefore: before?.connections.length ?? 0,
-    totalConnectionsAfter: after.connections.length,
+    totalNodesBefore: normalizedBefore?.nodes.length ?? 0,
+    totalNodesAfter: normalizedAfter.nodes.length,
+    totalConnectionsBefore: normalizedBefore?.connections.length ?? 0,
+    totalConnectionsAfter: normalizedAfter.connections.length,
     addedNodeIds,
     removedNodeIds,
     changedNodeIds,

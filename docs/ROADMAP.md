@@ -499,3 +499,11 @@ Esta é uma fatia de domínio intencionalmente segura: ainda não adiciona tipos
 A auditoria factual do repositório foi registrada em [`VERITAS_AUDIT.md`](../VERITAS_AUDIT.md). O estado encontrado confirma uma base funcional ampla — engine pura, CircuitDocument v1, editor visual, simulação temporal, IndexedDB, Supabase/Auth/Realtime, HDL, ALGO-001/002/003, MCP stdio e gates de release — mas também identifica contratos duplicados de validação, concentração de responsabilidades no `CircuitEditor.tsx`, divergência de versão do plugin e ausência de evidências cross-user reais para promoção beta.
 
 O próximo incremento foi definido como `FOUNDATION-001`: consolidar contrato runtime do documento, normalização defensiva, limites, migração de schema, topo sort compartilhado, vetores de validação entre TypeScript/SQL/Edge e alinhamento do artefato do plugin. A expansão wireless permanece isolada até atravessar domínio, validação, engine, UI, persistência e HDL com uma fatia vertical completa.
+
+## Implementação FOUNDATION-001 — contrato canônico e normalização — 2026-08-22
+
+A fundação começou em `src/circuit/documentContract.ts`, `src/circuit/documentLimits.ts` e `src/circuit/topology.ts`. O contrato agora normaliza nome, IDs, labels e referências sem mutar documentos; aplica limites de nome, cardinalidade e payload; expõe guard estrutural; e centraliza a ordem topológica determinística usada pela avaliação escalar e vetorial.
+
+A integração alcança netlist, contexto/hash de IA, tabelas verdade, otimização, exportadores HDL, IndexedDB, diffs de histórico e clientes cloud/IA. A Edge Function recebeu a réplica defensiva dos limites e exige Bearer antes de processar payload. O plugin foi alinhado para `0.9.0-rc.1` e o bundle autocontido foi regenerado.
+
+A etapa mantém `CircuitDocument` v1, não habilita novos componentes e não aplica migração destrutiva. Os testes de fundação cobrem normalização, limites, payload serializado, ordem topológica, ciclos, consumidores, IndexedDB e diffs. Ainda faltam os gates completos finais antes da publicação.

@@ -82,6 +82,15 @@ describe('editorModel', () => {
     )
   })
 
+  it('detecta IDs equivalentes depois de aparar whitespace', () => {
+    const document = andCircuit()
+    document.nodes[1].id = ' a '
+
+    expect(validateCircuit(document)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'duplicate-node', nodeId: 'a' }),
+    ]))
+  })
+
   it('mantém documentos escalares sem options.width compatíveis', () => {
     expect(validateCircuit(andCircuit())).toEqual([])
   })

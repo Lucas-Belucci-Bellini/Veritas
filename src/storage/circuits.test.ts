@@ -45,6 +45,31 @@ describe('circuitProjects', () => {
     expect(await getCircuitProject(id)).toBeUndefined()
   })
 
+  it('normaliza IDs, labels e referências antes de persistir', async () => {
+    const spaced = {
+      ...document,
+      name: '  AND local  ',
+      nodes: document.nodes.map((node) => ({
+        ...node,
+        id: `  ${node.id}  `,
+        label: node.label ? `  ${node.label}  ` : node.label,
+      })),
+      connections: document.connections.map((connection) => ({
+        source: { ...connection.source, node: `  ${connection.source.node}  ` },
+        target: { ...connection.target, node: `  ${connection.target.node}  ` },
+      })),
+    }
+
+    const id = await createCircuitProject({ name: '  Meu AND  ', document: spaced })
+    const saved = await getCircuitProject(id)
+
+    expect(saved?.name).toBe('Meu AND')
+    expect(saved?.document.name).toBe('AND local')
+    expect(saved?.document.nodes[0].id).toBe('a')
+    expect(saved?.document.connections[0].source.node).toBe('a')
+    expect(saved?.document.nodes[0].label).toBe('A')
+  })
+
   it('atualiza o documento e move o circuito para o topo da lista', async () => {
     const firstId = await createCircuitProject({ name: 'Primeiro', document })
     await createCircuitProject({ name: 'Segundo', document })

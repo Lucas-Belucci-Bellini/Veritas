@@ -1,5 +1,5 @@
 import type { CircuitDocument } from '../circuit'
-import { buildCircuitContext } from '../circuit'
+import { buildCircuitContext, isCircuitDocumentShape, validateCircuit } from '../circuit'
 import { supabase } from '../lib/supabase'
 import { compareCircuitDocuments, type CircuitChangeSummary } from './circuitDiff'
 
@@ -74,11 +74,12 @@ export async function syncCloudCircuitVersion(
   const client = requireSupabase()
   await currentUser()
   const context = buildCircuitContext(document)
-  const diff = compareCircuitDocuments(previousDocument, document)
+  const normalizedDocument = context.payload.document
+  const diff = compareCircuitDocuments(previousDocument, normalizedDocument)
   const { data, error } = await client.rpc('veritas_sync_circuit_project', {
     p_project_id: projectId,
-    p_name: name.trim() || document.name || 'Circuito sem nome',
-    p_document: document,
+    p_name: name.trim() || context.circuitName || 'Circuito sem nome',
+    p_document: normalizedDocument,
     p_content_hash: context.contentHash,
     p_change_summary: diff,
     p_base_version: baseVersion,
@@ -174,25 +175,9 @@ function isChangeSummary(value: unknown): value is CircuitChangeSummary {
 }
 
 function isCircuitDocument(value: unknown): value is CircuitDocument {
-  if (!isRecord(value) || value.format !== 'veritas-circuit' || value.version !== 1) return false
-  if (typeof value.name !== 'string' || !Array.isArray(value.nodes) || !Array.isArray(value.connections)) return false
-  return value.nodes.every(isCircuitNode) && value.connections.every(isCircuitConnection)
-}
-
-function isCircuitNode(value: unknown): boolean {
-  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.type !== 'string') return false
-  return isRecord(value.position) && isFiniteNumber(value.position.x) && isFiniteNumber(value.position.y)
-}
-
-function isCircuitConnection(value: unknown): boolean {
-  if (!isRecord(value) || !isRecord(value.source) || !isRecord(value.target)) return false
-  return typeof value.source.node === 'string' && typeof value.target.node === 'string' && Number.isInteger(value.target.port)
+  return isCircuitDocumentShape(value) && validateCircuit(value, { allowBuses: true }).length === 0
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
 }

@@ -1,5 +1,6 @@
 import { buildCircuitTruthTable } from './truthTable'
 import { validateCircuit, type CircuitDocument } from './editorModel'
+import { normalizeCircuitDocument } from './documentContract'
 
 export interface CircuitContextRecord {
   sourceRef: string
@@ -31,25 +32,26 @@ export function buildCircuitContext(
   document: CircuitDocument,
   outputId?: string,
 ): CircuitContextRecord {
-  const issues = validateCircuit(document)
+  const normalized = normalizeCircuitDocument(document)
+  const issues = validateCircuit(normalized)
   if (issues.length > 0) throw new Error(issues[0].message)
 
-  const truthTable = buildCircuitTruthTable(document, { outputId, maxRows: 256 })
-  const inputs = document.nodes.filter((node) => node.type === 'input').map((node) => node.label ?? node.id)
-  const outputs = document.nodes.filter((node) => node.type === 'output').map((node) => node.label ?? node.id)
-  const content = stableStringify({ document, outputId })
+  const truthTable = buildCircuitTruthTable(normalized, { outputId, maxRows: 256 })
+  const inputs = normalized.nodes.filter((node) => node.type === 'input').map((node) => node.label ?? node.id)
+  const outputs = normalized.nodes.filter((node) => node.type === 'output').map((node) => node.label ?? node.id)
+  const content = stableStringify({ document: normalized, outputId })
 
   return {
-    sourceRef: `veritas:circuit:${document.name}`,
+    sourceRef: `veritas:circuit:${normalized.name}`,
     contextType: 'circuit',
-    circuitName: document.name,
+    circuitName: normalized.name,
     summary: `Circuito combinacional com ${inputs.length} entrada(s), ${outputs.length} saída(s) e ${truthTable.totalRows} combinação(ões) possíveis.`,
     tags: ['veritas', 'circuit', 'combinational'],
     contentHash: hashText(content),
     payload: {
       format: 'veritas-circuit-context',
       version: 1,
-      document,
+      document: normalized,
       inputs,
       outputs,
       truthTable: {

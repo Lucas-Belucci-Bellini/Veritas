@@ -40,6 +40,27 @@ describe('compareCircuitDocuments', () => {
     expect(summarizeCircuitDiff(diff)).toContain('+1 componente(s)')
   })
 
+  it('ignora whitespace quando compara documentos semanticamente iguais', () => {
+    const before = documentWithGate()
+    const after = {
+      ...before,
+      name: '  Base  ',
+      nodes: before.nodes.map((node) => ({ ...node, id: `  ${node.id}  `, label: node.label ? `  ${node.label}  ` : node.label })),
+      connections: before.connections.map((connection) => ({
+        source: { ...connection.source, node: `  ${connection.source.node}  ` },
+        target: { ...connection.target, node: `  ${connection.target.node}  ` },
+      })),
+    }
+
+    const diff = compareCircuitDocuments(before, after)
+
+    expect(diff.nameChanged).toBe(false)
+    expect(diff.nodesAdded).toBe(0)
+    expect(diff.nodesChanged).toBe(0)
+    expect(diff.connectionsAdded).toBe(0)
+    expect(diff.connectionsRemoved).toBe(0)
+  })
+
   it('compara a primeira versão contra um estado vazio', () => {
     const diff = compareCircuitDocuments(null, documentWithGate())
 

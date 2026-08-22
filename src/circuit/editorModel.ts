@@ -7,6 +7,7 @@ import {
   type Netlist,
   type PortRef,
 } from '../simulation/components'
+import { getCircuitDocumentBoundIssues, normalizeCircuitDocument } from './documentContract'
 
 export const CIRCUIT_DOCUMENT_FORMAT = 'veritas-circuit'
 export const CIRCUIT_DOCUMENT_VERSION = 1 as const
@@ -88,6 +89,11 @@ export interface CircuitIssue {
   | 'invalid-width'
   | 'unsupported-width'
   | 'width-mismatch'
+  | 'invalid-document-name'
+  | 'document-too-many-nodes'
+  | 'document-too-many-connections'
+  | 'node-label-too-long'
+  | 'document-too-large'
   message: string
   nodeId?: string
 }
@@ -137,7 +143,12 @@ export function createCircuitDocument(name = 'Circuito sem título'): CircuitDoc
 }
 
 export function validateCircuit(document: CircuitDocument, options: CircuitValidationOptions = {}): CircuitIssue[] {
-  const issues: CircuitIssue[] = []
+  document = normalizeCircuitDocument(document)
+  const issues: CircuitIssue[] = getCircuitDocumentBoundIssues(document).map((issue) => ({
+    code: issue.code,
+    nodeId: issue.nodeId,
+    message: issue.message,
+  }))
   const nodes = new Map<string, CircuitNode>()
 
   for (const node of document.nodes) {
@@ -302,17 +313,18 @@ export function isValidCircuitWidth(width: number): boolean {
 
 /** Converte o documento visual para o netlist consumido pelo simulador. */
 export function toNetlist(document: CircuitDocument, options: CircuitValidationOptions = {}): Netlist {
-  const issues = validateCircuit(document, options)
+  const normalized = normalizeCircuitDocument(document)
+  const issues = validateCircuit(normalized, options)
   if (issues.length > 0) throw new CircuitValidationError(issues)
 
   const inputsByNode = new Map<string, PortRef[]>()
-  for (const connection of document.connections) {
+  for (const connection of normalized.connections) {
     const inputs = inputsByNode.get(connection.target.node) ?? []
     inputs[connection.target.port] = connection.source
     inputsByNode.set(connection.target.node, inputs)
   }
 
-  const components: ComponentSpec[] = document.nodes.map((node) => {
+  const components: ComponentSpec[] = normalized.nodes.map((node) => {
     const inputs = inputsByNode.get(node.id)
     return {
       id: node.id,
