@@ -4,8 +4,10 @@ import {
   MAX_CIRCUIT_NAME_LENGTH,
   MAX_CIRCUIT_NODES,
   MAX_CIRCUIT_SERIALIZED_BYTES,
+  MAX_WIRELESS_CHANNEL_LENGTH,
 } from './documentLimits'
 import type { CircuitDocument } from './editorModel'
+import { normalizeWirelessChannel } from './wirelessChannels'
 
 export type CircuitDocumentBoundIssueCode =
   | 'invalid-document-name'
@@ -13,6 +15,7 @@ export type CircuitDocumentBoundIssueCode =
   | 'document-too-many-connections'
   | 'node-label-too-long'
   | 'document-too-large'
+  | 'wireless-channel-too-long'
 
 export interface CircuitDocumentBoundIssue {
   code: CircuitDocumentBoundIssueCode
@@ -31,13 +34,19 @@ export function normalizeCircuitDocument(document: CircuitDocument): CircuitDocu
   const nodes = document.nodes.map((node) => {
     const id = node.id.trim()
     const label = normalizeOptionalText(node.label)
-    if (id !== node.id || label !== node.label) changed = true
+    const channel = node.options?.channel === undefined ? undefined : normalizeWirelessChannel(node.options.channel)
+    if (id !== node.id || label !== node.label || channel !== node.options?.channel) changed = true
     return {
       ...node,
       id,
       label,
       position: node.position ? { x: node.position.x, y: node.position.y } : node.position,
-      options: node.options ? { ...node.options } : undefined,
+      options: node.options
+        ? {
+            ...node.options,
+            ...(channel === undefined ? {} : { channel }),
+          }
+        : undefined,
     }
   })
   const connections = document.connections.map((connection) => {
@@ -85,6 +94,13 @@ export function getCircuitDocumentBoundIssues(document: CircuitDocument): Circui
         code: 'node-label-too-long',
         nodeId: node.id,
         message: `O rótulo do componente "${node.id}" pode ter no máximo ${MAX_CIRCUIT_LABEL_LENGTH} caracteres.`,
+      })
+    }
+    if (node.options?.channel !== undefined && normalizeWirelessChannel(node.options.channel).length > MAX_WIRELESS_CHANNEL_LENGTH) {
+      issues.push({
+        code: 'wireless-channel-too-long',
+        nodeId: node.id,
+        message: `O canal wireless do componente "${node.id}" pode ter no máximo ${MAX_WIRELESS_CHANNEL_LENGTH} caracteres.`,
       })
     }
   }

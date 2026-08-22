@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { bitVector, toBinary } from '../bus'
 import { buildCircuitVectorTruthTable, createCircuitDocument, evaluateCircuit, evaluateCircuitVectors, type CircuitDocument } from './index'
 
+function vectorWirelessCircuit(width = 4): CircuitDocument {
+  return {
+    ...createCircuitDocument('Wireless vetorial'),
+    nodes: [
+      { id: 'input', type: 'input', position: { x: 0, y: 0 }, options: { width } },
+      { id: 'tx', type: 'transmitter', position: { x: 140, y: 0 }, options: { channel: 'bus', width } },
+      { id: 'rx', type: 'receiver', position: { x: 280, y: 0 }, options: { channel: 'bus', width } },
+      { id: 'out', type: 'output', position: { x: 420, y: 0 }, options: { width } },
+    ],
+    connections: [
+      { source: { node: 'input' }, target: { node: 'tx', port: 0 } },
+      { source: { node: 'rx' }, target: { node: 'out', port: 0 } },
+    ],
+  }
+}
+
 function vectorAndCircuit(width = 4): CircuitDocument {
   return {
     ...createCircuitDocument('AND vetorial'),
@@ -34,6 +50,14 @@ describe('evaluateCircuitVectors', () => {
     expect(toBinary(result.outputs.out)).toBe('00000000')
     expect(toBinary(result.values.a)).toBe('11110000')
     expect(toBinary(result.values.b)).toBe('00001111')
+  })
+
+  it('propaga barramento por canal wireless', () => {
+    const result = evaluateCircuitVectors(vectorWirelessCircuit(), { input: '0b1010' })
+
+    expect(toBinary(result.values.rx)).toBe('1010')
+    expect(toBinary(result.outputs.out)).toBe('1010')
+    expect(result.order).toEqual(['input', 'tx', 'rx', 'out'])
   })
 
   it('rejeita input com largura incompatível e preserva a API escalar', () => {

@@ -20,7 +20,7 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `simplify_expression` | Forma mínima em soma de produtos (Quine-McCluskey) e a economia de portas |
 | `karnaugh_map` | Mapa de Karnaugh de 1 a 4 variáveis com os agrupamentos |
 | `normal_forms` | SOP e POS, canônicas e mínimas, e a classificação da expressão dada |
-| `simulate_circuit` | Roda um circuito com clock e flip-flops e devolve o diagrama de tempo |
+| `simulate_circuit` | Roda um circuito com clock, flip-flops, atrasos e canais wireless e devolve o diagrama de tempo |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
 
@@ -105,6 +105,8 @@ A instalação stdio atende clientes que iniciam processos locais. Para Claude A
 ```
 
 ## Erros
+
+A simulação wireless usa `transmitter` com `options.channel` como origem e `receiver` com o mesmo canal como destino virtual. Cada canal aceita um transmissor e vários receptores; canal ausente, transmissor duplicado ou receptor órfão devem ser corrigidos antes da simulação.
 
 Erro de sintaxe não derruba o servidor: volta como resposta de erro da
 ferramenta, com o dedo no lugar exato do problema.

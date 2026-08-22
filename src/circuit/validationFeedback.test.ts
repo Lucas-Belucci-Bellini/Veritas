@@ -17,6 +17,10 @@ describe('feedback de validação do editor', () => {
       'invalid-width',
       'unsupported-width',
       'width-mismatch',
+      'wireless-empty-channel',
+      'wireless-duplicate-transmitter',
+      'wireless-missing-transmitter',
+      'wireless-channel-too-long',
     ]
     const guidance = buildCircuitIssueGuidance(codes.map((code) => ({ code, message: `erro ${code}` })))
 
@@ -24,6 +28,7 @@ describe('feedback de validação do editor', () => {
     expect(guidance.every((item) => item.title.length > 0 && item.action.length > 0)).toBe(true)
     expect(guidance.find((item) => item.code === 'cycle')?.action).toContain('Interrompa')
     expect(guidance.find((item) => item.code === 'missing-input')?.action).toContain('Conecte')
+    expect(guidance.find((item) => item.code === 'wireless-missing-transmitter')?.action).toContain('transmissor')
   })
 
   it('resume o primeiro problema e preserva o número total', () => {

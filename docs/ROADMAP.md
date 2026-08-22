@@ -507,3 +507,13 @@ A fundação começou em `src/circuit/documentContract.ts`, `src/circuit/documen
 A integração alcança netlist, contexto/hash de IA, tabelas verdade, otimização, exportadores HDL, IndexedDB, diffs de histórico e clientes cloud/IA. A Edge Function recebeu a réplica defensiva dos limites e exige Bearer antes de processar payload. O plugin foi alinhado para `0.9.0-rc.1` e o bundle autocontido foi regenerado.
 
 A etapa mantém `CircuitDocument` v1, não habilita novos componentes e não aplica migração destrutiva. Os testes de fundação cobrem normalização, limites, payload serializado, ordem topológica, ciclos, consumidores, IndexedDB e diffs. Ainda faltam os gates completos finais antes da publicação.
+
+## Implementação WIRELESS-001 — integração vertical inicial — 2026-08-22
+
+A fundação wireless agora atravessa o modelo canônico: `transmitter` e `receiver` foram adicionados ao `ComponentType`, `EditorComponentType`, paleta e serialização do CircuitEditor. O transmissor possui uma entrada convencional; o receptor recebe uma entrada virtual derivada do canal e não cria conexão visual de entrada.
+
+`validateCircuit` resolve canais antes de aceitar o documento e publica feedback acionável para canal ausente, transmissor duplicado e receptor órfão. O netlist injeta a dependência `{ node: transmitterId }` para cada receptor. Avaliação escalar, avaliação vetorial e simulador temporal tratam ambos como pass-throughs, preservando a ordem topológica determinística.
+
+O CircuitEditor oferece o campo `Canal`, exibe TX/RX com canal e largura, restaura os nós wireless ao abrir documentos e mostra canais ativos no status de validação. IndexedDB, cloud, Realtime e IA continuam usando o documento canônico existente. Verilog e VHDL exportam os endpoints como sinais internos, sem inventar portas físicas para o canal.
+
+A fatia não inclui latência, arbitragem, tri-state, sinais `X/Z`, edição inline de canal em nó existente ou radio físico. O canal atual é um túnel lógico combinacional determinístico com um transmissor por canal.

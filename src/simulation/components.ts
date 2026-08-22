@@ -20,6 +20,8 @@ export type ComponentType =
   | 'dff'
   | 'tff'
   | 'delay'
+  | 'transmitter'
+  | 'receiver'
 
 /** De onde vem um sinal: um componente e qual das saídas dele. */
 export interface PortRef {
@@ -39,6 +41,8 @@ export interface ComponentOptions {
   initial?: boolean
   /** Largura do sinal em bits; ausente equivale a um bit. */
   width?: number
+  /** Nome normalizado do canal wireless para transmitter/receiver. */
+  channel?: string
 }
 
 export interface ComponentSpec {
@@ -75,10 +79,12 @@ export function inputNames(type: ComponentType): string[] | null {
     case 'delay':
     case 'not':
     case 'output':
+    case 'transmitter':
       return ['IN']
     case 'input':
     case 'constant':
     case 'clock':
+    case 'receiver':
       return []
     default:
       // Portas lógicas aceitam qualquer número de entradas.

@@ -1,4 +1,5 @@
 import { MAX_BUS_WIDTH } from '../bus'
+import { MAX_WIRELESS_CHANNEL_LENGTH } from './documentLimits'
 
 export type WirelessEndpointKind = 'transmitter' | 'receiver'
 
@@ -17,7 +18,7 @@ export interface WirelessChannel {
 }
 
 export interface WirelessChannelIssue {
-  code: 'empty-channel' | 'duplicate-node' | 'duplicate-transmitter' | 'missing-transmitter' | 'invalid-width' | 'width-mismatch'
+  code: 'empty-channel' | 'channel-too-long' | 'duplicate-node' | 'duplicate-transmitter' | 'missing-transmitter' | 'invalid-width' | 'width-mismatch'
   message: string
   nodeId?: string
   channel?: string
@@ -47,6 +48,10 @@ export function resolveWirelessChannels(endpoints: readonly WirelessEndpoint[]):
     seenNodes.add(nodeId)
     if (!channel) {
       issues.push({ code: 'empty-channel', nodeId, message: `O endpoint wireless "${nodeId}" precisa informar um canal.` })
+      continue
+    }
+    if (channel.length > MAX_WIRELESS_CHANNEL_LENGTH) {
+      issues.push({ code: 'channel-too-long', nodeId, channel, message: `O canal wireless "${channel}" pode ter no máximo ${MAX_WIRELESS_CHANNEL_LENGTH} caracteres.` })
       continue
     }
     if (!Number.isInteger(endpoint.width) || endpoint.width < 1 || endpoint.width > MAX_BUS_WIDTH) {

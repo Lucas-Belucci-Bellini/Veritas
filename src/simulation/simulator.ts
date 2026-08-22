@@ -243,6 +243,8 @@ export class Simulator {
         return
 
       case 'output':
+      case 'transmitter':
+      case 'receiver':
         node.next[0] = values[0] ?? false
         return
 

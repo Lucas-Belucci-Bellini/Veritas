@@ -8,6 +8,7 @@ import {
   type PortRef,
 } from '../simulation/components'
 import { getCircuitDocumentBoundIssues, normalizeCircuitDocument } from './documentContract'
+import { resolveWirelessChannels } from './wirelessChannels'
 
 export const CIRCUIT_DOCUMENT_FORMAT = 'veritas-circuit'
 export const CIRCUIT_DOCUMENT_VERSION = 1 as const
@@ -25,6 +26,8 @@ export type EditorComponentType = Extract<
   | 'dff'
   | 'tff'
   | 'delay'
+  | 'transmitter'
+  | 'receiver'
 >
 
 export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
@@ -39,6 +42,8 @@ export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
   'dff',
   'tff',
   'delay',
+  'transmitter',
+  'receiver',
 ]
 
 export interface CircuitPosition {
@@ -94,6 +99,10 @@ export interface CircuitIssue {
   | 'document-too-many-connections'
   | 'node-label-too-long'
   | 'document-too-large'
+  | 'wireless-empty-channel'
+  | 'wireless-duplicate-transmitter'
+  | 'wireless-missing-transmitter'
+  | 'wireless-channel-too-long'
   message: string
   nodeId?: string
 }
@@ -118,7 +127,10 @@ export function editorInputCount(type: EditorComponentType): number {
     case 'not':
     case 'output':
     case 'delay':
+    case 'transmitter':
       return 1
+    case 'receiver':
+      return 0
     case 'and':
     case 'or':
     case 'xor':
@@ -185,6 +197,30 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
       })
     }
     nodes.set(node.id, node)
+  }
+
+  const wirelessResolution = resolveWirelessChannels(
+    document.nodes
+      .filter((node) => node.type === 'transmitter' || node.type === 'receiver')
+      .map((node) => ({
+        nodeId: node.id,
+        channel: node.options?.channel ?? '',
+        kind: node.type as 'transmitter' | 'receiver',
+        width: circuitNodeWidth(node),
+      })),
+  )
+  for (const issue of wirelessResolution.issues) {
+    if (issue.code === 'duplicate-node') continue
+    const code = issue.code === 'empty-channel'
+      ? 'wireless-empty-channel'
+      : issue.code === 'duplicate-transmitter'
+        ? 'wireless-duplicate-transmitter'
+        : issue.code === 'missing-transmitter'
+          ? 'wireless-missing-transmitter'
+          : issue.code === 'invalid-width'
+              ? 'invalid-width'
+              : 'width-mismatch'
+    issues.push({ code, nodeId: issue.nodeId, message: issue.message })
   }
 
   const occupiedInputs = new Set<string>()
@@ -323,9 +359,30 @@ export function toNetlist(document: CircuitDocument, options: CircuitValidationO
     inputs[connection.target.port] = connection.source
     inputsByNode.set(connection.target.node, inputs)
   }
+  const wirelessResolution = resolveWirelessChannels(
+    normalized.nodes
+      .filter((node) => node.type === 'transmitter' || node.type === 'receiver')
+      .map((node) => ({
+        nodeId: node.id,
+        channel: node.options?.channel ?? '',
+        kind: node.type as 'transmitter' | 'receiver',
+        width: circuitNodeWidth(node),
+      })),
+  )
+  if (wirelessResolution.issues.length > 0) {
+    throw new CircuitValidationError(validateCircuit(normalized, options))
+  }
+  const wirelessByReceiver = new Map(
+    wirelessResolution.channels.flatMap((channel) => channel.receivers.map((receiver) => [
+      receiver.nodeId,
+      { node: channel.transmitter.nodeId },
+    ] as const)),
+  )
 
   const components: ComponentSpec[] = normalized.nodes.map((node) => {
-    const inputs = inputsByNode.get(node.id)
+    const inputs = node.type === 'receiver'
+      ? [wirelessByReceiver.get(node.id)!]
+      : inputsByNode.get(node.id)
     return {
       id: node.id,
       type: node.type,

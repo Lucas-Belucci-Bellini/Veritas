@@ -68,6 +68,34 @@ describe('exportCircuit', () => {
     expect(() => exportVhdl(invalid)).toThrow('desconectada')
   })
 
+  it('exporta transmitter e receiver como sinais internos do canal wireless', () => {
+    const wireless: CircuitDocument = {
+      ...document,
+      name: 'Wireless simples',
+      nodes: [
+        { id: 'input', type: 'input', position: { x: 0, y: 0 }, label: 'I' },
+        { id: 'tx', type: 'transmitter', position: { x: 120, y: 0 }, options: { channel: 'bus-a' } },
+        { id: 'rx', type: 'receiver', position: { x: 240, y: 0 }, options: { channel: 'bus-a' } },
+        { id: 'out', type: 'output', position: { x: 360, y: 0 }, label: 'Y' },
+      ],
+      connections: [
+        { source: { node: 'input' }, target: { node: 'tx', port: 0 } },
+        { source: { node: 'rx' }, target: { node: 'out', port: 0 } },
+      ],
+    }
+
+    const verilog = exportVerilog(wireless)
+    const vhdl = exportVhdl(wireless)
+
+    expect(verilog).toContain('wire rx;')
+    expect(verilog).toContain('wire tx;')
+    expect(verilog).toContain('assign tx = I;')
+    expect(verilog).toContain('assign Y = rx;')
+    expect(vhdl).toContain('signal rx : std_logic;')
+    expect(vhdl).toContain('rx <= tx;')
+    expect(vhdl).toContain('Y <= rx;')
+  })
+
   it('gera portas e sinais vetoriais em Verilog e VHDL', () => {
     const vector = {
       ...document,

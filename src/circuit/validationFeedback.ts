@@ -83,6 +83,22 @@ const GUIDANCE: Record<CircuitIssue['code'], Pick<CircuitIssueGuidance, 'title' 
     title: 'Documento muito grande',
     action: 'Reduza o circuito ou divida-o em projetos menores antes de salvar.',
   },
+  'wireless-empty-channel': {
+    title: 'Canal wireless ausente',
+    action: 'Informe um nome de canal no transmissor ou receptor wireless.',
+  },
+  'wireless-duplicate-transmitter': {
+    title: 'Transmissores wireless duplicados',
+    action: 'Mantenha somente um transmissor por canal wireless.',
+  },
+  'wireless-missing-transmitter': {
+    title: 'Receptor wireless sem transmissor',
+    action: 'Adicione um transmissor no mesmo canal ou altere o nome do canal.',
+  },
+  'wireless-channel-too-long': {
+    title: 'Canal wireless muito longo',
+    action: 'Reduza o nome do canal para no máximo 64 caracteres.',
+  },
 }
 
 export function buildCircuitIssueGuidance(issues: readonly CircuitIssue[]): CircuitIssueGuidance[] {

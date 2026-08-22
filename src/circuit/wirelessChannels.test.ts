@@ -37,6 +37,13 @@ describe('canais wireless', () => {
     expect(orphan.issues).toEqual([expect.objectContaining({ code: 'missing-transmitter', nodeId: 'rx-a' })])
   })
 
+  it('rejeita canal wireless acima do limite', () => {
+    const result = resolveWirelessChannels([endpoint({ channel: 'x'.repeat(65) })])
+
+    expect(result.issues).toEqual([expect.objectContaining({ code: 'channel-too-long', nodeId: 'tx-a' })])
+    expect(result.channels).toEqual([])
+  })
+
   it('rejeita largura incompatível entre transmissor e receptor', () => {
     const result = resolveWirelessChannels([
       endpoint({ width: 8 }),

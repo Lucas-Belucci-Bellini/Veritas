@@ -8,6 +8,26 @@ import {
   type CircuitDocument,
 } from './index'
 
+function wirelessCircuit(width = 1): CircuitDocument {
+  return {
+    ...createCircuitDocument('Wireless AND'),
+    nodes: [
+      { id: 'input', type: 'input', position: { x: 0, y: 0 }, options: { width } },
+      { id: 'tx', type: 'transmitter', position: { x: 140, y: 0 }, options: { channel: '  BUS A  ', width } },
+      { id: 'rx-a', type: 'receiver', position: { x: 280, y: 0 }, options: { channel: 'bus-a', width } },
+      { id: 'rx-b', type: 'receiver', position: { x: 280, y: 100 }, options: { channel: 'bus-a', width } },
+      { id: 'gate', type: 'and', position: { x: 420, y: 50 }, options: { width } },
+      { id: 'out', type: 'output', position: { x: 560, y: 50 }, options: { width } },
+    ],
+    connections: [
+      { source: { node: 'input' }, target: { node: 'tx', port: 0 } },
+      { source: { node: 'rx-a' }, target: { node: 'gate', port: 0 } },
+      { source: { node: 'rx-b' }, target: { node: 'gate', port: 1 } },
+      { source: { node: 'gate' }, target: { node: 'out', port: 0 } },
+    ],
+  }
+}
+
 function andCircuit(): CircuitDocument {
   return {
     ...createCircuitDocument('AND de teste'),
@@ -48,6 +68,18 @@ describe('editorModel', () => {
     expect(evaluateCircuit(document, { a: false, b: true }).outputs.out).toBe(false)
     expect(evaluateCircuit(document, { a: true, b: false }).outputs.out).toBe(false)
     expect(evaluateCircuit(document, { a: true, b: true }).outputs.out).toBe(true)
+  })
+
+  it('resolve canal wireless no netlist e propaga para múltiplos receptores', () => {
+    const document = wirelessCircuit()
+
+    expect(validateCircuit(document)).toEqual([])
+    expect(toNetlist(document).components).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'tx', type: 'transmitter', inputs: [{ node: 'input' }] }),
+      expect.objectContaining({ id: 'rx-a', type: 'receiver', inputs: [{ node: 'tx' }] }),
+      expect.objectContaining({ id: 'rx-b', type: 'receiver', inputs: [{ node: 'tx' }] }),
+    ]))
+    expect(evaluateCircuit(document, { input: true }).outputs.out).toBe(true)
   })
 
   it('aplica o valor inicial quando uma entrada não é informada', () => {

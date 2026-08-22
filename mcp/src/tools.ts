@@ -19,6 +19,7 @@ import {
 } from '../../src/engine/index'
 import type { ChipCatalog, ChipEntry } from '../../src/chips/types'
 import { Simulator, type ComponentSpec } from '../../src/simulation/index'
+import { resolveWirelessChannels } from '../../src/circuit/wirelessChannels'
 import {
   buildFullPropositionalTruthTable,
   evaluateLogicTestCase,
@@ -444,6 +445,30 @@ export const MAX_SIMULATION_TICKS = 1000
  * que a tabela verdade não consegue descrever porque a saída deles depende do
  * que aconteceu antes.
  */
+function resolveWirelessComponentInputs(components: readonly ComponentSpec[]): ComponentSpec[] {
+  const resolution = resolveWirelessChannels(
+    components
+      .filter((component) => component.type === 'transmitter' || component.type === 'receiver')
+      .map((component) => ({
+        nodeId: component.id,
+        channel: component.options?.channel ?? '',
+        kind: component.type as 'transmitter' | 'receiver',
+        width: component.options?.width ?? 1,
+      })),
+  )
+  if (resolution.issues.length > 0) throw new Error(resolution.issues.map((issue) => issue.message).join(' '))
+
+  const wirelessByReceiver = new Map(
+    resolution.channels.flatMap((channel) => channel.receivers.map((receiver) => [
+      receiver.nodeId,
+      { node: channel.transmitter.nodeId },
+    ] as const)),
+  )
+  return components.map((component) => component.type === 'receiver'
+    ? { ...component, inputs: [wirelessByReceiver.get(component.id)!] }
+    : component)
+}
+
 export function simulateCircuit(
   components: ComponentSpec[],
   steps: SimulationStep[],
@@ -458,8 +483,10 @@ export function simulateCircuit(
   }
 
   let simulator: Simulator
+  let resolvedComponents: ComponentSpec[]
   try {
-    simulator = new Simulator({ components })
+    resolvedComponents = resolveWirelessComponentInputs(components)
+    simulator = new Simulator({ components: resolvedComponents })
   } catch (error) {
     return {
       isError: true,
@@ -467,13 +494,13 @@ export function simulateCircuit(
     }
   }
 
-  const known = new Set(components.map((component) => component.id))
+  const known = new Set(resolvedComponents.map((component) => component.id))
   const unknown = watch.filter((id) => !known.has(id))
   if (unknown.length > 0) {
     return { isError: true, text: `Não existem no circuito: ${unknown.join(', ')}.` }
   }
 
-  const observed = watch.length > 0 ? watch : components.map((component) => component.id)
+  const observed = watch.length > 0 ? watch : resolvedComponents.map((component) => component.id)
   const rows: string[] = []
   const record = (tick: number, note: string) => {
     const values = observed.map((id) => (simulator.read(id) ? '1' : '0'))

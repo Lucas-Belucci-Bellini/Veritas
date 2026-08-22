@@ -24,7 +24,10 @@ import {
   evaluateCircuit,
   evaluateCircuitVectors,
   exportCircuit,
+  normalizeCircuitDocument,
+  normalizeWirelessChannel,
   validateCircuit,
+  resolveWirelessChannels,
   decideRemoteCircuitUpdate,
   type CircuitDocument,
   type CircuitEvaluation,
@@ -59,7 +62,7 @@ import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realti
 import { buildCircuitIssueGuidance, summarizeCircuitIssues } from '../circuit/validationFeedback'
 
 interface EditorNodeData extends Record<string, unknown> {
-  kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential'
+  kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential' | 'wireless'
   componentType: EditorComponentType
   label: string
   inputs: number
@@ -70,6 +73,7 @@ interface EditorNodeData extends Record<string, unknown> {
   period?: number
   ticks?: number
   initial?: boolean
+  channel?: string
 }
 
 type EditorFlowNode = Node<EditorNodeData>
@@ -88,6 +92,8 @@ const PALETTE: readonly { type: EditorComponentType; label: string; description:
   { type: 'dff', label: 'DFF', description: 'Flip-flop D · D/CLK → Q' },
   { type: 'tff', label: 'TFF', description: 'Flip-flop T · T/CLK → Q' },
   { type: 'delay', label: 'Delay', description: 'Atraso de N tiques' },
+  { type: 'transmitter', label: 'Transmissor', description: 'Publica sinal em um canal wireless' },
+  { type: 'receiver', label: 'Receptor', description: 'Lê sinal de um canal wireless' },
 ]
 
 const NODE_LABELS: Record<EditorComponentType, string> = {
@@ -102,6 +108,8 @@ const NODE_LABELS: Record<EditorComponentType, string> = {
   dff: 'DFF',
   tff: 'TFF',
   delay: 'Delay',
+  transmitter: 'Transmissor',
+  receiver: 'Receptor',
 }
 
 export function CircuitEditor() {
@@ -132,6 +140,7 @@ export function CircuitEditor() {
   const [nextSignalWidth, setNextSignalWidth] = useState(1)
   const [nextClockPeriod, setNextClockPeriod] = useState(1)
   const [nextDelayTicks, setNextDelayTicks] = useState(1)
+  const [nextWirelessChannel, setNextWirelessChannel] = useState('bus-a')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [sequentialSnapshot, setSequentialSnapshot] = useState<DocumentRuntimeSnapshot | null>(null)
@@ -225,6 +234,19 @@ export function CircuitEditor() {
   )
   const issues = useMemo(() => validateCircuit(document, { allowBuses: true }), [document])
   const scalarIssues = useMemo(() => validateCircuit(document), [document])
+  const wirelessResolution = useMemo(
+    () => resolveWirelessChannels(
+      document.nodes
+        .filter((node) => node.type === 'transmitter' || node.type === 'receiver')
+        .map((node) => ({
+          nodeId: node.id,
+          channel: node.options?.channel ?? '',
+          kind: node.type as 'transmitter' | 'receiver',
+          width: node.options?.width ?? 1,
+        })),
+    ),
+    [document],
+  )
   const outputNodes = useMemo(
     () => nodes.filter((node) => node.data.componentType === 'output'),
     [nodes],
@@ -500,6 +522,7 @@ export function CircuitEditor() {
       const node = createNode(type, current.length, nextNodeId(type, current), nextSignalWidth)
       if (type === 'clock') node.data.period = nextClockPeriod
       if (type === 'delay') node.data.ticks = nextDelayTicks
+      if (type === 'transmitter' || type === 'receiver') node.data.channel = normalizeWirelessChannel(nextWirelessChannel)
       return [...current, node]
     })
   }
@@ -793,6 +816,11 @@ export function CircuitEditor() {
               {[1, 2, 3, 4, 8].map((ticks) => <option key={ticks} value={ticks}>{ticks} tique{ticks === 1 ? '' : 's'}</option>)}
             </select>
           </label>
+          <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="circuit-wireless-channel">
+            Canal
+            <AccessibleTooltip label="Define o canal dos próximos transmissores e receptores wireless. Um canal deve ter um transmissor e pode ter vários receptores." />
+            <input id="circuit-wireless-channel" value={nextWirelessChannel} onChange={(event) => setNextWirelessChannel(event.target.value)} placeholder="bus-a" maxLength={64} className="w-20 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700" />
+          </label>
           <button type="button" className="key text-xs" onClick={reset}>
             Novo exemplo
           </button>
@@ -840,7 +868,7 @@ export function CircuitEditor() {
 
       {showGuide && (
                   <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 dark:border-brand-900/70 dark:bg-brand-950/40 dark:text-brand-100">
-          <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, use Clock/DFF/TFF/Delay para circuitos com estado e salve o desenho no navegador. A tabela verdade permanece exclusiva para circuitos combinacionais.
+            <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, use Transmissor/Receptor com o mesmo canal para compartilhar um sinal sem fio pelo circuito. Clock/DFF/TFF/Delay criam circuitos com estado; salve o desenho no navegador. A tabela verdade permanece exclusiva para circuitos combinacionais.
 
         </div>
       )}
@@ -907,6 +935,9 @@ export function CircuitEditor() {
               {!notice && <AccessibleTooltip label="O editor valida conexões, entradas, ciclos e larguras antes de liberar tabela verdade, IA ou exportação." />}
             </div>
             <p className="mt-1">{notice || validationMessage}</p>
+            {!notice && wirelessResolution.channels.length > 0 && wirelessResolution.issues.length === 0 && (
+              <p className="mt-2 text-xs">Canais wireless ativos: {wirelessResolution.channels.map((channel) => `${channel.channel} (${channel.receivers.length} receptor${channel.receivers.length === 1 ? '' : 'es'})`).join(', ')}.</p>
+            )}
             {!notice && issueGuidance.length > 0 && (
               <ul className="mt-2 grid gap-1 text-xs" aria-label="Orientações para corrigir o circuito">
                 {issueGuidance.slice(0, 3).map((issue, index) => (
@@ -1141,6 +1172,19 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
   const lit = data.value === true
   const dot = `!h-1.5 !w-1.5 !border-0 ${lit ? '!bg-amber-500' : '!bg-slate-400 dark:!bg-slate-500'}`
 
+  if (data.kind === 'wireless') {
+    const isTransmitter = data.componentType === 'transmitter'
+    return (
+      <div className="relative flex h-14 w-32 flex-col items-center justify-center rounded-lg border-2 border-cyan-300 bg-cyan-50 px-2 text-center shadow-sm dark:border-cyan-700 dark:bg-cyan-950/40" title={`${data.label} · canal ${data.channel || 'sem canal'}`}>
+        {isTransmitter && <Handle type="target" position={Position.Left} id="a" className={dot} />}
+        <span className="font-mono text-xs font-black text-cyan-800 dark:text-cyan-200">{isTransmitter ? 'TX' : 'RX'} · {data.label}</span>
+        <span className="max-w-full truncate text-[10px] text-cyan-700 dark:text-cyan-300">{data.channel || 'canal ausente'} · {data.width} bit{data.width === 1 ? '' : 's'}</span>
+        {!isTransmitter && <span className="text-[10px] text-cyan-700 dark:text-cyan-300">sinal {lit ? '1' : '0'}</span>}
+        <Handle type="source" position={Position.Right} className={dot} />
+      </div>
+    )
+  }
+
   if (data.kind === 'sequential') {
     const isFlipFlop = data.componentType === 'dff' || data.componentType === 'tff'
     const outputClass = `!h-1.5 !w-1.5 !border-0 ${lit ? '!bg-amber-500' : '!bg-slate-400 dark:!bg-slate-500'}`
@@ -1210,6 +1254,7 @@ function buildNodeOptions(data: EditorNodeData): CircuitNode['options'] {
   if (data.componentType === 'input' || data.componentType === 'clock' || data.componentType === 'dff' || data.componentType === 'tff') {
     options.initial = data.initial ?? false
   }
+  if (data.componentType === 'transmitter' || data.componentType === 'receiver') options.channel = normalizeWirelessChannel(data.channel ?? '')
   if (data.width !== 1) options.width = data.width
   return Object.keys(options).length > 0 ? options : undefined
 }
@@ -1247,7 +1292,9 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       ? 'output'
       : type === 'clock' || type === 'dff' || type === 'tff' || type === 'delay'
         ? 'sequential'
-        : 'gate'
+        : type === 'transmitter' || type === 'receiver'
+          ? 'wireless'
+          : 'gate'
   const defaultValue = type === 'constant'
   const label = type === 'input' ? `I${index + 1}` : type === 'output' ? `O${index + 1}` : NODE_LABELS[type]
 
@@ -1266,6 +1313,7 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       initial: false,
       period: type === 'clock' ? 1 : undefined,
       ticks: type === 'delay' ? 1 : undefined,
+      channel: type === 'transmitter' || type === 'receiver' ? 'bus-a' : undefined,
     },
   }
 }
@@ -1298,11 +1346,12 @@ function nextNodeId(type: EditorComponentType, nodes: EditorFlowNode[]): string 
 }
 
 function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edges: Edge[] } {
+  const normalized = normalizeCircuitDocument(document)
   return {
-    nodes: document.nodes.map((node, index) =>
+    nodes: normalized.nodes.map((node, index) =>
       createNode(node.type, index, node.id),
     ).map((node, index) => {
-      const source = document.nodes[index]
+      const source = normalized.nodes[index]
       return {
         ...node,
         position: source.position,
@@ -1310,6 +1359,7 @@ function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edg
           ...node.data,
           label: source.label ?? node.data.label,
           width: source.options?.width ?? 1,
+          channel: source.options?.channel ?? '',
           value: source.options?.value ?? source.options?.initial ?? node.data.value,
           initial: source.options?.initial ?? false,
           period: source.options?.period ?? 1,
@@ -1317,8 +1367,8 @@ function fromDocument(document: CircuitDocument): { nodes: EditorFlowNode[]; edg
         },
       }
     }),
-    edges: document.connections.map((connection) => {
-      const sourceNode = document.nodes.find((node) => node.id === connection.source.node)
+    edges: normalized.connections.map((connection) => {
+      const sourceNode = normalized.nodes.find((node) => node.id === connection.source.node)
       const hasNamedOutputs = sourceNode?.type === 'dff' || sourceNode?.type === 'tff'
       return {
         id: `${connection.source.node}->${connection.target.node}:${connection.source.port === 1 ? 'qbar' : 'q'}:${connection.target.port === 1 ? 'b' : 'a'}`,

@@ -130,6 +130,8 @@ function evaluateVectorComponent(
     case 'constant':
       return coerceVector(component.options?.value ?? false, width)
     case 'output':
+    case 'transmitter':
+    case 'receiver':
       return componentInputs[0] ?? bitVector(width, 0)
     case 'and':
       return foldVectors(componentInputs, width, bitwiseAnd)
@@ -178,6 +180,8 @@ function evaluateComponent(
     case 'constant':
       return [component.options?.value ?? false]
     case 'output':
+    case 'transmitter':
+    case 'receiver':
       return [componentInputs[0] ?? false]
     case 'and':
     case 'or':

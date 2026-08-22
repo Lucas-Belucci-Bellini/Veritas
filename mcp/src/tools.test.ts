@@ -187,6 +187,22 @@ describe('simulate_circuit', () => {
     expect(lines[5]).toContain('| 3 | 1 | 0 |')
   })
 
+  it('simula a propagação de um canal wireless', () => {
+    const result = simulateCircuit(
+      [
+        { id: 'input', type: 'input' },
+        { id: 'tx', type: 'transmitter', inputs: [{ node: 'input' }], options: { channel: 'BUS A' } },
+        { id: 'rx', type: 'receiver', options: { channel: 'bus-a' } },
+        { id: 'out', type: 'output', inputs: [{ node: 'rx' }] },
+      ],
+      [{ set: { input: true }, ticks: 3 }],
+      ['input', 'tx', 'rx', 'out'],
+    )
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('| 3 | 1 | 1 | 1 | 1 |')
+  })
+
   it('deixa o clock oscilar sozinho', () => {
     const { text } = simulateCircuit(
       [{ id: 'clk', type: 'clock', options: { period: 2 } }],

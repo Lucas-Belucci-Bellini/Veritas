@@ -21113,6 +21113,8 @@ var Simulator = class {
 				node.next[0] = options?.value ?? false;
 				return;
 			case "output":
+			case "transmitter":
+			case "receiver":
 				node.next[0] = values[0] ?? false;
 				return;
 			case "clock": {
@@ -21193,6 +21195,101 @@ function createState(spec) {
 		nextQueue: [...queue],
 		counter: 0,
 		nextCounter: 0
+	};
+}
+//#endregion
+//#region src/circuit/wirelessChannels.ts
+function normalizeWirelessChannel(channel) {
+	return channel.trim().replace(/\s+/g, "-").toLowerCase();
+}
+function resolveWirelessChannels(endpoints) {
+	const issues = [];
+	const seenNodes = /* @__PURE__ */ new Set();
+	const grouped = /* @__PURE__ */ new Map();
+	for (const endpoint of endpoints) {
+		const nodeId = endpoint.nodeId.trim();
+		const channel = normalizeWirelessChannel(endpoint.channel);
+		if (!nodeId || seenNodes.has(nodeId)) {
+			issues.push({
+				code: "duplicate-node",
+				nodeId,
+				message: `O endpoint wireless "${nodeId}" está vazio ou duplicado.`
+			});
+			continue;
+		}
+		seenNodes.add(nodeId);
+		if (!channel) {
+			issues.push({
+				code: "empty-channel",
+				nodeId,
+				message: `O endpoint wireless "${nodeId}" precisa informar um canal.`
+			});
+			continue;
+		}
+		if (channel.length > 64) {
+			issues.push({
+				code: "channel-too-long",
+				nodeId,
+				channel,
+				message: `O canal wireless "${channel}" pode ter no máximo 64 caracteres.`
+			});
+			continue;
+		}
+		if (!Number.isInteger(endpoint.width) || endpoint.width < 1 || endpoint.width > 64) {
+			issues.push({
+				code: "invalid-width",
+				nodeId,
+				channel,
+				message: `O canal wireless "${channel}" usa uma largura inválida.`
+			});
+			continue;
+		}
+		const normalized = {
+			...endpoint,
+			nodeId,
+			channel,
+			width: endpoint.width
+		};
+		const current = grouped.get(channel) ?? [];
+		current.push(normalized);
+		grouped.set(channel, current);
+	}
+	const channels = [];
+	for (const [channel, channelEndpoints] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+		const transmitters = channelEndpoints.filter((endpoint) => endpoint.kind === "transmitter").sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+		const receivers = channelEndpoints.filter((endpoint) => endpoint.kind === "receiver").sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+		const transmitter = transmitters[0];
+		for (const duplicate of transmitters.slice(1)) issues.push({
+			code: "duplicate-transmitter",
+			nodeId: duplicate.nodeId,
+			channel,
+			message: `O canal wireless "${channel}" possui mais de um transmissor.`
+		});
+		if (!transmitter) {
+			for (const receiver of receivers) issues.push({
+				code: "missing-transmitter",
+				nodeId: receiver.nodeId,
+				channel,
+				message: `O receptor "${receiver.nodeId}" não encontra transmissor no canal wireless "${channel}".`
+			});
+			continue;
+		}
+		for (const receiver of receivers) if (receiver.width !== transmitter.width) issues.push({
+			code: "width-mismatch",
+			nodeId: receiver.nodeId,
+			channel,
+			message: `O receptor "${receiver.nodeId}" usa ${receiver.width} bits, mas o transmissor usa ${transmitter.width}.`
+		});
+		channels.push({
+			channel,
+			width: transmitter.width,
+			transmitter,
+			receivers
+		});
+	}
+	return {
+		channels,
+		issues
 	};
 }
 //#endregion
@@ -22118,6 +22215,20 @@ var MAX_SIMULATION_TICKS = 1e3;
 * que a tabela verdade não consegue descrever porque a saída deles depende do
 * que aconteceu antes.
 */
+function resolveWirelessComponentInputs(components) {
+	const resolution = resolveWirelessChannels(components.filter((component) => component.type === "transmitter" || component.type === "receiver").map((component) => ({
+		nodeId: component.id,
+		channel: component.options?.channel ?? "",
+		kind: component.type,
+		width: component.options?.width ?? 1
+	})));
+	if (resolution.issues.length > 0) throw new Error(resolution.issues.map((issue) => issue.message).join(" "));
+	const wirelessByReceiver = new Map(resolution.channels.flatMap((channel) => channel.receivers.map((receiver) => [receiver.nodeId, { node: channel.transmitter.nodeId }])));
+	return components.map((component) => component.type === "receiver" ? {
+		...component,
+		inputs: [wirelessByReceiver.get(component.id)]
+	} : component);
+}
 function simulateCircuit(components, steps, watch) {
 	const total = steps.reduce((sum, step) => sum + (step.ticks ?? 1), 0);
 	if (total > 1e3) return {
@@ -22125,21 +22236,23 @@ function simulateCircuit(components, steps, watch) {
 		text: `São ${total} tiques no total; o limite por chamada é ${MAX_SIMULATION_TICKS}.`
 	};
 	let simulator;
+	let resolvedComponents;
 	try {
-		simulator = new Simulator({ components });
+		resolvedComponents = resolveWirelessComponentInputs(components);
+		simulator = new Simulator({ components: resolvedComponents });
 	} catch (error) {
 		return {
 			isError: true,
 			text: error instanceof Error ? error.message : "Circuito inválido."
 		};
 	}
-	const known = new Set(components.map((component) => component.id));
+	const known = new Set(resolvedComponents.map((component) => component.id));
 	const unknown = watch.filter((id) => !known.has(id));
 	if (unknown.length > 0) return {
 		isError: true,
 		text: `Não existem no circuito: ${unknown.join(", ")}.`
 	};
-	const observed = watch.length > 0 ? watch : components.map((component) => component.id);
+	const observed = watch.length > 0 ? watch : resolvedComponents.map((component) => component.id);
 	const rows = [];
 	const record = (tick, note) => {
 		const values = observed.map((id) => simulator.read(id) ? "1" : "0");
@@ -22316,23 +22429,26 @@ var COMPONENT = object({
 		"clock",
 		"dff",
 		"tff",
-		"delay"
+		"delay",
+		"transmitter",
+		"receiver"
 	]),
 	inputs: array(object({
 		node: string(),
 		port: number().int().min(0).optional()
-	})).optional().describe("Ligações das entradas, na ordem dos pinos. dff/tff usam [D, CLK]"),
+	})).optional().describe("Ligações das entradas, na ordem dos pinos. dff/tff usam [D, CLK]; receiver recebe o sinal do canal wireless"),
 	options: object({
 		period: number().int().min(1).optional().describe("clock: tiques em cada nível"),
 		ticks: number().int().min(1).optional().describe("delay: tamanho do atraso"),
 		value: boolean().optional().describe("constant: o valor fixo"),
-		initial: boolean().optional().describe("valor no instante zero")
+		initial: boolean().optional().describe("valor no instante zero"),
+		channel: string().max(64).optional().describe("transmitter/receiver: nome do canal wireless")
 	}).optional(),
 	label: string().optional()
 });
 server.registerTool("simulate_circuit", {
 	title: "Simular circuito",
-	description: "Roda um circuito por alguns tiques e devolve o diagrama de tempo. Diferente da tabela verdade, aceita clock, flip-flops (dff/tff) e atrasos, cujo resultado depende do que aconteceu antes. Cada componente leva um tique para propagar. As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1).",
+	description: "Roda um circuito por alguns tiques e devolve o diagrama de tempo. Diferente da tabela verdade, aceita clock, flip-flops (dff/tff), atrasos e canais wireless, cujo resultado depende do que aconteceu antes. Cada componente leva um tique para propagar. As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1).",
 	inputSchema: {
 		components: array(COMPONENT).min(1).describe("Os componentes do circuito"),
 		steps: array(object({

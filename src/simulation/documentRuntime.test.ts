@@ -38,6 +38,32 @@ describe('documentRuntime', () => {
     expect(documentWatches(document).map((watch) => watch.label)).toEqual(['clk', 'ff · Q', 'ff · Q̄', 'out'])
   })
 
+  it('propaga sinal wireless sem estado extra no runtime', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'Wireless runtime',
+      nodes: [
+        { id: 'input', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'tx', type: 'transmitter', position: { x: 120, y: 0 }, options: { channel: 'bus-a' } },
+        { id: 'rx', type: 'receiver', position: { x: 240, y: 0 }, options: { channel: 'bus-a' } },
+        { id: 'out', type: 'output', position: { x: 360, y: 0 } },
+      ],
+      connections: [
+        { source: { node: 'input' }, target: { node: 'tx', port: 0 } },
+        { source: { node: 'rx' }, target: { node: 'out', port: 0 } },
+      ],
+    }
+    const simulator = createDocumentRuntime(document)
+
+    simulator.setInput('input', true)
+    simulator.tick(3)
+
+    expect(simulator.read('tx')).toBe(true)
+    expect(simulator.read('rx')).toBe(true)
+    expect(simulator.read('out')).toBe(true)
+  })
+
   it('mantém a realimentação e atualiza Q no pulso de clock', () => {
     const simulator = createDocumentRuntime(feedbackDocument())
 

@@ -235,17 +235,20 @@ const COMPONENT = z.object({
     'dff',
     'tff',
     'delay',
+    'transmitter',
+    'receiver',
   ]),
   inputs: z
     .array(z.object({ node: z.string(), port: z.number().int().min(0).optional() }))
     .optional()
-    .describe('Ligações das entradas, na ordem dos pinos. dff/tff usam [D, CLK]'),
+    .describe('Ligações das entradas, na ordem dos pinos. dff/tff usam [D, CLK]; receiver recebe o sinal do canal wireless'),
   options: z
     .object({
       period: z.number().int().min(1).optional().describe('clock: tiques em cada nível'),
       ticks: z.number().int().min(1).optional().describe('delay: tamanho do atraso'),
       value: z.boolean().optional().describe('constant: o valor fixo'),
       initial: z.boolean().optional().describe('valor no instante zero'),
+      channel: z.string().max(64).optional().describe('transmitter/receiver: nome do canal wireless'),
     })
     .optional(),
   label: z.string().optional(),
@@ -257,7 +260,7 @@ server.registerTool(
     title: 'Simular circuito',
     description:
       'Roda um circuito por alguns tiques e devolve o diagrama de tempo. Diferente da ' +
-      'tabela verdade, aceita clock, flip-flops (dff/tff) e atrasos, cujo resultado ' +
+      'tabela verdade, aceita clock, flip-flops (dff/tff), atrasos e canais wireless, cujo resultado ' +
       'depende do que aconteceu antes. Cada componente leva um tique para propagar. ' +
       'As saídas de dff e tff são Q (porta 0) e Q barrado (porta 1).',
     inputSchema: {
