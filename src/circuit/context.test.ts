@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildCircuitContext } from './context'
+import { buildCustomChipDefinition } from './customChip'
 import { createCircuitDocument, type CircuitDocument } from './editorModel'
 
 function circuit(): CircuitDocument {
@@ -15,6 +16,37 @@ function circuit(): CircuitDocument {
       { source: { node: 'a' }, target: { node: 'gate', port: 0 } },
       { source: { node: 'b' }, target: { node: 'gate', port: 1 } },
       { source: { node: 'gate' }, target: { node: 'out', port: 0 } },
+    ],
+  }
+}
+
+function customChipEntry() {
+  const definition: CircuitDocument = {
+    ...createCircuitDocument('NOT interno'),
+    nodes: [
+      { id: 'input', type: 'input', position: { x: 0, y: 0 }, label: 'Entrada' },
+      { id: 'not', type: 'not', position: { x: 160, y: 0 }, label: 'NOT' },
+      { id: 'output', type: 'output', position: { x: 320, y: 0 }, label: 'Saída' },
+    ],
+    connections: [
+      { source: { node: 'input' }, target: { node: 'not', port: 0 } },
+      { source: { node: 'not' }, target: { node: 'output', port: 0 } },
+    ],
+  }
+  return { id: 42, definition: buildCustomChipDefinition(definition, 'NOT interno') }
+}
+
+function customChipCircuit(): CircuitDocument {
+  return {
+    ...createCircuitDocument('Contexto NOT customizado'),
+    nodes: [
+      { id: 'source', type: 'input', position: { x: 0, y: 0 }, label: 'Sinal' },
+      { id: 'chip', type: 'custom-chip', position: { x: 180, y: 0 }, label: 'NOT customizado', options: { customChipId: 42 } },
+      { id: 'result', type: 'output', position: { x: 360, y: 0 }, label: 'Resultado' },
+    ],
+    connections: [
+      { source: { node: 'source' }, target: { node: 'chip', port: 0 } },
+      { source: { node: 'chip' }, target: { node: 'result', port: 0 } },
     ],
   }
 }
@@ -45,6 +77,15 @@ describe('buildCircuitContext', () => {
     expect(context.payload.document.nodes[0].id).toBe('a')
     expect(context.payload.document.connections[0].source.node).toBe('a')
     expect(context.payload.truthTable.rows).toHaveLength(4)
+  })
+
+  it('inclui representação elaborada e metadados mínimos de chips customizados', () => {
+    const context = buildCircuitContext(customChipCircuit(), undefined, { customChips: [customChipEntry()] })
+
+    expect(context.payload.truthTable.rows).toHaveLength(2)
+    expect(context.payload.elaboratedDocument?.nodes.some((node) => node.id === 'chip__not')).toBe(true)
+    expect(context.payload.customChips).toEqual([{ id: 42, name: 'NOT interno', inputs: ['Entrada'], outputs: ['Saída'] }])
+    expect(context.contentHash).toContain('fnv1a-')
   })
 
   it('recusa circuito inválido', () => {

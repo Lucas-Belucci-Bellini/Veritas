@@ -1,5 +1,7 @@
 import { buildCircuitTruthTable } from './truthTable'
 import { validateCircuit, type CircuitDocument } from './editorModel'
+import type { CustomChipLibraryEntry } from './customChip'
+import { elaborateCustomChipDocument } from './customChipElaboration'
 import { normalizeCircuitDocument } from './documentContract'
 
 export interface CircuitContextRecord {
@@ -21,6 +23,13 @@ export interface CircuitContextRecord {
       totalRows: number
       truncated: boolean
     }
+    elaboratedDocument?: CircuitDocument
+    customChips?: Array<{
+      id: number
+      name: string
+      inputs: string[]
+      outputs: string[]
+    }>
   }
 }
 
@@ -28,18 +37,37 @@ export interface CircuitContextRecord {
  * Produz um pacote seguro para a futura API autenticada do Veritas.
  * Não envia tokens, credenciais ou conteúdo arbitrário de prompts.
  */
+export interface CircuitContextOptions {
+  customChips?: readonly CustomChipLibraryEntry[]
+}
+
 export function buildCircuitContext(
   document: CircuitDocument,
   outputId?: string,
+  options: CircuitContextOptions = {},
 ): CircuitContextRecord {
   const normalized = normalizeCircuitDocument(document)
-  const issues = validateCircuit(normalized)
+  const issues = validateCircuit(normalized, { customChips: options.customChips })
   if (issues.length > 0) throw new Error(issues[0].message)
 
-  const truthTable = buildCircuitTruthTable(normalized, { outputId, maxRows: 256 })
+  const truthTable = buildCircuitTruthTable(normalized, { outputId, maxRows: 256, customChips: options.customChips })
   const inputs = normalized.nodes.filter((node) => node.type === 'input').map((node) => node.label ?? node.id)
   const outputs = normalized.nodes.filter((node) => node.type === 'output').map((node) => node.label ?? node.id)
-  const content = stableStringify({ document: normalized, outputId })
+  const hasCustomInstances = normalized.nodes.some((node) => node.type === 'custom-chip')
+  const elaboratedDocument = hasCustomInstances
+    ? elaborateCustomChipDocument(normalized, { customChips: options.customChips })
+    : undefined
+  const customChips = hasCustomInstances
+    ? (options.customChips ?? [])
+      .filter((entry) => normalized.nodes.some((node) => node.type === 'custom-chip' && node.options?.customChipId === entry.id))
+      .map((entry) => ({
+        id: entry.id,
+        name: entry.definition.name,
+        inputs: entry.definition.inputs.map((port) => port.name),
+        outputs: entry.definition.outputs.map((port) => port.name),
+      }))
+    : undefined
+  const content = stableStringify({ document: normalized, outputId, elaboratedDocument, customChips })
 
   return {
     sourceRef: `veritas:circuit:${normalized.name}`,
@@ -60,6 +88,8 @@ export function buildCircuitContext(
         totalRows: truthTable.totalRows,
         truncated: truthTable.truncated,
       },
+      ...(elaboratedDocument ? { elaboratedDocument } : {}),
+      ...(customChips ? { customChips } : {}),
     },
   }
 }

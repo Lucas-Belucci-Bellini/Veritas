@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { CircuitDocument } from '../circuit'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { CircuitContextOptions, CircuitDocument } from '../circuit'
 import { useAuth } from '../auth/useAuth'
 import {
   deleteCloudCircuitProject,
@@ -31,8 +31,9 @@ interface UseCloudCircuitProjects {
   loadVersions: (projectId: string) => Promise<void>
 }
 
-export function useCloudCircuitProjects(): UseCloudCircuitProjects {
+export function useCloudCircuitProjects(options: CircuitContextOptions = {}): UseCloudCircuitProjects {
   const { configured, user } = useAuth()
+  const customChips = useMemo(() => options.customChips ?? [], [options.customChips])
   const [projects, setProjects] = useState<CloudCircuitProject[]>([])
   const [versions, setVersions] = useState<CloudCircuitVersion[]>([])
   const [loading, setLoading] = useState(false)
@@ -48,14 +49,14 @@ export function useCloudCircuitProjects(): UseCloudCircuitProjects {
     }
     setLoading(true)
     try {
-      setProjects(await listCloudCircuitProjects())
+      setProjects(await listCloudCircuitProjects({ customChips }))
       setError(null)
     } catch (refreshError) {
       setError(messageOf(refreshError, 'Não foi possível carregar os circuitos da nuvem.'))
     } finally {
       setLoading(false)
     }
-  }, [configured, user])
+  }, [configured, customChips, user])
 
   useEffect(() => {
     void refresh()
@@ -64,14 +65,14 @@ export function useCloudCircuitProjects(): UseCloudCircuitProjects {
   const loadVersions = useCallback(async (projectId: string) => {
     setVersionsLoading(true)
     try {
-      setVersions(await listCloudCircuitVersions(projectId))
+      setVersions(await listCloudCircuitVersions(projectId, { customChips }))
       setError(null)
     } catch (versionsError) {
       setError(messageOf(versionsError, 'Não foi possível carregar o histórico do circuito.'))
     } finally {
       setVersionsLoading(false)
     }
-  }, [])
+  }, [customChips])
 
   return {
     projects,
@@ -86,9 +87,9 @@ export function useCloudCircuitProjects(): UseCloudCircuitProjects {
       if (!user) throw new Error('Faça login para sincronizar circuitos na nuvem.')
       setLoading(true)
       try {
-        const previousVersions = id ? await listCloudCircuitVersions(id) : []
+        const previousVersions = id ? await listCloudCircuitVersions(id, { customChips }) : []
         const baseVersion = previousVersions[0]?.versionNumber ?? 0
-        const result = await syncCloudCircuitVersion(id ?? null, name, document, previousVersions[0]?.document ?? null, baseVersion)
+        const result = await syncCloudCircuitVersion(id ?? null, name, document, previousVersions[0]?.document ?? null, baseVersion, { customChips })
         const version = result.version
         const project: CloudCircuitProject = {
           id: result.projectId,

@@ -6,7 +6,7 @@ type CircuitNode = {
   type: string;
   position: { x: number; y: number };
   label?: string;
-  options?: { value?: boolean; initial?: boolean };
+  options?: { value?: boolean; initial?: boolean; width?: number; channel?: string; customChipId?: number; customChipBoundary?: "internal" };
 };
 type Connection = {
   source: { node: string; port?: number };
@@ -22,7 +22,11 @@ type CircuitDocument = {
 type CircuitContext = {
   circuitName: string;
   summary: string;
-  payload: { document: CircuitDocument };
+  payload: {
+    document: CircuitDocument;
+    elaboratedDocument?: CircuitDocument;
+    customChips?: Array<{ id: number; name: string; inputs: string[]; outputs: string[] }>;
+  };
 };
 
 type AiResult = {
@@ -46,6 +50,9 @@ const COMPONENT_TYPES = new Set([
   "dff",
   "tff",
   "delay",
+  "transmitter",
+  "receiver",
+  "custom-chip",
 ]);
 const MAX_CIRCUIT_NODES = 256;
 const MAX_CIRCUIT_CONNECTIONS = 512;
@@ -148,8 +155,8 @@ function parseDocumentJson(value: unknown): CircuitDocument | null {
 }
 
 function heuristic(action: Action, context: CircuitContext): AiResult {
-  const document = context.payload.document;
-  const outputs = document.nodes.filter((node) => node.type === "output");
+  const document = context.payload.elaboratedDocument ?? context.payload.document;
+  const outputs = document.nodes.filter((node) => node.type === "output" && node.options?.customChipBoundary !== "internal");
   const reachable = new Set<string>();
   const incoming = new Map<string, string[]>();
   for (const connection of document.connections) {
@@ -182,7 +189,16 @@ function heuristic(action: Action, context: CircuitContext): AiResult {
 
 function isContext(value: unknown): value is CircuitContext {
   if (!isRecord(value) || typeof value.circuitName !== "string" || !isRecord(value.payload)) return false;
-  return isDocument(value.payload.document);
+  if (!isDocument(value.payload.document)) return false;
+  if (value.payload.elaboratedDocument !== undefined && !isDocument(value.payload.elaboratedDocument)) return false;
+  if (value.payload.customChips !== undefined && (!Array.isArray(value.payload.customChips) || !value.payload.customChips.every(isCustomChipMetadata))) return false;
+  return true;
+}
+
+function isCustomChipMetadata(value: unknown): value is { id: number; name: string; inputs: string[]; outputs: string[] } {
+  if (!isRecord(value) || !Number.isInteger(value.id) || value.id < 1 || !isBoundedText(value.name, 1, MAX_CIRCUIT_LABEL_LENGTH)) return false;
+  return Array.isArray(value.inputs) && value.inputs.every((item) => isBoundedText(item, 1, MAX_CIRCUIT_LABEL_LENGTH)) &&
+    Array.isArray(value.outputs) && value.outputs.every((item) => isBoundedText(item, 1, MAX_CIRCUIT_LABEL_LENGTH));
 }
 
 function isDocument(value: unknown): value is CircuitDocument {
@@ -198,6 +214,9 @@ function isDocument(value: unknown): value is CircuitDocument {
       if (node.options.width !== undefined && (!Number.isInteger(node.options.width) || node.options.width < 1 || node.options.width > 64)) return false;
       if (node.options.value !== undefined && typeof node.options.value !== "boolean") return false;
       if (node.options.initial !== undefined && typeof node.options.initial !== "boolean") return false;
+      if (node.options.customChipId !== undefined && (!Number.isInteger(node.options.customChipId) || node.options.customChipId < 1)) return false;
+      if (node.options.customChipBoundary !== undefined && node.options.customChipBoundary !== "internal") return false;
+      if (node.options.channel !== undefined && !isBoundedText(node.options.channel, 1, 64)) return false;
     }
     return true;
   }) && value.connections.every((connection) => {

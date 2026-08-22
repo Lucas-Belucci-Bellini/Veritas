@@ -1,5 +1,5 @@
 import type { CircuitDocument } from '../circuit'
-import { buildCircuitContext, isCircuitDocumentShape, validateCircuit } from '../circuit'
+import { buildCircuitContext, isCircuitDocumentShape, validateCircuit, type CircuitContextOptions } from '../circuit'
 import { supabase } from '../lib/supabase'
 
 export interface CloudCircuitProject {
@@ -20,7 +20,7 @@ type CloudCircuitRow = {
   updated_at: string
 }
 
-export async function listCloudCircuitProjects(): Promise<CloudCircuitProject[]> {
+export async function listCloudCircuitProjects(options: CircuitContextOptions = {}): Promise<CloudCircuitProject[]> {
   const client = requireSupabase()
   const { data, error } = await client
     .from('veritas_circuit_projects')
@@ -29,7 +29,7 @@ export async function listCloudCircuitProjects(): Promise<CloudCircuitProject[]>
 
   if (error) throw error
   return (data as CloudCircuitRow[]).flatMap((row) => {
-    const project = toCloudProject(row)
+    const project = toCloudProject(row, options)
     return project ? [project] : []
   })
 }
@@ -38,10 +38,11 @@ export async function upsertCloudCircuitProject(
   name: string,
   document: CircuitDocument,
   id?: string,
+  options: CircuitContextOptions = {},
 ): Promise<CloudCircuitProject> {
   const client = requireSupabase()
   const user = await currentUser()
-  const context = buildCircuitContext(document)
+  const context = buildCircuitContext(document, undefined, options)
   const normalizedDocument = context.payload.document
   const row = {
     ...(id ? { id } : {}),
@@ -58,7 +59,7 @@ export async function upsertCloudCircuitProject(
     .single()
 
   if (error) throw error
-  const project = toCloudProject(data as CloudCircuitRow)
+  const project = toCloudProject(data as CloudCircuitRow, options)
   if (!project) throw new Error('O Supabase devolveu um circuito inválido.')
   return project
 }
@@ -82,8 +83,8 @@ async function currentUser() {
   return data.user
 }
 
-function toCloudProject(row: CloudCircuitRow): CloudCircuitProject | null {
-  if (!isCircuitDocument(row.document)) return null
+function toCloudProject(row: CloudCircuitRow, options: CircuitContextOptions = {}): CloudCircuitProject | null {
+  if (!isCircuitDocument(row.document, options)) return null
   return {
     id: row.id,
     name: row.name,
@@ -94,6 +95,6 @@ function toCloudProject(row: CloudCircuitRow): CloudCircuitProject | null {
   }
 }
 
-function isCircuitDocument(value: unknown): value is CircuitDocument {
-  return isCircuitDocumentShape(value) && validateCircuit(value, { allowBuses: true }).length === 0
+function isCircuitDocument(value: unknown, options: CircuitContextOptions = {}): value is CircuitDocument {
+  return isCircuitDocumentShape(value) && validateCircuit(value, { allowBuses: true, customChips: options.customChips }).length === 0
 }

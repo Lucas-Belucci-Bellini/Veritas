@@ -1,5 +1,5 @@
 import type { CircuitDocument } from '../circuit'
-import { buildCircuitContext, isCircuitDocumentShape, validateCircuit } from '../circuit'
+import { buildCircuitContext, isCircuitDocumentShape, validateCircuit, type CircuitContextOptions } from '../circuit'
 import { supabase } from '../lib/supabase'
 import { compareCircuitDocuments, type CircuitChangeSummary } from './circuitDiff'
 
@@ -49,7 +49,7 @@ type SyncRow = {
   updated_at: string
 }
 
-export async function listCloudCircuitVersions(projectId: string): Promise<CloudCircuitVersion[]> {
+export async function listCloudCircuitVersions(projectId: string, options: CircuitContextOptions = {}): Promise<CloudCircuitVersion[]> {
   const client = requireSupabase()
   const { data, error } = await client
     .from('veritas_circuit_versions')
@@ -59,7 +59,7 @@ export async function listCloudCircuitVersions(projectId: string): Promise<Cloud
 
   if (error) throw error
   return (data as VersionRow[]).flatMap((row) => {
-    const version = toCloudVersion(row)
+    const version = toCloudVersion(row, options)
     return version ? [version] : []
   })
 }
@@ -70,10 +70,11 @@ export async function syncCloudCircuitVersion(
   document: CircuitDocument,
   previousDocument: CircuitDocument | null,
   baseVersion = 0,
+  options: CircuitContextOptions = {},
 ): Promise<{ projectId: string; version: CloudCircuitVersion }> {
   const client = requireSupabase()
   await currentUser()
-  const context = buildCircuitContext(document)
+  const context = buildCircuitContext(document, undefined, options)
   const normalizedDocument = context.payload.document
   const diff = compareCircuitDocuments(previousDocument, normalizedDocument)
   const { data, error } = await client.rpc('veritas_sync_circuit_project', {
@@ -100,7 +101,7 @@ export async function syncCloudCircuitVersion(
     content_hash: row.content_hash,
     change_summary: diff,
     created_at: row.created_at,
-  })
+  }, options)
   if (!version) throw new Error('O Supabase devolveu uma versão inválida.')
   return { projectId: row.project_id, version }
 }
@@ -127,8 +128,8 @@ async function currentUser() {
   return data.user
 }
 
-function toCloudVersion(row: VersionRow): CloudCircuitVersion | null {
-  if (!isCircuitDocument(row.document)) return null
+function toCloudVersion(row: VersionRow, options: CircuitContextOptions = {}): CloudCircuitVersion | null {
+  if (!isCircuitDocument(row.document, options)) return null
   return {
     id: row.id,
     projectId: row.project_id,
@@ -174,8 +175,8 @@ function isChangeSummary(value: unknown): value is CircuitChangeSummary {
   ].every((key) => typeof value[key] === (key === 'nameChanged' ? 'boolean' : 'number'))
 }
 
-function isCircuitDocument(value: unknown): value is CircuitDocument {
-  return isCircuitDocumentShape(value) && validateCircuit(value, { allowBuses: true }).length === 0
+function isCircuitDocument(value: unknown, options: CircuitContextOptions = {}): value is CircuitDocument {
+  return isCircuitDocumentShape(value) && validateCircuit(value, { allowBuses: true, customChips: options.customChips }).length === 0
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -18,15 +18,15 @@ O `AuthProvider` restaura a sessão persistida, acompanha `onAuthStateChange`, p
 
 O IndexedDB continua sendo a fonte local-first. Usuários autenticados podem usar **Sincronizar nuvem** no editor. O cliente envia somente o documento versionado `veritas-circuit`, seu nome e o hash determinístico do contexto. A tabela `public.veritas_circuit_projects` aceita somente registros do próprio `auth.uid()`, revoga acesso anônimo e possui índice único por usuário e hash.
 
-A sincronização é um upsert idempotente: circuitos com o mesmo conteúdo não são duplicados para o mesmo usuário. A abertura e exclusão dos projetos remotos ocorrem no próprio editor. Não existe upload automático de circuitos locais sem uma ação explícita do usuário.
+A sincronização é um upsert idempotente: circuitos com o mesmo conteúdo não são duplicados para o mesmo usuário. A biblioteca local é usada apenas para validar e interpretar as referências `customChipId`; o documento hierárquico salvo, o diff e o hash continuam sendo preservados sem achatamento. A abertura e exclusão dos projetos remotos ocorrem no próprio editor. Não existe upload automático de circuitos locais sem uma ação explícita do usuário.
 
 ## Análise e otimização por IA
 
-O editor envia `buildCircuitContext(document)` para a Edge Function autenticada `veritas-circuit-ai`. O JWT é obrigatório (`verify_jwt: true`). A função valida o contexto e limita o tamanho do payload antes de processar.
+O editor envia `buildCircuitContext(document, undefined, { customChips })` para a Edge Function autenticada `veritas-circuit-ai`. O JWT é obrigatório (`verify_jwt: true`). Para instâncias de chips customizados, o payload conserva `payload.document` hierárquico e acrescenta `payload.elaboratedDocument`, usado para análise, além de metadados mínimos de nomes e portas. A função valida os dois documentos e limita o tamanho do payload antes de processar.
 
 Quando `AI_PROVIDER_URL`, `AI_PROVIDER_KEY` e opcionalmente `AI_MODEL` estão configurados como secrets da Edge Function, ela chama o provedor LLM com saída JSON estruturada. O contexto não é enviado diretamente do navegador para uma API de modelo. Quando o provedor não está configurado ou falha, a função usa uma heurística conservadora que remove apenas componentes inalcançáveis a partir das saídas.
 
-A aplicação nunca aplica uma otimização automaticamente. O resultado aparece com resumo, sugestões, provedor e confiança; o usuário precisa clicar em **Aplicar otimização**. Depois disso, o resultado é local e deve ser sincronizado novamente de forma explícita.
+A aplicação nunca aplica uma otimização automaticamente. O resultado aparece com resumo, sugestões, provedor e confiança; o usuário precisa clicar em **Aplicar otimização**. A validação do cliente usa a biblioteca local quando a resposta ainda contém `custom-chip`. Depois disso, o resultado é local e deve ser sincronizado novamente de forma explícita.
 
 ## Migrações e deploy
 

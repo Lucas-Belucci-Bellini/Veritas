@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createCircuitDocument, type CircuitDocument } from '../circuit'
+import { buildCustomChipDefinition, createCircuitDocument, type CircuitDocument } from '../circuit'
 
 const fakeSupabase = vi.hoisted(() => ({
   auth: { getUser: vi.fn() },
@@ -19,6 +19,32 @@ const document: CircuitDocument = {
   ],
   connections: [{ source: { node: 'a' }, target: { node: 'out', port: 0 } }],
 }
+
+const customDefinitionDocument: CircuitDocument = {
+  ...createCircuitDocument('NOT local'),
+  nodes: [
+    { id: 'input', type: 'input', position: { x: 0, y: 0 }, label: 'Entrada' },
+    { id: 'not', type: 'not', position: { x: 160, y: 0 }, label: 'NOT' },
+    { id: 'output', type: 'output', position: { x: 320, y: 0 }, label: 'Saída' },
+  ],
+  connections: [
+    { source: { node: 'input' }, target: { node: 'not', port: 0 } },
+    { source: { node: 'not' }, target: { node: 'output', port: 0 } },
+  ],
+}
+const customDocument: CircuitDocument = {
+  ...createCircuitDocument('Circuito custom cloud'),
+  nodes: [
+    { id: 'source', type: 'input', position: { x: 0, y: 0 }, label: 'Sinal' },
+    { id: 'chip', type: 'custom-chip', position: { x: 180, y: 0 }, label: 'NOT', options: { customChipId: 7 } },
+    { id: 'result', type: 'output', position: { x: 360, y: 0 }, label: 'Resultado' },
+  ],
+  connections: [
+    { source: { node: 'source' }, target: { node: 'chip', port: 0 } },
+    { source: { node: 'chip' }, target: { node: 'result', port: 0 } },
+  ],
+}
+const customChips = [{ id: 7, definition: buildCustomChipDefinition(customDefinitionDocument, 'NOT local') }]
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -97,6 +123,28 @@ describe('syncCloudCircuitVersion', () => {
     expect(call[1].p_change_summary).toMatchObject({ nodesAdded: 2, connectionsAdded: 1 })
     expect(call[1].p_base_version).toBe(0)
     expect(result).toMatchObject({ projectId: 'project-1', version: { id: 'version-1', versionNumber: 1 } })
+  })
+
+  it('sincroniza documento hierárquico usando as definições locais', async () => {
+    fakeSupabase.rpc.mockResolvedValue({
+      data: [{
+        project_id: 'project-1',
+        version_id: 'version-custom',
+        version_number: 1,
+        name: 'Custom',
+        document: customDocument,
+        content_hash: 'fnv1a-custom',
+        created_at: '2026-08-14T19:00:00.000Z',
+        updated_at: '2026-08-14T19:00:00.000Z',
+      }],
+      error: null,
+    })
+
+    const result = await syncCloudCircuitVersion(null, 'Custom', customDocument, null, 0, { customChips })
+    const call = fakeSupabase.rpc.mock.calls[0]
+
+    expect(call[1].p_document).toEqual(customDocument)
+    expect(result.version.document.nodes.find((node) => node.type === 'custom-chip')?.options?.customChipId).toBe(7)
   })
 
   it('envia a versão-base e rejeita conflito otimista sem aplicar o salvamento', async () => {

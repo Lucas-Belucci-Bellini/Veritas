@@ -70,12 +70,22 @@ O contexto tem este formato resumido:
       "rows": [[false, false, false], [true, true, true]],
       "totalRows": 4,
       "truncated": false
-    }
+    },
+    "elaboratedDocument": {
+      "format": "veritas-circuit",
+      "version": 1,
+      "name": "Circuito AND",
+      "nodes": [],
+      "connections": []
+    },
+    "customChips": [
+      { "id": 7, "name": "Meu AND", "inputs": ["A", "B"], "outputs": ["Y"] }
+    ]
   }
 }
 ```
 
-O campo `payload.document` é a fonte estrutural que a função aceita. O hash e a tabela verdade fornecem rastreabilidade e contexto compacto, mas não autorizam o modelo a inventar componentes, IDs ou conexões.
+O campo `payload.document` é a fonte estrutural hierárquica que a função aceita e que deve ser preservada ao devolver uma otimização. Quando há instâncias `custom-chip`, o cliente também envia `payload.elaboratedDocument`, uma representação achatada e validada para análise, além de `payload.customChips` com apenas IDs, nomes e nomes de portas. A Edge Function usa a representação elaborada no fallback heurístico, mas nunca trata portas internas marcadas como fronteira como saídas externas. O hash e a tabela verdade fornecem rastreabilidade e contexto compacto, mas não autorizam o modelo a inventar componentes, IDs ou conexões.
 
 ## Resposta de sucesso
 
@@ -104,7 +114,7 @@ A resposta possui a mesma forma para as duas ações:
 | `optimizedDocument` | `CircuitDocument \| null` | Documento candidato validado; pode ser nulo quando não há transformação segura |
 | `confidence` | number | Confiança normalizada entre `0` e `1`; não substitui revisão humana |
 
-A ação `analyze` normalmente retorna `optimizedDocument: null`. A ação `optimize` pode retornar um documento candidato, mas o frontend não o aplica automaticamente. O usuário deve revisar a sugestão e clicar em **Aplicar otimização**.
+A ação `analyze` normalmente retorna `optimizedDocument: null`. A ação `optimize` pode retornar um documento candidato, mas o frontend não o aplica automaticamente. Para circuitos com chips customizados, o cliente valida novamente o documento usando a biblioteca local disponível antes de exibir o botão de aplicação. O usuário deve revisar a sugestão e clicar em **Aplicar otimização**.
 
 ## Erros HTTP
 

@@ -143,7 +143,7 @@ export function CircuitEditor() {
     [customChips.chips],
   )
   const { user } = useAuth()
-  const cloud = useCloudCircuitProjects()
+  const cloud = useCloudCircuitProjects({ customChips: customChipEntries })
   const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
   const [lastAppliedRemoteVersion, setLastAppliedRemoteVersion] = useState<number | null>(null)
   const [pendingRemoteSnapshot, setPendingRemoteSnapshot] = useState<CircuitBroadcast | null>(null)
@@ -712,10 +712,6 @@ export function CircuitEditor() {
   }
 
   const runAi = async (action: 'analyze' | 'optimize') => {
-    if (hasCustomChipInstances) {
-      setNotice('A análise de IA de instâncias customizadas será habilitada em uma próxima fatia.')
-      return
-    }
     if (hasSequential) {
       setNotice('A análise de IA do editor ainda está disponível somente para circuitos combinacionais.')
       return
@@ -731,7 +727,7 @@ export function CircuitEditor() {
     setAiLoading(true)
     setAiResult(null)
     try {
-      setAiResult(await requestCircuitAi(document, action))
+      setAiResult(await requestCircuitAi(document, action, undefined, { customChips: customChipEntries }))
       setNotice(action === 'analyze' ? 'Análise de IA concluída.' : 'Otimização de IA concluída; revise antes de aplicar.')
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Não foi possível concluir a análise de IA.')
@@ -1265,8 +1261,8 @@ export function CircuitEditor() {
               <p className="mt-1 text-xs text-violet-800/80 dark:text-violet-200/80">Analisa o contexto do circuito e propõe uma limpeza conservadora das portas.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses || hasCustomChipInstances} onClick={() => void runAi('analyze')} title={hasCustomChipInstances ? 'A análise de IA de chips instanciados será habilitada em uma próxima fatia.' : hasBuses ? 'A análise vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Analisando…' : 'Analisar com IA'}</button>
-              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses || hasCustomChipInstances} onClick={() => void runAi('optimize')} title={hasCustomChipInstances ? 'A otimização de IA de chips instanciados será habilitada em uma próxima fatia.' : hasBuses ? 'A otimização vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Otimizando…' : 'Otimizar portas'}</button>
+              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses} onClick={() => void runAi('analyze')} title={hasBuses ? 'A análise vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Analisando…' : 'Analisar com IA'}</button>
+              <button type="button" className="key text-xs" disabled={aiLoading || hasBuses} onClick={() => void runAi('optimize')} title={hasBuses ? 'A otimização vetorial de IA será habilitada em uma próxima fatia.' : undefined}>{aiLoading ? 'Otimizando…' : 'Otimizar portas'}</button>
             </div>
           </div>
           {aiResult && (

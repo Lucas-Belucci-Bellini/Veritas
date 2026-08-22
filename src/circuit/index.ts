@@ -24,7 +24,7 @@ export type { CircuitEvaluation, CircuitEvaluationOptions, CircuitVectorEvaluati
 export { buildCircuitTruthTable, buildCircuitVectorTruthTable } from './truthTable'
 export type { CircuitTruthTableOptions, CircuitVectorTruthTable, CircuitVectorTruthTableColumn, CircuitVectorTruthTableOptions } from './truthTable'
 export { buildCircuitContext } from './context'
-export type { CircuitContextRecord } from './context'
+export type { CircuitContextOptions, CircuitContextRecord } from './context'
 export { exportCircuit, exportVerilog, exportVhdl } from './export'
 export type { CircuitExportFormat, CircuitExportOptions } from './export'
 export { elaborateCustomChipDocument, MAX_CUSTOM_CHIP_ELABORATION_DEPTH } from './customChipElaboration'
