@@ -9,6 +9,7 @@ import {
   karnaugh,
   listChips,
   circuitTruthTable,
+  exportCircuitTool,
   MAX_SIMULATION_TICKS,
   normalForms,
   simplifyExpression,
@@ -213,6 +214,27 @@ describe('circuit_truth_table', () => {
 
   it('recusa tabela de instância sem definição portátil', () => {
     const result = circuitTruthTable({ document: customChipCircuit })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('definição local')
+  })
+})
+
+describe('export_circuit_hdl', () => {
+  it('exporta Verilog e VHDL de um circuito com custom-chip', () => {
+    const verilog = exportCircuitTool({ document: customChipCircuit, format: 'verilog', customChips })
+    const vhdl = exportCircuitTool({ document: customChipCircuit, format: 'vhdl', customChips })
+
+    expect(verilog.isError).not.toBe(true)
+    expect(verilog.text).toContain('module Circuito_NOT_MCP (')
+    expect(verilog.text).toContain('output Resultado')
+    expect(vhdl.isError).not.toBe(true)
+    expect(vhdl.text).toContain('entity Circuito_NOT_MCP is')
+    expect(vhdl.text).toContain('Resultado : out std_logic')
+  })
+
+  it('recusa exportar custom-chip sem definição correspondente', () => {
+    const result = exportCircuitTool({ document: customChipCircuit, format: 'verilog' })
 
     expect(result.isError).toBe(true)
     expect(result.text).toContain('definição local')

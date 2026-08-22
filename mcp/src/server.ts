@@ -5,6 +5,7 @@ import { z } from 'zod'
 import {
   circuitTruthTable,
   debugAlgorithm,
+  exportCircuitTool,
   evaluateExpression,
   evaluateLogicCase,
   fullPropositionalTable,
@@ -180,6 +181,27 @@ server.registerTool(
 )
 
 const RUNTIME_VALUE = z.union([z.boolean(), z.number(), z.string(), z.null()])
+
+server.registerTool(
+  'export_circuit_hdl',
+  {
+    title: 'Exportar circuito HDL',
+    description:
+      'Exporta um CircuitDocument validado para Verilog ou VHDL. Instâncias custom-chip ' +
+      'exigem suas definições veritas-custom-chip em custom_chips.',
+    inputSchema: {
+      document: z.unknown().describe('CircuitDocument serializável do formato veritas-circuit'),
+      format: z.enum(['verilog', 'vhdl']).describe('Formato industrial de saída'),
+      custom_chips: z
+        .array(z.object({ id: z.number().int().min(1), definition: z.unknown() }))
+        .max(128)
+        .default([])
+        .describe('Definições veritas-custom-chip usadas pelas instâncias custom-chip'),
+    },
+  },
+  async ({ document, format, custom_chips }) =>
+    guard(() => exportCircuitTool({ document, format, customChips: custom_chips })),
+)
 
 server.registerTool(
   'circuit_truth_table',

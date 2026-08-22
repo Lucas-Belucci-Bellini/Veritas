@@ -1,4 +1,4 @@
-export const MCP_ACCEPTANCE_IDS = ['MCP-001', 'MCP-002', 'MCP-003', 'MCP-004', 'MCP-005', 'MCP-006', 'MCP-007', 'MCP-008']
+export const MCP_ACCEPTANCE_IDS = ['MCP-001', 'MCP-002', 'MCP-003', 'MCP-004', 'MCP-005', 'MCP-006', 'MCP-007', 'MCP-008', 'MCP-009']
 
 export function sanitizeMcpMessage(value) {
   return String(value ?? '')

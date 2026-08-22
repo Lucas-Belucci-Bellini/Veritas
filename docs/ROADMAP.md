@@ -564,3 +564,10 @@ O servidor MCP agora expõe `circuit_truth_table`, uma ferramenta portátil que 
 A ferramenta reaproveita `buildCircuitTruthTable` e o avaliador hierárquico do domínio. Definições locais são reconstruídas e validadas antes da enumeração; referências ausentes, chips inválidos e circuitos sequenciais ou vetoriais incompatíveis retornam erro controlado. A aceitação MCP foi ampliada para MCP-008, com golden de um NOT customizado e verificação de doze ferramentas no `tools/list`.
 
 Critérios de aceite: chamadas anteriores permanecem compatíveis; documento nativo e documento com custom-chip geram tabela correta; `output_id`, limite de linhas e erros são determinísticos; o vetor stdio mantém somente JSON-RPC no stdout; clientes interoperáveis recebem o mesmo conteúdo sem credenciais ou acesso a dados privados. A ferramenta é escalar por desenho: tabelas vetoriais e circuitos sequenciais continuam fora deste contrato.
+
+## Implementação MCP-009 — exportação HDL pelo MCP — 2026-08-22
+O servidor MCP agora expõe `export_circuit_hdl`, recebendo um `CircuitDocument`, o formato `verilog` ou `vhdl` e, opcionalmente, o array explícito `custom_chips`. A ferramenta reaproveita os exportadores centrais, a elaboração hierárquica CHIP-003 e os mesmos contratos de validação utilizados pelo editor.
+
+Circuitos com `custom-chip` são elaborados antes da emissão, preservando somente a interface externa e convertendo portas internas em sinais namespaced. Definições ausentes, documentos inválidos, recursão, larguras incompatíveis e outros erros de HDL são devolvidos como respostas MCP controladas, sem produzir artefato enganoso. Chamadas anteriores continuam compatíveis e não exigem credenciais ou acesso ao navegador.
+
+O gate stdio foi ampliado para MCP-009, com golden de Verilog contendo instância NOT, verificação da interface externa e erro para definição ausente. A ferramenta é local por desenho; transporte remoto, autenticação HTTP e testes específicos de cada host continuam fora desta etapa.

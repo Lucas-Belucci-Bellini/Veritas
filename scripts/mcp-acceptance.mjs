@@ -110,6 +110,11 @@ function main() {
       max_rows: 4,
       custom_chips: [{ id: 7, definition: CUSTOM_CHIP_DEFINITION }],
     } }),
+    request(9, 'tools/call', { name: 'export_circuit_hdl', arguments: {
+      document: CUSTOM_CHIP_CIRCUIT,
+      format: 'verilog',
+      custom_chips: [{ id: 7, definition: CUSTOM_CHIP_DEFINITION }],
+    } }),
   ])
   const initialize = responseFor(session.responses, 1)
   const listed = responseFor(session.responses, 2)
@@ -119,8 +124,9 @@ function main() {
   const invalid = responseFor(session.responses, 6)
   const customSimulation = responseFor(session.responses, 7)
   const customTruthTable = responseFor(session.responses, 8)
+  const customHdl = responseFor(session.responses, 9)
   const toolNames = listed.result?.tools?.map((tool) => tool.name) ?? []
-  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit', 'circuit_truth_table']
+  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit', 'circuit_truth_table', 'export_circuit_hdl']
   const missingTools = expectedTools.filter((name) => !toolNames.includes(name))
   const initializeOk = initialize.result?.serverInfo?.name === 'veritas' && initialize.result?.protocolVersion
   const truthText = textOf(truth)
@@ -129,6 +135,7 @@ function main() {
   const invalidText = textOf(invalid)
   const customSimulationText = textOf(customSimulation)
   const customTruthTableText = textOf(customTruthTable)
+  const customHdlText = textOf(customHdl)
   const results = [
     result('MCP-001', initializeOk ? 'PASS' : 'FAIL', 'initialize JSON-RPC', initializeOk ? `servidor ${initialize.result.serverInfo.name} negociou ${initialize.result.protocolVersion}` : JSON.stringify(initialize)),
     result('MCP-002', missingTools.length === 0 ? 'PASS' : 'FAIL', 'tools/list schema', missingTools.length === 0 ? `${toolNames.length} ferramentas listadas com nomes estáveis` : `ferramentas ausentes: ${missingTools.join(', ')}`),
@@ -138,6 +145,7 @@ function main() {
     result('MCP-006', session.responses.every((item) => item.jsonrpc === '2.0') ? 'PASS' : 'FAIL', 'transporte stdio JSON-RPC', `${session.responses.length} respostas JSON-RPC válidas sem saída não protocolar`),
     result('MCP-007', customSimulation.result?.isError !== true && customSimulationText.includes('| 3 | 1 | 1 | 1 |') ? 'PASS' : 'FAIL', 'simulate_circuit custom-chip golden', customSimulationText || JSON.stringify(customSimulation)),
     result('MCP-008', customTruthTable.result?.isError !== true && customTruthTableText.includes('| Entrada | Resultado |') && customTruthTableText.includes('| 0 | 1 |') ? 'PASS' : 'FAIL', 'circuit_truth_table custom-chip golden', customTruthTableText || JSON.stringify(customTruthTable)),
+    result('MCP-009', customHdl.result?.isError !== true && customHdlText.includes('module Circuito_NOT_MCP') && customHdlText.includes('output Resultado') ? 'PASS' : 'FAIL', 'export_circuit_hdl custom-chip golden', customHdlText || JSON.stringify(customHdl)),
   ]
   if (results.some((item) => !MCP_ACCEPTANCE_IDS.includes(item.id))) throw new Error('IDs MCP fora do contrato')
   mkdirSync(dirname(REPORT_PATH), { recursive: true })

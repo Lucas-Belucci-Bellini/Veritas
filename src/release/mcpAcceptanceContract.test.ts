@@ -6,8 +6,8 @@ import {
 } from '../../scripts/mcpAcceptanceContract.mjs'
 
 describe('contrato de aceitação MCP', () => {
-  it('mantém os oito cenários MCP em ordem estável', () => {
-    expect(MCP_ACCEPTANCE_IDS).toEqual(['MCP-001', 'MCP-002', 'MCP-003', 'MCP-004', 'MCP-005', 'MCP-006', 'MCP-007', 'MCP-008'])
+  it('mantém os nove cenários MCP em ordem estável', () => {
+    expect(MCP_ACCEPTANCE_IDS).toEqual(['MCP-001', 'MCP-002', 'MCP-003', 'MCP-004', 'MCP-005', 'MCP-006', 'MCP-007', 'MCP-008', 'MCP-009'])
   })
 
   it('sanitiza credenciais sem alterar o protocolo do resultado', () => {
@@ -27,9 +27,10 @@ describe('contrato de aceitação MCP', () => {
       { id: 'MCP-006', status: 'SKIP', operation: 'transport', message: 'ensaio remoto' },
       { id: 'MCP-007', status: 'PASS', operation: 'custom-chip', message: 'ok' },
       { id: 'MCP-008', status: 'PASS', operation: 'circuit-truth-table', message: 'ok' },
+      { id: 'MCP-009', status: 'PASS', operation: 'export-hdl', message: 'ok' },
     ], '2026-08-21T00:00:00.000Z')
     expect(report).toContain('# MCP acceptance 2026-08-21T00:00:00.000Z')
-    expect(report).toContain('Resumo: 7 PASS, 0 FAIL, 1 SKIP.')
+    expect(report).toContain('Resumo: 8 PASS, 0 FAIL, 1 SKIP.')
     expect(report).toContain('sem sessão de IA')
   })
 })

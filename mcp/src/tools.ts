@@ -22,6 +22,7 @@ import {
   buildCircuitTruthTable,
   buildCustomChipDefinition,
   elaborateCustomChipDocument,
+  exportCircuit,
   isCircuitDocumentShape,
   type CircuitDocument,
   type CustomChipLibraryEntry,
@@ -434,6 +435,22 @@ export function normalForms(expression: string, notation: Notation = 'math'): To
       '',
       cheaper,
     ].join('\n'),
+  }
+}
+
+export interface ExportCircuitToolQuery {
+  document: unknown
+  format: 'verilog' | 'vhdl'
+  customChips?: readonly CustomChipToolDefinition[]
+}
+
+export function exportCircuitTool(query: ExportCircuitToolQuery): ToolResult {
+  try {
+    if (!isCircuitDocumentShape(query.document)) return { isError: true, text: 'O documento não possui o formato veritas-circuit esperado.' }
+    const customChips = normalizeCustomChipLibrary(query.customChips)
+    return { text: exportCircuit(query.document, query.format, { customChips }) }
+  } catch (error) {
+    return { isError: true, text: error instanceof Error ? error.message : 'Falha ao exportar o circuito.' }
   }
 }
 

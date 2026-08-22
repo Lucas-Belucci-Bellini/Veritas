@@ -5,7 +5,7 @@
 **Transporte validado:** MCP por stdio local  
 **Objetivo:** comprovar que clientes MCP locais conseguem negociar o servidor, descobrir ferramentas, chamar vetores golden e receber erros controlados sem depender de uma sessão específica de IA.
 
-A superfície atual contém doze ferramentas; esta etapa adiciona `circuit_truth_table` sem alterar os nomes ou argumentos obrigatórios das ferramentas existentes.
+A superfície atual contém treze ferramentas; esta etapa adiciona `export_circuit_hdl` sem alterar os nomes ou argumentos obrigatórios das ferramentas existentes.
 
 ## 1. Matriz golden
 
@@ -14,13 +14,14 @@ O comando `npm run beta:mcp` inicia `mcp/dist/server.js` como subprocesso Node e
 | ID | Cenário | Critério |
 |---|---|---|
 | MCP-001 | `initialize` | O servidor negocia protocolo `2025-03-26` e informa `name=veritas`. |
-| MCP-002 | `tools/list` | Ferramentas esperadas, incluindo `truth_table`, `logic_case`, `propositional_truth_table`, `debug_algorithm`, `simulate_circuit` e `circuit_truth_table`, aparecem com schemas. |
+| MCP-002 | `tools/list` | Ferramentas esperadas, incluindo `truth_table`, `logic_case`, `propositional_truth_table`, `debug_algorithm`, `simulate_circuit`, `circuit_truth_table` e `export_circuit_hdl`, aparecem com schemas. |
 | MCP-003 | `truth_table` | O vetor `A XOR B` preserva cabeçalho, linhas e classificação golden. |
 | MCP-004 | `logic_case` e `propositional_truth_table` | Caso didático e tabela proposicional devolvem o formato textual esperado. |
 | MCP-005 | Erro de ferramenta | Expressão inválida retorna `isError=true` e mensagem em português; o processo continua protocolar. |
 | MCP-006 | Transporte | Todas as respostas observadas são JSON-RPC `2.0`, sem saída não protocolar em stdout. |
 | MCP-007 | `simulate_circuit` com `custom-chip` | Instância com `options.customChipId` e definição correspondente em `custom_chips` propaga a saída no vetor golden; definição ausente retorna erro controlado. |
 | MCP-008 | `circuit_truth_table` com `custom-chip` | CircuitDocument com uma instância NOT devolve as duas linhas esperadas; definição ausente retorna erro controlado. |
+| MCP-009 | `export_circuit_hdl` com `custom-chip` | CircuitDocument com uma instância NOT devolve módulo Verilog com interface externa válida; definição ausente retorna erro controlado. |
 
 ## 2. Execução
 
@@ -40,7 +41,7 @@ BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
 npm run beta:evidence
 ```
 
-O gate `mcp` só fica `PASS` quando MCP-001 a MCP-008 possuem `PASS` explícito e o relatório está anexado. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
+O gate `mcp` só fica `PASS` quando MCP-001 a MCP-009 possuem `PASS` explícito e o relatório está anexado. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
 
 ## 3. Compatibilidade com clientes
 
@@ -63,7 +64,7 @@ O caminho real deve ser absoluto no ambiente do cliente. Nenhuma API key é nece
 
 ## 4. Limites
 
-Esta aceitação cobre interoperabilidade local de protocolo e conteúdo, não prova integração visual de cada host, suporte a configuração específica de cada produto, transporte remoto Streamable HTTP, autenticação remota ou performance sob carga. Cada cliente deve repetir MCP-001 a MCP-008 no seu próprio ambiente antes de publicar uma integração.
+Esta aceitação cobre interoperabilidade local de protocolo e conteúdo, não prova integração visual de cada host, suporte a configuração específica de cada produto, transporte remoto Streamable HTTP, autenticação remota ou performance sob carga. Cada cliente deve repetir MCP-001 a MCP-009 no seu próprio ambiente antes de publicar uma integração.
 
 Uma falha deve ser classificada por camada: domínio se o resultado lógico estiver errado; schema se `tools/list` mudar sem contrato; protocolo se JSON-RPC ou stdout falhar; transporte se o processo não iniciar; ou cliente se a configuração do host estiver incorreta. Não corrija uma falha de cliente alterando o domínio sem evidência.
 

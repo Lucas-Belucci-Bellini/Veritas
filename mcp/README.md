@@ -22,6 +22,7 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `normal_forms` | SOP e POS, canônicas e mínimas, e a classificação da expressão dada |
 | `simulate_circuit` | Roda um circuito com clock, flip-flops, atrasos, canais wireless e instâncias `custom-chip`; devolve o diagrama de tempo |
 | `circuit_truth_table` | Gera a tabela verdade de um `CircuitDocument`, incluindo instâncias `custom-chip` com definições explícitas |
+| `export_circuit_hdl` | Exporta um `CircuitDocument` validado para Verilog ou VHDL, incluindo chips customizados elaborados |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
 
@@ -109,7 +110,7 @@ A instalação stdio atende clientes que iniciam processos locais. Para Claude A
 
 A simulação wireless usa `transmitter` com `options.channel` como origem e `receiver` com o mesmo canal como destino virtual. Cada canal aceita um transmissor e vários receptores; canal ausente, transmissor duplicado ou receptor órfão devem ser corrigidos antes da simulação.
 
-As definições de `custom_chips` são validadas e reconstruídas pelo contrato CHIP-001 antes da expansão. O MCP rejeita IDs duplicados, documentos inválidos, chips aninhados e referências sem definição correspondente. A expansão é combinacional e respeita o limite seguro de oito níveis; componentes que não pertencem ao documento canônico são rejeitados com erro controlado quando aparecem junto de um `custom-chip`.
+As definições de `custom_chips` são validadas e reconstruídas pelo contrato CHIP-001 antes da expansão. O MCP rejeita IDs duplicados, documentos inválidos, chips aninhados e referências sem definição correspondente. A expansão é combinacional e respeita o limite seguro de oito níveis; componentes que não pertencem ao documento canônico são rejeitados com erro controlado quando aparecem junto de um `custom-chip`. A exportação HDL usa o mesmo payload e não expõe portas internas como portas externas; circuitos inválidos falham antes de produzir código.
 
 Erro de sintaxe não derruba o servidor: volta como resposta de erro da
 ferramenta, com o dedo no lugar exato do problema.
