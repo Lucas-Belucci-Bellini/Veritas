@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.12] — 2026-08-22
+
+### Adicionado
+
+- Contrato experimental VNET/VRES versionado para um subconjunto de netlists combinacionais uniformes de 1 a 64 bits, com payload little-endian, limites explícitos e códigos de erro estáveis.
+- Adaptador TypeScript fail-closed e decoder Rust/WASM-002 com buffer linear opt-in; componentes sequenciais, `custom-chip`, wireless, múltiplas larguras e `CircuitDocument` permanecem fora da ponte.
+- Gate `npm run beta:wasm:parity` integrado aos workflows Quality e Release, comparando bytes, valores e ordem topológica contra fixture golden independente.
+
+### Validação e limites
+
+- WASM-002 passou localmente e no Quality do GitHub com zero imports, capabilities `3`, payload VNET de 104 bytes, resultado VRES de 60 bytes e paridade confirmada; os números de build são observações da execução, não promessa de desempenho.
+- A feature `wasm-netlist-abi` é opt-in e não entra no build produtivo, no navegador, no MCP ou no plugin. O TypeScript continua como runtime produtivo e fallback local-first.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.11] — 2026-08-22
 
 ### Adicionado
