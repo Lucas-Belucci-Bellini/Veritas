@@ -104,7 +104,7 @@ export function evaluateNetlist(
   return { values, outputs, order }
 }
 
-function evaluateVectorNetlist(
+export function evaluateVectorNetlist(
   netlist: Netlist,
   inputs: Record<string, VectorInput>,
   options: CircuitVectorEvaluationOptions,

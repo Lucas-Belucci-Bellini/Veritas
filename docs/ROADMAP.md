@@ -651,3 +651,11 @@ O núcleo Rust não substitui o avaliador TypeScript, não é carregado pelo nav
 O acceptance `npm run beta:rust` executa `cargo fmt --check` e `cargo test --offline`; a primeira execução produziu RUST-001 e RUST-002 em PASS. Os testes Rust nativos e o teste Vitest de paridade também passaram. Isso comprova o contrato coberto, mas ainda não comprova superioridade de desempenho nem autoriza trocar o runtime: o próximo critério é benchmark controlado e decisão explícita sobre WASM.
 
 A análise do Digital Logic Sim foi somente leitura. O projeto de referência é uma aplicação Unity publicada sob MIT, com módulos separados de simulação, gráficos e persistência; nenhuma implementação, asset ou binário foi copiado. O Veritas preserva seu núcleo TypeScript e o modo local-first enquanto a hipótese Rust é medida de forma independente.
+
+## Implementação RUST-002 — benchmark comparativo controlado TypeScript/Rust — 2026-08-22
+
+A próxima fatia mede o mesmo netlist combinacional pelos dois runtimes, com cenários fixos de 1, 8, 32 e 64 bits, entradas determinísticas, aquecimento separado, número de iterações declarado, checksum de saída e tempo de execução medido somente na avaliação. O harness TypeScript deve atravessar `evaluateCircuitVectors()` e o harness Rust deve usar `evaluate()` com a mesma topologia e os mesmos valores; compilação, parsing, build e inicialização ficam fora da janela de medição.
+
+O resultado é evidência de comparabilidade do cenário, não uma promessa de que Rust é mais rápido. O relatório deve registrar runtime, modo de compilação, versão das ferramentas, sistema, iterações, checksum e duração por cenário; execuções em máquinas diferentes não devem ser comparadas como série científica. Nenhuma integração WASM, troca do runtime produtivo ou remoção do fallback TypeScript faz parte desta etapa.
+
+Critérios de aceite: os dois runtimes produzem os mesmos checksums em todos os cenários; entradas e topologia são carregadas de fixture compartilhado; resultados de tempo são reproduzíveis no formato, mas não precisam ser numericamente idênticos; falhas ou divergências encerram o gate; artefatos locais ficam fora do Git; e a decisão sobre WASM permanece bloqueada até uma etapa posterior que também meça tamanho, cold start, memória, repetição e comportamento offline.

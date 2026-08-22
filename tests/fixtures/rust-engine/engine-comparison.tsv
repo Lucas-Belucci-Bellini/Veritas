@@ -1,0 +1,5 @@
+# scenario width iterations input_a input_b expected_output
+chain-1 1 10001 0x0 0x0 0x1
+chain-8 8 10001 0x3c 0xa5 0x42
+chain-32 32 10001 0x0f0f0f0f 0x00000000 0xf0f0f0f0
+chain-64 64 10001 0x0123456789abcdef 0x0000000000000000 0xfedcba9876543210

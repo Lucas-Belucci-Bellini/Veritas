@@ -47,6 +47,9 @@ jobs:
       - name: Rust engine acceptance
         run: npm run beta:rust
 
+      - name: TypeScript/Rust controlled benchmark
+        run: npm run bench:compare
+
       - name: Typecheck frontend and MCP
         run: npm run typecheck
 

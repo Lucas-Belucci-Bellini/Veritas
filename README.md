@@ -287,6 +287,7 @@ plugins/veritas-logic/
   server.mjs             servidor empacotado (gerado, versionado)
 scripts/
   import-dls-chips.mjs   importador da biblioteca de chips
+  engine-comparison-benchmark.mjs  comparador TypeScript/Rust
 engine-rs/
   src/lib.rs             núcleo Rust combinacional experimental
   tests/golden.rs        contrato golden compartilhado
@@ -298,6 +299,8 @@ nenhuma cópia paralela. O `engine-rs/` é uma trilha experimental separada: ele
 não substitui o avaliador TypeScript e não é carregado pelo navegador. O contrato,
 a estratégia de fallback e os critérios para uma futura integração WASM estão em
 [`docs/RUST-ENGINE.md`](./docs/RUST-ENGINE.md).
+
+O benchmark controlado é executado sob demanda com `npm run bench:compare`. Ele usa um fixture compartilhado, compara saída e checksum nos runtimes TypeScript e Rust e grava um relatório local em `artifacts/`. Os tempos são observações da máquina da execução; não são uma promessa de que Rust é superior, nem habilitam WASM ou substituem o fallback TypeScript.
 
 ## Stack
 

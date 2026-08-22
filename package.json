@@ -20,6 +20,7 @@
     "beta:mcp:http": "node scripts/mcp-http-acceptance.mjs",
     "test:rust": "cargo test --manifest-path engine-rs/Cargo.toml --offline",
     "bench:rust": "cargo bench --manifest-path engine-rs/Cargo.toml --offline --bench throughput",
+    "bench:compare": "node scripts/engine-comparison-benchmark.mjs",
     "beta:rust": "node scripts/rust-engine-acceptance.mjs",
     "build:plugin": "vite build --config vite.plugin.config.ts",
     "smoke:release": "node scripts/smoke-release.mjs",

@@ -43,6 +43,14 @@ O acceptance runner `npm run beta:rust` executa `cargo fmt --check` e `cargo tes
 
 Esses resultados provam compilação, determinismo local e concordância das operações bitwise cobertas. O primeiro benchmark local terminou com `iterations=100000`, checksum determinístico `0` e duração dependente da máquina; esse número não é uma promessa de latência. Os resultados ainda não provam que Rust é mais rápido ou menor que TypeScript, nem autorizam substituir o motor em produção. O próximo critério é um benchmark controlado com cenários equivalentes, incluindo circuitos pequenos, netlists largos, 64 bits, ciclos rejeitados e repetição de avaliações.
 
+## RUST-002 — benchmark comparativo controlado
+
+O comando `npm run bench:compare` executa o avaliador vetorial TypeScript de produção e o núcleo Rust sobre o fixture compartilhado `tests/fixtures/rust-engine/engine-comparison.tsv`. Cada linha usa a mesma topologia combinacional de nove nós, entradas determinísticas, largura de 1, 8, 32 ou 64 bits, 100 iterações de aquecimento fora da medição e 10.001 avaliações cronometradas. A construção do documento/netlist, o parsing do fixture, o build e a inicialização não entram na janela medida.
+
+O lado TypeScript é carregado pelo bundle transformado pelo Vitest/esbuild e chama `evaluateVectorNetlist()`; o lado Rust é executado com `cargo bench --offline --bench comparison` e perfil release. Ambos escrevem `output_bits`, `checksum`, `elapsed_ns`, largura e iterações; o runner falha se qualquer checksum ou saída divergir. O relatório sanitizado fica em `artifacts/engine-comparison-benchmark.md`, acompanhado de JSON local para auditoria.
+
+A paridade de saída é o gate obrigatório. Os tempos servem apenas como observação da mesma máquina e execução: não são uma comparação científica entre sistemas operacionais, compiladores ou máquinas diferentes, e não autorizam afirmar superioridade do Rust. Esta etapa também não habilita WASM, não muda o runtime do navegador e não remove o fallback TypeScript. Uma eventual integração futura deverá medir, separadamente, tamanho do artefato, cold start, memória, repetição, carregamento e comportamento offline.
+
 ## Referências
 
 [1]: https://github.com/Lucas-Belucci-Bellini/Veritas/blob/main/src/bus/bitVector.ts "Contrato BitVector do Veritas"

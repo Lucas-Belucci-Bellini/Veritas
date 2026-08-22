@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'mcp/**/*.test.ts', 'tests/**/*.test.ts'],
-    exclude: ['tests/benchmarks/**'],
+    include: ['tests/benchmarks/engineComparisonBenchmark.test.ts'],
+    reporters: ['dot'],
   },
 })

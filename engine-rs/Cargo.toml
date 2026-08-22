@@ -14,6 +14,10 @@ path = "src/lib.rs"
 name = "throughput"
 harness = false
 
+[[bench]]
+name = "comparison"
+harness = false
+
 [profile.release]
 codegen-units = 1
 lto = true
