@@ -26,6 +26,7 @@ npm run build:mcp
 npm run build:mcp:http
 npm run beta:rust
 npm run beta:wasm
+npm run beta:wasm:parity
 npm run bench:compare
 ```
 
@@ -33,7 +34,7 @@ Os testes devem cobrir a tabela verdade canônica, leis de De Morgan, implicaç�
 
 A asserção de determinismo deve comparar duas execuções com o mesmo documento e entradas, removendo apenas campos não determinísticos como timestamp ou identificador de sessão. O documento, trace, estado final, pausa e erro devem ser idênticos.
 
-O `beta:rust` é um gate técnico local/CI: verifica `cargo fmt --check` e os testes do crate `engine-rs` em modo offline. O `beta:wasm` é um gate de prontidão experimental: compila `wasm32-unknown-unknown`, exige zero imports, os dois exports ABI de função e somente os metadados técnicos conhecidos do linker (`memory`, `__data_end` e `__heap_base`), instancia o módulo e registra tamanho/cold start/repetição em relatório sanitizado. O `bench:compare` executa os harnesses TypeScript/Rust sobre fixture compartilhado, exige saídas e checksums independentes iguais e grava relatório sanitizado em `artifacts/`. Nenhum desses gates é evidência de isolamento cross-user, autorização Supabase, compatibilidade de produto WASM, superioridade de desempenho ou promoção beta; essas conclusões exigem seus próprios ensaios.
+O `beta:rust` é um gate técnico local/CI: verifica `cargo fmt --check` e os testes do crate `engine-rs` em modo offline. O `beta:wasm` é um gate de prontidão experimental: compila `wasm32-unknown-unknown`, exige zero imports, os dois exports ABI de função e somente os metadados técnicos conhecidos do linker (`memory`, `__data_end` e `__heap_base`), instancia o módulo e registra tamanho/cold start/repetição em relatório sanitizado. O `beta:wasm:parity` compila apenas a feature opt-in `wasm-netlist-abi`, executa o fixture VNET/VRES no Node e exige paridade de valores e ordem topológica com o golden. O `bench:compare` executa os harnesses TypeScript/Rust sobre fixture compartilhado, exige saídas e checksums independentes iguais e grava relatório sanitizado em `artifacts/`. Nenhum desses gates é evidência de isolamento cross-user, autorização Supabase, compatibilidade de produto WASM, superioridade de desempenho ou promoção beta; essas conclusões exigem seus próprios ensaios.
 
 ## 3. Smoke test HTTP/PWA
 

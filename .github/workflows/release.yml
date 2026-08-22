@@ -131,6 +131,9 @@ jobs:
       - name: WASM readiness acceptance
         run: npm run beta:wasm
 
+      - name: WASM netlist golden parity
+        run: npm run beta:wasm:parity
+
       - name: TypeScript/Rust controlled benchmark
         run: npm run bench:compare
 

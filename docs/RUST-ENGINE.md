@@ -57,7 +57,7 @@ O gate `npm run beta:wasm` compila o crate para `wasm32-unknown-unknown` com Rus
 
 O runner instancia o módulo pela API WASM nativa do Node, valida os marcadores, repete 100 instanciações e registra tamanho bruto, tamanho gzip, cold start e tempo total de repetição em `artifacts/wasm-readiness.md` e no JSON local correspondente. O `.wasm` é produzido em `engine-rs/target/` e permanece ignorado pelo Git; nenhum binário entra no bundle web, no MCP ou no plugin.
 
-Esta etapa é uma prova de empacotamento e carregabilidade, não uma integração de runtime. Ela não usa `wasm-bindgen`, não recebe `CircuitDocument`, não expõe memória linear e não permite executar documentos arbitrários. O TypeScript continua sendo o runtime produtivo e fallback. A próxima prova, se necessária, deverá definir um adaptador de `Netlist`, comparar resultados golden dentro do WASM e medir cold start, memória, tamanho e comportamento offline em um cenário de produto antes de qualquer carregamento no navegador.
+Esta etapa é uma prova de empacotamento e carregabilidade, não uma integração de runtime. Ela não usa `wasm-bindgen`, não recebe `CircuitDocument`, não expõe memória linear e não permite executar documentos arbitrários. O TypeScript continua sendo o runtime produtivo e fallback. A próxima prova é o WASM-002, documentado em [`docs/WASM-NETLIST-ABI.md`](./WASM-NETLIST-ABI.md): um adaptador VNET/VRES limitado, compilado somente com a feature `wasm-netlist-abi`, que compara valores e ordem topológica golden sem carregamento no navegador.
 
 ## Referências
 

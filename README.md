@@ -302,7 +302,7 @@ a estratégia de fallback e os critérios para uma futura integração WASM est�
 
 O benchmark controlado é executado sob demanda com `npm run bench:compare`. Ele usa um fixture compartilhado, compara saída e checksum nos runtimes TypeScript e Rust e grava um relatório local em `artifacts/`. Os tempos são observações da máquina da execução; não são uma promessa de que Rust é superior, nem habilitam WASM ou substituem o fallback TypeScript.
 
-O gate experimental `npm run beta:wasm` compila o núcleo para `wasm32-unknown-unknown`, verifica o ABI mínimo sem imports externos, instancia o módulo e mede tamanho, cold start e repetição. O `.wasm` permanece fora do bundle do navegador: a avaliação de circuitos e o fallback produtivo continuam em TypeScript até uma prova de paridade WASM com adaptador formal.
+O gate experimental `npm run beta:wasm` compila o núcleo para `wasm32-unknown-unknown`, verifica o ABI mínimo sem imports externos, instancia o módulo e mede tamanho, cold start e repetição. A prova opt-in `npm run beta:wasm:parity` executa o contrato VNET/VRES em um netlist combinacional uniforme e compara valores e ordem topológica com um fixture golden; a especificação está em [`docs/WASM-NETLIST-ABI.md`](./docs/WASM-NETLIST-ABI.md). O `.wasm` permanece fora do bundle do navegador: a avaliação de circuitos e o fallback produtivo continuam em TypeScript.
 
 ## Stack
 

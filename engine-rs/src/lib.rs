@@ -14,6 +14,13 @@ pub const MAX_WIDTH: u8 = 64;
 pub const WASM_ABI_VERSION: u32 = 1;
 /// Bit 0 advertises only that the ABI marker is available; no evaluator is exported.
 pub const WASM_CAPABILITY_ABI_MARKER: u32 = 1;
+#[cfg(feature = "wasm-netlist-abi")]
+pub const WASM_CAPABILITIES: u32 = WASM_CAPABILITY_ABI_MARKER | 2;
+#[cfg(not(feature = "wasm-netlist-abi"))]
+pub const WASM_CAPABILITIES: u32 = WASM_CAPABILITY_ABI_MARKER;
+
+#[cfg(feature = "wasm-netlist-abi")]
+mod wasm_netlist;
 
 #[no_mangle]
 pub extern "C" fn veritas_wasm_abi_version() -> u32 {
@@ -22,7 +29,7 @@ pub extern "C" fn veritas_wasm_abi_version() -> u32 {
 
 #[no_mangle]
 pub extern "C" fn veritas_wasm_capabilities() -> u32 {
-    WASM_CAPABILITY_ABI_MARKER
+    WASM_CAPABILITIES
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -420,9 +427,9 @@ mod tests {
     }
 
     #[test]
-    fn exposes_only_the_versioned_wasm_readiness_marker() {
+    fn exposes_versioned_wasm_capabilities() {
         assert_eq!(veritas_wasm_abi_version(), 1);
-        assert_eq!(veritas_wasm_capabilities(), WASM_CAPABILITY_ABI_MARKER);
+        assert_eq!(veritas_wasm_capabilities(), WASM_CAPABILITIES);
     }
 
     #[test]

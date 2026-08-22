@@ -6,6 +6,10 @@ description = "Deterministic combinational engine for Veritas"
 license = "MIT"
 rust-version = "1.75"
 
+[features]
+default = []
+wasm-netlist-abi = []
+
 [lib]
 name = "veritas_engine"
 path = "src/lib.rs"

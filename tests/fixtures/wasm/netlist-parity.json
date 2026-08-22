@@ -1,0 +1,49 @@
+{
+  "width": 8,
+  "netlist": {
+    "components": [
+      {
+        "id": "b",
+        "type": "input",
+        "options": { "width": 8, "initial": false }
+      },
+      {
+        "id": "a",
+        "type": "input",
+        "options": { "width": 8, "initial": false }
+      },
+      {
+        "id": "and",
+        "type": "and",
+        "options": { "width": 8 },
+        "inputs": [{ "node": "a" }, { "node": "b" }]
+      },
+      {
+        "id": "not",
+        "type": "not",
+        "options": { "width": 8 },
+        "inputs": [{ "node": "and" }]
+      },
+      {
+        "id": "out",
+        "type": "output",
+        "options": { "width": 8 },
+        "inputs": [{ "node": "not" }]
+      }
+    ]
+  },
+  "overrides": { "a": "0xFF", "b": "0xF0" },
+  "payload_hex": "564e45540108050001620000000000000000000001610000000000000000000003616e640200000000000000000201000000036e6f74080000000000000000010200036f757409000000000000000001030002000100ff000000000000000000f000000000000000",
+  "expected": {
+    "values": {
+      "b": "F0",
+      "a": "FF",
+      "and": "F0",
+      "not": "0F",
+      "out": "0F"
+    },
+    "outputs": { "out": "0F" },
+    "order": ["a", "b", "and", "not", "out"],
+    "result_hex": "5652455301080500f000000000000000ff00000000000000f0000000000000000f000000000000000f00000000000000050001000000020003000400"
+  }
+}
