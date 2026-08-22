@@ -12,3 +12,6 @@ coverage
 dev-dist
 dist-lib
 mcp/dist
+
+# Rust build artifacts
+engine-rs/target/
