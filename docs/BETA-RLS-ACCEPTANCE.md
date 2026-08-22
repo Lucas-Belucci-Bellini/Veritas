@@ -1,7 +1,7 @@
 # Procedimento de aceitação RLS-001 a RLS-022
 
 **Produto:** Veritas  
-**Versão candidata:** `v0.9.0-rc.9`
+**Versão candidata:** `v0.9.0-rc.10`
 **Projeto Supabase:** `hcwzsxdcvmswebunznak`  
 **Objetivo:** provar isolamento cross-user, autorização por papel, isolamento Realtime, conflito otimista e autenticação da Edge Function antes da promoção para beta.
 
@@ -137,7 +137,7 @@ A matriz passa somente se RLS-001 a RLS-022 tiverem `PASS` explícito, nenhum da
 Para executar o preflight com o relatório:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.9 \
+BETA_EXPECTED_VERSION=0.9.0-rc.10 \
 SMOKE_URL=https://veritas-opal-seven.vercel.app \
 BETA_PREFLIGHT_REQUIRE_SMOKE=1 \
 BETA_PREFLIGHT_REQUIRE_RLS=1 \

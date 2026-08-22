@@ -2,6 +2,19 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.10] — 2026-08-22
+
+### Adicionado
+
+- Benchmark comparativo controlado `npm run bench:compare`, com fixture compartilhado entre TypeScript e Rust, quatro larguras, aquecimento separado e saída/checksum independentes.
+- Gate RUST-002 integrado aos workflows Quality e Release; divergência de saída ou checksum encerra a validação.
+
+### Validação e limites
+
+- RUST-002 passou em quatro cenários com paridade de saída; os tempos registrados são observações da mesma execução e não comprovam superioridade de desempenho entre runtimes.
+- O avaliador TypeScript permanece no caminho produtivo e o núcleo Rust continua experimental, sem WASM, sem mudança no navegador e com fallback TypeScript preservado.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.9] — 2026-08-22
 
 ### Adicionado
