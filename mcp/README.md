@@ -103,6 +103,20 @@ npm run beta:mcp:http
 
 O runner usa localhost, token efêmero do processo e dados sintéticos. A aprovação do MCP-011 não é autorização para publicar um endpoint remoto. A etapa pública continua condicionada à escolha de um provedor OAuth/resource server, metadata de recurso, validação de audience/resource, PKCE, HTTPS, rate limiting, observabilidade sanitizada e smoke externo.
 
+### MCP-012: Protected Resource Metadata local
+
+O módulo `mcp/src/protectedResourceMetadata.ts` fornece um contrato puro para construir o documento de Protected Resource Metadata sem fazer descoberta, login ou chamada de rede. Ele normaliza `resource` e `authorization_servers`, aceita HTTPS para recursos remotos e HTTP somente em localhost, rejeita credenciais/query/fragmentos e limita `bearer_methods_supported` a `["header"]`. O contrato não está exposto como rota pública nesta versão.
+
+```ts
+const metadata = buildProtectedResourceMetadata({
+  resource: 'https://veritas.example/mcp',
+  authorization_servers: ['https://auth.example/realms/veritas'],
+  scopes_supported: ['circuit:read'],
+})
+```
+
+A metadata não contém tokens. Antes de publicar `.well-known/oauth-protected-resource`, ainda é obrigatório aprovar o provedor OAuth, resource indicator/audience, PKCE, HTTPS, rate limiting, threat model e smoke remoto.
+
 ## Exemplo
 
 ```

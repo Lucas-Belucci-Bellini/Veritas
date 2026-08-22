@@ -134,6 +134,8 @@ A implementação inicial foi entregue como MCP-011: a fábrica comum vive em `m
 
 A próxima etapa pública não é habilitada automaticamente por esta fatia. Antes de expor uma URL remota, será necessário escolher o authorization server, implementar Protected Resource Metadata, resource indicator/audience, PKCE, validação de escopo, HTTPS, rate limiting, logs sanitizados e smoke remoto. O servidor stdio deve permanecer inalterado para não quebrar clientes locais.
 
+O MCP-012 fornece apenas o construtor puro `buildProtectedResourceMetadata` em `mcp/src/protectedResourceMetadata.ts`. Ele valida e normaliza `resource`, `authorization_servers`, `scopes_supported` e `bearer_methods_supported` sem rede, login ou persistência. A metadata não é publicada por uma rota `.well-known` nesta etapa; isso evita transformar um contrato local em uma promessa de autorização remota incompleta.
+
 ### Referências
 
 [1]: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports "MCP — Transports"

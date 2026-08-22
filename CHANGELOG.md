@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.5] — 2026-08-22
+
+### Adicionado
+
+- Contrato puro `buildProtectedResourceMetadata` para Protected Resource Metadata, sem descoberta, login, rede ou persistência.
+- Normalização determinística de `resource`, `authorization_servers`, escopos e `bearer_methods_supported`, com HTTPS obrigatório fora de localhost.
+- Rejeição controlada de credenciais, query strings, fragmentos, escopos inválidos/duplicados e authorization servers ausentes.
+
+### Segurança e validação
+
+- O MCP-012 não publica rota `.well-known`, não emite tokens e não altera o transporte stdio ou o HTTP local do MCP-011.
+- Foram adicionados cinco testes unitários positivos/negativos; os gates MCP-001…MCP-010 e MCP-011 HTTP continuam sendo executados como regressão.
+- RLS-001…RLS-022 e RT-001…RT-005 reais continuam pendentes e bloqueiam o beta público.
+
 ## [0.9.0-rc.4] — 2026-08-22
 
 ### Adicionado
