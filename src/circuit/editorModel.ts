@@ -356,6 +356,7 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
 }
 
 function nodeInputCount(node: CircuitNode, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
+  if (node.type === 'input' && node.options?.customChipBoundary === 'internal') return 1
   if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0
   return editorInputCount(node.type)
 }

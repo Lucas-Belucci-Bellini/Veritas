@@ -685,7 +685,7 @@ export function CircuitEditor() {
 
   const downloadIndustrialExport = (format: 'verilog' | 'vhdl') => {
     try {
-      const content = exportCircuit(document, format)
+      const content = exportCircuit(document, format, { customChips: customChipEntries })
       const extension = format === 'verilog' ? 'v' : 'vhd'
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -947,10 +947,10 @@ export function CircuitEditor() {
           <button type="button" className="key text-xs" onClick={exportLocal}>
             Exportar
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={hasSequential || hasCustomChipInstances || scalarIssues.length > 0} title={hasCustomChipInstances ? 'A exportação HDL de instâncias customizadas será habilitada em uma próxima fatia.' : hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('verilog')} disabled={hasSequential || scalarIssues.length > 0} title={hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
             Verilog
           </button>
-          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={hasSequential || hasCustomChipInstances || scalarIssues.length > 0} title={hasCustomChipInstances ? 'A exportação HDL de instâncias customizadas será habilitada em uma próxima fatia.' : hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
+          <button type="button" className="key text-xs" onClick={() => downloadIndustrialExport('vhdl')} disabled={hasSequential || scalarIssues.length > 0} title={hasSequential ? 'Exportação HDL sequencial será habilitada em uma próxima fatia.' : undefined}>
             VHDL
           </button>
           <button type="button" className="key text-xs" onClick={() => fileInputRef.current?.click()}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCircuitDocument, CircuitValidationError, exportVerilog, exportVhdl, type CircuitDocument } from '.'
+import { buildCustomChipDefinition, createCircuitDocument, CircuitValidationError, exportVerilog, exportVhdl, type CircuitDocument, type CustomChipLibraryEntry } from '.'
 
 const document: CircuitDocument = {
   ...createCircuitDocument('Somador simples'),
@@ -14,6 +14,41 @@ const document: CircuitDocument = {
     { source: { node: 'input-b' }, target: { node: 'gate', port: 1 } },
     { source: { node: 'gate' }, target: { node: 'output', port: 0 } },
   ],
+}
+
+function customChipLibrary(): CustomChipLibraryEntry[] {
+  const definitionDocument: CircuitDocument = {
+    ...createCircuitDocument('AND interno'),
+    nodes: [
+      { id: 'a', type: 'input', position: { x: 0, y: 0 }, label: 'A' },
+      { id: 'b', type: 'input', position: { x: 0, y: 100 }, label: 'B' },
+      { id: 'gate', type: 'and', position: { x: 160, y: 50 }, label: 'E' },
+      { id: 'y', type: 'output', position: { x: 320, y: 50 }, label: 'Y' },
+    ],
+    connections: [
+      { source: { node: 'a' }, target: { node: 'gate', port: 0 } },
+      { source: { node: 'b' }, target: { node: 'gate', port: 1 } },
+      { source: { node: 'gate' }, target: { node: 'y', port: 0 } },
+    ],
+  }
+  return [{ id: 9, definition: buildCustomChipDefinition(definitionDocument, 'AND interno') }]
+}
+
+function customChipDocument(): CircuitDocument {
+  return {
+    ...createCircuitDocument('AND instanciado'),
+    nodes: [
+      { id: 'x', type: 'input', position: { x: 0, y: 0 }, label: 'X' },
+      { id: 'z', type: 'input', position: { x: 0, y: 100 }, label: 'Z' },
+      { id: 'chip', type: 'custom-chip', position: { x: 180, y: 50 }, label: 'Meu AND', options: { customChipId: 9 } },
+      { id: 'out', type: 'output', position: { x: 400, y: 50 }, label: 'Resultado' },
+    ],
+    connections: [
+      { source: { node: 'x' }, target: { node: 'chip', port: 0 } },
+      { source: { node: 'z' }, target: { node: 'chip', port: 1 } },
+      { source: { node: 'chip', port: 0 }, target: { node: 'out', port: 0 } },
+    ],
+  }
 }
 
 describe('exportCircuit', () => {
@@ -94,6 +129,35 @@ describe('exportCircuit', () => {
     expect(vhdl).toContain('signal rx : std_logic;')
     expect(vhdl).toContain('rx <= tx;')
     expect(vhdl).toContain('Y <= rx;')
+  })
+
+  it('elabora instâncias customizadas em Verilog e VHDL sem expor portas internas', () => {
+    const library = customChipLibrary()
+    const verilog = exportVerilog(customChipDocument(), { customChips: library })
+    const vhdl = exportVhdl(customChipDocument(), { customChips: library })
+
+    expect(verilog).toContain('input X')
+    expect(verilog).toContain('input Z')
+    expect(verilog).toContain('output Resultado')
+    expect(verilog).toContain('assign A = X;')
+    expect(verilog).toContain('assign B = Z;')
+    expect(verilog).toContain('assign E = A & B;')
+    expect(verilog).toContain('assign Resultado = Y;')
+    expect(verilog).not.toContain('input A')
+    expect(verilog).not.toContain('output Y')
+
+    expect(vhdl).toContain('X : in std_logic')
+    expect(vhdl).toContain('Z : in std_logic')
+    expect(vhdl).toContain('Resultado : out std_logic')
+    expect(vhdl).toContain('A <= X;')
+    expect(vhdl).toContain('E <= A and B;')
+    expect(vhdl).toContain('Resultado <= Y;')
+    expect(vhdl).not.toContain('A : in std_logic')
+    expect(vhdl).not.toContain('Y : out std_logic')
+  })
+
+  it('recusa elaborar uma instância sem definição local', () => {
+    expect(() => exportVerilog(customChipDocument())).toThrow('definição local')
   })
 
   it('gera portas e sinais vetoriais em Verilog e VHDL', () => {

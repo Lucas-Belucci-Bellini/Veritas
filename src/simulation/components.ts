@@ -46,6 +46,8 @@ export interface ComponentOptions {
   channel?: string
   /** ID da definição local usada por uma instância `custom-chip`. */
   customChipId?: number
+  /** Marca interna transitória usada pela elaboração HDL. */
+  customChipBoundary?: 'internal'
 }
 
 export interface ComponentSpec {

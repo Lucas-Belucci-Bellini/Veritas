@@ -1,15 +1,20 @@
 import { CircuitValidationError, editorInputCount, validateCircuit, type CircuitDocument, type CircuitNode } from './editorModel'
-import { normalizeCircuitDocument } from './documentContract'
+import { elaborateCustomChipDocument } from './customChipElaboration'
+import type { CustomChipLibraryEntry } from './customChip'
 import { resolveWirelessChannels } from './wirelessChannels'
 
 export type CircuitExportFormat = 'verilog' | 'vhdl'
 
-export function exportCircuit(document: CircuitDocument, format: CircuitExportFormat): string {
-  return format === 'verilog' ? exportVerilog(document) : exportVhdl(document)
+export interface CircuitExportOptions {
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
-export function exportVerilog(document: CircuitDocument): string {
-  const normalized = normalizeCircuitDocument(document)
+export function exportCircuit(document: CircuitDocument, format: CircuitExportFormat, options: CircuitExportOptions = {}): string {
+  return format === 'verilog' ? exportVerilog(document, options) : exportVhdl(document, options)
+}
+
+export function exportVerilog(document: CircuitDocument, options: CircuitExportOptions = {}): string {
+  const normalized = elaborateCustomChipDocument(document, options)
   assertValid(normalized)
   const model = buildExportModel(normalized)
   const moduleName = sanitizeIdentifier(normalized.name, 'veritas_circuit')
@@ -19,7 +24,8 @@ export function exportVerilog(document: CircuitDocument): string {
   ]
   const declarations = model.internalNodes.map((node) => `  wire${verilogWidth(node)} ${model.names.get(node.id)};`)
   const assignments = model.nodes.flatMap((node) => {
-    if (node.type === 'input' || node.type === 'output') return []
+    if (node.type === 'output' && node.options?.customChipBoundary !== 'internal') return []
+    if (node.type === 'input' && node.options?.customChipBoundary !== 'internal') return []
     return [`  assign ${model.names.get(node.id)} = ${verilogExpression(node, model)};`]
   })
   const outputAssignments = model.outputs.map((node) => `  assign ${model.names.get(node.id)} = ${sourceExpression(node, model)};`)
@@ -38,8 +44,8 @@ export function exportVerilog(document: CircuitDocument): string {
   ].join('\n')
 }
 
-export function exportVhdl(document: CircuitDocument): string {
-  const normalized = normalizeCircuitDocument(document)
+export function exportVhdl(document: CircuitDocument, options: CircuitExportOptions = {}): string {
+  const normalized = elaborateCustomChipDocument(document, options)
   assertValid(normalized)
   const model = buildExportModel(normalized)
   const entityName = sanitizeIdentifier(normalized.name, 'veritas_circuit')
@@ -49,7 +55,8 @@ export function exportVhdl(document: CircuitDocument): string {
   ]
   const declarations = model.internalNodes.map((node) => `  signal ${model.names.get(node.id)} : ${vhdlType(node)};`)
   const assignments = model.nodes.flatMap((node) => {
-    if (node.type === 'input' || node.type === 'output') return []
+    if (node.type === 'output' && node.options?.customChipBoundary !== 'internal') return []
+    if (node.type === 'input' && node.options?.customChipBoundary !== 'internal') return []
     return [`  ${model.names.get(node.id)} <= ${vhdlExpression(node, model)};`]
   })
   const outputAssignments = model.outputs.map((node) => `  ${model.names.get(node.id)} <= ${sourceExpression(node, model)};`)
@@ -94,9 +101,9 @@ function buildExportModel(document: CircuitDocument): ExportModel {
   const allocator = new NameAllocator()
   const names = new Map<string, string>()
   for (const node of nodes) names.set(node.id, allocator.allocate(node.label ?? node.id, node.id))
-  const inputs = nodes.filter((node) => node.type === 'input')
-  const outputs = nodes.filter((node) => node.type === 'output')
-  const internalNodes = nodes.filter((node) => node.type !== 'input' && node.type !== 'output')
+  const inputs = nodes.filter((node) => node.type === 'input' && node.options?.customChipBoundary !== 'internal')
+  const outputs = nodes.filter((node) => node.type === 'output' && node.options?.customChipBoundary !== 'internal')
+  const internalNodes = nodes.filter((node) => !inputs.includes(node) && !outputs.includes(node))
   const inputsByNode = new Map<string, Map<number, { node: string; port?: number }>>()
   for (const connection of document.connections) {
     const target = inputsByNode.get(connection.target.node) ?? new Map()
@@ -131,6 +138,7 @@ function sourceExpression(node: CircuitNode, model: ExportModel): string {
 }
 
 function verilogExpression(node: CircuitNode, model: ExportModel): string {
+  if (node.type === 'input' || node.type === 'output') return sourceExpression(node, model)
   if (node.type === 'constant') return verilogLiteral(nodeWidth(node), node.options?.value ?? false)
   if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))[0] ?? verilogLiteral(nodeWidth(node), false)
   const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
@@ -140,6 +148,7 @@ function verilogExpression(node: CircuitNode, model: ExportModel): string {
 }
 
 function vhdlExpression(node: CircuitNode, model: ExportModel): string {
+  if (node.type === 'input' || node.type === 'output') return sourceExpression(node, model)
   if (node.type === 'constant') return vhdlLiteral(nodeWidth(node), node.options?.value ?? false)
   if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))[0] ?? vhdlLiteral(nodeWidth(node), false)
   const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
