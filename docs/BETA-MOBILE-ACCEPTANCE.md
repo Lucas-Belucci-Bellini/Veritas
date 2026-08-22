@@ -1,7 +1,7 @@
 # Aceitação Beta — mobile manual
 
 **Produto:** Veritas  
-**Versão candidata:** `v0.9.0-rc.6`
+**Versão candidata:** `v0.9.0-rc.7`
 **Objetivo:** registrar uma inspeção humana reproduzível do fluxo principal em dispositivo ou viewport móvel, sem confundir um smoke de desktop com aprovação mobile.
 
 ## 1. Contrato do gate

@@ -2,6 +2,17 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.7] — 2026-08-22
+
+### Alterado
+
+- MCP-014 torna explícita a política CORS da metadata local: somente `GET, OPTIONS`, `Vary: Origin` e `POST` bloqueado; o endpoint `/mcp` mantém `POST, OPTIONS` e Bearer obrigatório.
+
+### Segurança e validação
+
+- A alteração é local-only, não cria rota nova, não emite tokens e não modifica o transporte stdio, schemas das ferramentas ou qualquer deployment remoto.
+- Acceptance combinado MCP-011/MCP-013/MCP-014 com 17 checks PASS, além dos testes do handler, typecheck e build HTTP; RLS-001…RLS-022 e RT-001…RT-005 reais continuam pendentes e bloqueiam o beta público.
+
 ## [0.9.0-rc.6] — 2026-08-22
 
 ### Adicionado

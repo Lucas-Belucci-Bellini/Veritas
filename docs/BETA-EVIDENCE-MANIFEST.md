@@ -3,7 +3,7 @@
 O comando `npm run beta:evidence` combina relatórios sanitizados da matriz RLS, da Edge Function e da auditoria estrutural Supabase em um único JSON consumível por `beta:preflight`. Ele não executa autenticação, não cria fixtures e não transforma uma ausência de relatório em aprovação.
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.6 \
+BETA_EXPECTED_VERSION=0.9.0-rc.7 \
 BETA_RLS_REPORT=artifacts/rls-acceptance.md \
 BETA_EDGE_REPORT=artifacts/edge-acceptance.md \
 BETA_REALTIME_REPORT=artifacts/realtime-acceptance.md \

@@ -4,7 +4,7 @@
 **Produto:** Veritas — editor e simulador didático de lógica digital
 **Repositório:** https://github.com/Lucas-Belucci-Bellini/Veritas
 **Preview/produção atual:** https://veritas-opal-seven.vercel.app
-**Versão declarada no `package.json`:** `0.9.0-rc.6`
+**Versão declarada no `package.json`:** `0.9.0-rc.7`
 
 ## 1. Decisão de posicionamento
 
@@ -22,7 +22,7 @@ Há, porém, quatro fatos que impedem chamar o estado atual de `1.0.0` sem uma r
 
 | Área | Estado atual | Consequência para o lançamento |
 | --- | --- | --- |
-| Versionamento | `package.json` está em `0.9.0-rc.6`; `v0.9.0-rc.5` está publicada e a nova RC está em preparação; ainda não há release estável. | Executar os gates da RC-6 e manter a sequência de pré-releases antes do estável. |
+| Versionamento | `package.json` está em `0.9.0-rc.7`; `v0.9.0-rc.6` está publicada e a nova RC está em preparação; ainda não há release estável. | Executar os gates da RC-7 e manter a sequência de pré-releases antes do estável. |
 | Distribuição | Existe deployment Vercel público, mas o fluxo de Preview/Production, domínio, headers e rollback ainda precisa ser formalizado. | Tratar o deployment atual como preview até concluir o checklist. |
 | MCP | Ferramentas determinísticas estão disponíveis por `stdio`; transporte HTTP remoto autenticado ainda é roadmap. | Não prometer integração web remota no lançamento inicial. |
 | Colaboração | Broadcast de snapshots e Presence funcionam, mas não são CRDT nem merge campo a campo. | Rotular como colaboração beta/preview e documentar o risco de sobrescrita concorrente. |
@@ -42,6 +42,7 @@ A recomendação é usar SemVer e manter os artefatos publicados imutáveis: cor
 | `v0.9.0-rc.4` | Release candidate MCP-011 HTTP local | Testadores convidados e mantenedores | stdio preservado, HTTP local protegido, 9 checks HTTP PASS, quality/release workflows verdes e endpoint público ainda bloqueado até OAuth/HTTPS. |
 | `v0.9.0-rc.5` | Release candidate MCP-012 metadata OAuth local | Testadores convidados e mantenedores | Contrato puro validado, URLs/escopos inseguros rejeitados, regressão MCP-011 verde e nenhuma rota OAuth pública habilitada. |
 | `v0.9.0-rc.6` | Release candidate MCP-013 metadata local opt-in | Testadores convidados e mantenedores | Rota 404 por padrão, metadata configurada validada, Origin obrigatório, configuração parcial/HTTP remoto rejeitados, 14 checks HTTP/stdio relacionados verdes e nenhuma rota OAuth pública habilitada. |
+| `v0.9.0-rc.7` | Release candidate MCP-014 CORS local explícito | Testadores convidados e mantenedores | Metadata anuncia apenas `GET, OPTIONS`, `/mcp` mantém `POST, OPTIONS` e Bearer, `POST` na metadata permanece 405, 17 checks HTTP locais verdes e nenhuma rota OAuth pública habilitada. |
 | `v0.9.0-beta.1` | Beta público sequencial | Estudantes/professores convidados | Manifesto de evidências completo, RLS/Realtime/HDL/mobile/acessibilidade/rollback aprovados e zero P0/P1. |
 | `v0.8.x` | Correções de beta/RC | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
 | `v1.0.0` | Lançamento estável | Público geral | API/documento público estável, política de dados, suporte básico e critérios P0/P1 encerrados. |
