@@ -1,6 +1,6 @@
 # Hardening da superfície de autorização Supabase
 
-**Escopo:** Veritas `0.9.0-rc.1`
+**Escopo:** Veritas `0.9.0-rc.2`
 **Projeto existente:** `hcwzsxdcvmswebunznak`
 
 ## Motivo

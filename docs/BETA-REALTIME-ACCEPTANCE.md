@@ -1,7 +1,7 @@
 # Aceitação Beta — Supabase Realtime temporal
 
 **Produto:** Veritas  
-**Versão candidata:** `0.9.0-rc.1`  
+**Versão candidata:** `0.9.0-rc.2`
 **Projeto Supabase:** `hcwzsxdcvmswebunznak`  
 **Objetivo:** provar que Presence continua limitado a colaboradores e que os eventos `circuit_snapshot`, `runtime_config` e `runtime_state` são recebidos somente em tópicos privados de rooms válidas, com publicação reservada a owner/editor.
 
@@ -85,7 +85,7 @@ RT-005 PASS — sala não permitida não é assinável: sala ghost foi rejeitada
 O agregador consome o relatório por `BETA_REALTIME_REPORT`:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.1 \
+BETA_EXPECTED_VERSION=0.9.0-rc.2 \
 BETA_REALTIME_REPORT=artifacts/realtime-acceptance-<timestamp>.md \
 npm run beta:evidence
 ```

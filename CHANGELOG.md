@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.2] — 2026-08-22
+
+### Adicionado
+
+- Ferramenta MCP local `circuit_vector_truth_table` para tabelas verdade determinísticas de circuitos com barramentos.
+- Limite explícito de até 12 bits de entrada e até 4096 linhas geradas, com suporte a truncamento controlado, `output_id` e definições portáteis de `custom_chips`.
+- Golden MCP-010 integrado ao gate stdio, elevando a superfície validada para 14 ferramentas e MCP-001…MCP-010.
+
+### Documentação e validação
+
+- README do MCP, roadmap e runbook de aceitação atualizados com payload vetorial e limites operacionais.
+- 382 testes aprovados em 59 arquivos; typecheck, lint, build frontend/PWA, build MCP, build do plugin, verificações de sintaxe e smoke PWA local aprovados.
+- A candidata continua sendo uma RC: RLS-001…RLS-022 e RT-001…RT-005 reais permanecem pendentes e bloqueiam o beta público.
+
 ## [0.9.0-rc.1] — 2026-08-21
 
 ### Adicionado
