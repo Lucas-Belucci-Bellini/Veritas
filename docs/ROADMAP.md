@@ -619,3 +619,13 @@ Critérios de aceite: `GET` e preflight `OPTIONS` da metadata retornam `Access-C
 O handler agora usa headers CORS específicos para a rota de metadata: somente `GET, OPTIONS` são anunciados, `Vary: Origin` é preservado e `POST` continua bloqueado. O endpoint `/mcp` manteve seu contrato separado de `POST, OPTIONS`, Bearer obrigatório e allowlist de Origin. O stdio, o schema das ferramentas e a exposição local-only não foram alterados.
 
 Critérios realizados: regressões unitárias do preflight MCP, GET/OPTIONS da metadata, `Vary: Origin`, POST 405 e Bearer no `/mcp`; acceptance combinado MCP-011/MCP-013/MCP-014 com 17 PASS, 0 FAIL e 0 SKIP; typecheck e build HTTP aprovados. OAuth remoto, HTTPS público e qualquer deployment externo continuam fora do escopo.
+
+## Planejamento MCP-015 — proteção contra colisão de paths locais — 2026-08-22
+A próxima fatia local-only será tornar fail-closed a configuração do path HTTP: o path configurável do MCP não poderá coincidir com `/.well-known/oauth-protected-resource`, rota reservada à metadata opt-in. Isso evita que uma configuração acidental torne o `/mcp` inacessível ou faça o handler interpretar requisições MCP como discovery. A mudança não altera stdio, schemas, OAuth ou a disponibilidade da metadata.
+
+Critérios de aceite: configuração com path MCP igual ao path reservado falha no startup com mensagem determinística; paths válidos continuam funcionando; o runner sanitizado cobre a rejeição; suíte, builds e smoke permanecem verdes.
+
+## Implementação MCP-015 — proteção contra colisão de paths locais — 2026-08-22
+`normalizeOptions` agora rejeita no startup qualquer path MCP igual a `/.well-known/oauth-protected-resource`, preservando a separação entre o endpoint protegido `/mcp` e a rota reservada de metadata. A rejeição é fail-closed e não altera stdio, schemas, autenticação Bearer ou a disponibilidade da metadata opt-in.
+
+Critérios realizados: teste unitário da colisão, acceptance `MCP-015-HTTP-001` com startup rejeitado, regressão dos checks MCP-011/MCP-013/MCP-014, typecheck e build HTTP aprovados. O resultado não habilita OAuth remoto nem qualquer endpoint público.

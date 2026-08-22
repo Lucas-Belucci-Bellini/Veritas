@@ -140,6 +140,8 @@ O MCP-013 integra essa metadata ao handler HTTP local apenas quando `VERITAS_MCP
 
 O MCP-014 torna a política CORS explícita: a rota de metadata anuncia apenas `GET, OPTIONS`, conserva `Vary: Origin` e rejeita `POST`; o endpoint `/mcp` permanece limitado a `POST, OPTIONS`, com Bearer obrigatório. Essa correção reduz ambiguidade de clientes sem ampliar a superfície para HTTP remoto ou autorização.
 
+O MCP-015 rejeita no startup qualquer configuração em que o path configurável do MCP coincida com `/.well-known/oauth-protected-resource`. A rota reservada de metadata e o endpoint `/mcp` permanecem semanticamente separados, sem alterar stdio ou habilitar OAuth remoto.
+
 ### Referências
 
 [1]: https://modelcontextprotocol.io/specification/2025-03-26/basic/transports "MCP — Transports"

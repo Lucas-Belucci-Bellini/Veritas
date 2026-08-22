@@ -2,6 +2,14 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.8] — 2026-08-22
+
+### Segurança e validação
+
+- MCP-015 rejeita no startup qualquer configuração em que o path do MCP coincida com `/.well-known/oauth-protected-resource`, preservando a separação entre o endpoint protegido e a rota de metadata local.
+- Acceptance combinado MCP-011/MCP-013/MCP-014/MCP-015 com 18 checks PASS, além de testes do handler, typecheck e build HTTP; nenhuma rota OAuth pública, token estático ou deployment remoto foi habilitado.
+- RLS-001…RLS-022 e RT-001…RT-005 reais continuam pendentes e bloqueiam o beta público.
+
 ## [0.9.0-rc.7] — 2026-08-22
 
 ### Alterado

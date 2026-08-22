@@ -254,6 +254,9 @@ function normalizeOptions(options: VeritasHttpServerOptions): { config: HttpConf
   const bearerToken = options.bearerToken.trim()
   const allowedOrigins = options.allowedOrigins.map((origin) => origin.trim()).filter(Boolean)
   if (!path.startsWith('/')) throw new Error('O path MCP deve começar com /.')
+  if (path === VERITAS_MCP_HTTP_METADATA_PATH) {
+    throw new Error('O path MCP não pode coincidir com a rota reservada de metadata.')
+  }
   if (!bearerToken) throw new Error('Bearer token MCP é obrigatório.')
   if (allowedOrigins.length === 0) throw new Error('É necessária uma allowlist de Origin MCP.')
 

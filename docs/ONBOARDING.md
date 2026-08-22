@@ -72,7 +72,7 @@ Se uma versão remota causar conflito, não repita o salvamento cegamente. Atual
 
 ## Limitações beta
 
-O Veritas ainda é uma prévia `v0.9.0-rc.7`. A promoção beta depende de evidências reais de RLS cross-user, Realtime entre contas, inspeção em navegadores/dispositivos, onboarding externo e rollback operacional. O checklist automatizado confirma a presença do tutorial e dos contratos locais; ele não substitui uma pessoa externa seguindo este guia.
+O Veritas ainda é uma prévia `v0.9.0-rc.8`. A promoção beta depende de evidências reais de RLS cross-user, Realtime entre contas, inspeção em navegadores/dispositivos, onboarding externo e rollback operacional. O checklist automatizado confirma a presença do tutorial e dos contratos locais; ele não substitui uma pessoa externa seguindo este guia.
 
 ## Referências
 

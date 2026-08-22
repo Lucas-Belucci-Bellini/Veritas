@@ -244,6 +244,11 @@ async function main() {
       VERITAS_MCP_HTTP_AUTHORIZATION_SERVERS: 'https://auth.example',
     })
     result('MCP-013-HTTP-005', insecureMetadataRejected ? 'PASS' : 'FAIL', 'metadata HTTPS', 'processo rejeita recurso remoto sem HTTPS')
+
+    const reservedPathRejected = await rejectsStartup({
+      VERITAS_MCP_HTTP_PATH: '/.well-known/oauth-protected-resource',
+    })
+    result('MCP-015-HTTP-001', reservedPathRejected ? 'PASS' : 'FAIL', 'colisão de path', 'processo rejeita o path MCP reservado à metadata')
   } catch (error) {
     result('MCP-014-HTTP-004', 'FAIL', 'runner HTTP', error instanceof Error ? error.message : 'erro desconhecido')
   } finally {
@@ -252,7 +257,7 @@ async function main() {
   }
 
   const lines = [
-    `# MCP-011 + MCP-013 + MCP-014 HTTP acceptance ${new Date().toISOString()}`,
+    `# MCP-011 + MCP-013 + MCP-014 + MCP-015 HTTP acceptance ${new Date().toISOString()}`,
     '',
     'O ensaio usa somente localhost, token efêmero do processo, Origin allowlist e dados determinísticos; nenhum segredo é persistido.',
     '',

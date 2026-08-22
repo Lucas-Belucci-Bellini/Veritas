@@ -232,6 +232,9 @@ describe('MCP-011 Streamable HTTP local', () => {
     expect(() => createVeritasHttpServer({ ...baseOptions, allowedOrigins: [] })).toThrow(
       'É necessária uma allowlist de Origin MCP.',
     )
+    expect(() => createVeritasHttpServer({ ...baseOptions, path: VERITAS_MCP_HTTP_METADATA_PATH })).toThrow(
+      'O path MCP não pode coincidir com a rota reservada de metadata.',
+    )
     expect(() =>
       createVeritasHttpServer({
         ...baseOptions,

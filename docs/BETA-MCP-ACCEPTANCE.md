@@ -1,11 +1,11 @@
 # Aceitação Beta — interoperabilidade MCP
 
 **Produto:** Veritas  
-**Versão candidata:** `v0.9.0-rc.7`
+**Versão candidata:** `v0.9.0-rc.8`
 **Transportes validados:** MCP por stdio local e HTTP local controlado
 **Objetivo:** comprovar que clientes MCP locais conseguem negociar o servidor, descobrir ferramentas, chamar vetores golden e receber erros controlados sem depender de uma sessão específica de IA, além de validar a fronteira HTTP sem publicar um endpoint remoto.
 
-A superfície atual contém quatorze ferramentas; o MCP-013 adiciona discovery local opt-in de Protected Resource Metadata e o MCP-014 explicita sua política CORS, sem alterar os nomes ou argumentos obrigatórios das ferramentas existentes.
+A superfície atual contém quatorze ferramentas; o MCP-013 adiciona discovery local opt-in de Protected Resource Metadata, o MCP-014 explicita sua política CORS e o MCP-015 protege o path reservado, sem alterar os nomes ou argumentos obrigatórios das ferramentas existentes.
 
 ## 1. Matriz golden
 
@@ -26,6 +26,7 @@ O comando `npm run beta:mcp` inicia `mcp/dist/server.js` como subprocesso Node e
 | MCP-011-HTTP-001…009 | `http-server.js` local | OPTIONS, Bearer, Origin allowlist, método, initialize `2025-11-25`, equivalência golden, HeaderMismatch, JSON inválido e limite de payload retornam os status esperados; nenhum token é persistido. |
 | MCP-013-HTTP-001…005 | `/.well-known/oauth-protected-resource` local | Sem configuração retorna 404; configuração opt-in retorna JSON determinístico; Origin ausente é rejeitada; configuração parcial e recurso remoto sem HTTPS são rejeitados no startup. |
 | MCP-014-HTTP-001…003 | CORS local da metadata e do `/mcp` | Metadata anuncia somente `GET, OPTIONS` com `Vary: Origin`; preflight do MCP mantém `POST, OPTIONS`; `POST` na metadata permanece `405`. |
+| MCP-015-HTTP-001 | Configuração local de path | O startup rejeita o path MCP coincidente com `/.well-known/oauth-protected-resource`. |
 
 ## 2. Execução
 
@@ -41,13 +42,13 @@ MCP_HTTP_REPORT_PATH=artifacts/mcp-http-acceptance.md npm run beta:mcp:http
 O workflow `.github/workflows/quality.yml` executa `build:mcp`, `build:mcp:http`, `beta:mcp` e `beta:mcp:http` em cada push/pull request. Para agregar a evidência ao manifesto beta:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.7 \
+BETA_EXPECTED_VERSION=0.9.0-rc.8 \
 BETA_MCP_REPORT=artifacts/mcp-acceptance.md \
 BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
 npm run beta:evidence
 ```
 
-O gate `mcp` só fica `PASS` quando MCP-001 a MCP-010 possuem `PASS` explícito e o relatório está anexado. O gate HTTP-011 é separado e só fica `PASS` quando MCP-011-HTTP-001 a MCP-011-HTTP-009 possuem `PASS` explícito. O gate MCP-013 é separado e só fica `PASS` quando MCP-013-HTTP-001 a MCP-013-HTTP-005 possuem `PASS` explícito. O gate MCP-014 é separado e só fica `PASS` quando MCP-014-HTTP-001 a MCP-014-HTTP-003 possuem `PASS` explícito. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
+O gate `mcp` só fica `PASS` quando MCP-001 a MCP-010 possuem `PASS` explícito e o relatório está anexado. O gate HTTP-011 é separado e só fica `PASS` quando MCP-011-HTTP-001 a MCP-011-HTTP-009 possuem `PASS` explícito. O gate MCP-013 é separado e só fica `PASS` quando MCP-013-HTTP-001 a MCP-013-HTTP-005 possuem `PASS` explícito. O gate MCP-014 é separado e só fica `PASS` quando MCP-014-HTTP-001 a MCP-014-HTTP-003 possuem `PASS` explícito. O gate MCP-015 é separado e só fica `PASS` quando MCP-015-HTTP-001 possui `PASS` explícito. Qualquer resposta ausente, schema quebrado, saída não JSON-RPC, `SKIP` ou `FAIL` mantém `MCP-EVIDENCE-INCOMPLETE` em `openP1`.
 
 ## 3. Compatibilidade com clientes
 
