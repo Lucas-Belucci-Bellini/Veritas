@@ -72,6 +72,12 @@ jobs:
       - name: Build MCP HTTP bundle
         run: npm run build:mcp:http
 
+      - name: Build plugin bundle
+        run: npm run build:plugin
+
+      - name: WASM production isolation guard
+        run: npm run beta:wasm:isolation
+
       - name: MCP interoperability acceptance
         run: npm run beta:mcp
 

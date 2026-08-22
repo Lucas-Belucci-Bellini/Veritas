@@ -24,6 +24,7 @@
     "beta:rust": "node scripts/rust-engine-acceptance.mjs",
     "beta:wasm": "node scripts/wasm-readiness.mjs",
     "beta:wasm:parity": "node scripts/wasm-netlist-parity.mjs",
+    "beta:wasm:isolation": "node scripts/wasm-isolation.mjs",
     "build:plugin": "vite build --config vite.plugin.config.ts",
     "smoke:release": "node scripts/smoke-release.mjs",
     "beta:preflight": "bash scripts/beta-preflight.sh",

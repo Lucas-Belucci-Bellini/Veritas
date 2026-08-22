@@ -57,7 +57,13 @@ O gate `npm run beta:wasm` compila o crate para `wasm32-unknown-unknown` com Rus
 
 O runner instancia o módulo pela API WASM nativa do Node, valida os marcadores, repete 100 instanciações e registra tamanho bruto, tamanho gzip, cold start e tempo total de repetição em `artifacts/wasm-readiness.md` e no JSON local correspondente. O `.wasm` é produzido em `engine-rs/target/` e permanece ignorado pelo Git; nenhum binário entra no bundle web, no MCP ou no plugin.
 
-Esta etapa é uma prova de empacotamento e carregabilidade, não uma integração de runtime. Ela não usa `wasm-bindgen`, não recebe `CircuitDocument`, não expõe memória linear e não permite executar documentos arbitrários. O TypeScript continua sendo o runtime produtivo e fallback. A próxima prova é o WASM-002, documentado em [`docs/WASM-NETLIST-ABI.md`](./WASM-NETLIST-ABI.md): um adaptador VNET/VRES limitado, compilado somente com a feature `wasm-netlist-abi`, que compara valores e ordem topológica golden sem carregamento no navegador.
+Esta etapa é uma prova de empacotamento e carregabilidade, não uma integração de runtime. Ela não usa `wasm-bindgen`, não recebe `CircuitDocument`, não expõe memória linear e não permite executar documentos arbitrários. O TypeScript continua sendo o runtime produtivo e fallback.
+
+## WASM-002/003 — adaptador VNET/VRES e isolamento experimental
+
+A prova VNET/VRES, documentada em [`docs/WASM-NETLIST-ABI.md`](./WASM-NETLIST-ABI.md), é compilada somente com a feature `wasm-netlist-abi`. O WASM-003 amplia o fixture para 1, 8, 32 e 64 bits, compara bytes, valores, saídas e ordem topológica e exercita códigos de erro na fronteira host/WASM. Essa ponte segue fora do carregamento no navegador, do MCP, do plugin e do build produtivo.
+
+A próxima prova é o WASM-004: um guard pós-build que confirma a ausência de imports do adaptador e de símbolos VNET/VRES nos bundles distribuíveis, além de verificar que a feature Rust continua opt-in. O guard não cria loader, Worker, endpoint ou seleção de runtime; TypeScript e IndexedDB permanecem no caminho de produção.
 
 ## Referências
 

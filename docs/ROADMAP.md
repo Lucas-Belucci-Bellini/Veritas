@@ -683,3 +683,11 @@ A etapa WASM-003 ampliou a evidência do contrato VNET/VRES sem ampliar a superf
 O runner também exercita a fronteira host/WASM com payloads truncados, magic/versão inválidos, referências e shape inválidos, largura inválida, ciclo e chamadas com buffer excedido. Cada falha retorna zero e um código estável, sem expor texto livre, memória fora do buffer, rede, tokens ou dados de usuário. A bridge continua fora do navegador, MCP, plugin, bundle produtivo e beta.
 
 Critérios realizados localmente: matriz golden multi-largura independente; paridade de bytes, valores, saídas e ordem; testes nativos e end-to-end dos códigos de erro; validação do limite de capacidade; relatório sanitizado; execução no Quality/Release pendente para este commit; nenhum aumento de capability sem revisão do contrato; e TypeScript preservado como runtime produtivo/fallback.
+
+## Próxima fatia — WASM-004 isolamento do runtime produtivo — 2026-08-22
+
+A etapa WASM-004 adicionará um guard determinístico para provar que o caminho experimental WASM permanece fora dos bundles do navegador, do MCP e do plugin. O guard verificará a ausência de imports do adaptador e de símbolos VNET/VRES nos artefatos distribuíveis, a manutenção do runtime TypeScript como caminho produtivo e a separação da feature Rust opt-in.
+
+A validação não carregará WASM no navegador, não criará loader, Worker, endpoint ou integração remota. Ela deverá falhar quando um bundle produtivo passar a depender da ponte experimental, quando a feature deixar de ser opt-in ou quando um artefato distribuível incluir símbolos do avaliador WASM. O beta permanece bloqueado e o rollback continuará apontando para a última release publicada.
+
+Critérios de aceite: guard executável em CI; frontend, MCP e plugin construídos e verificados sem símbolos experimentais; feature `wasm-netlist-abi` ausente do build padrão; TypeScript e IndexedDB continuam intactos; testes negativos do próprio guard; documentação e relatório sanitizado; e nenhuma capability ou integração de produção ampliada.
