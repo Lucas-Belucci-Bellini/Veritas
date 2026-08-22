@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.13] — 2026-08-22
+
+### Adicionado
+
+- Matriz golden WASM-003 para netlists combinacionais uniformes de 1, 8, 32 e 64 bits, cobrindo constantes, overrides, portas AND/NAND/OR/NOR/XOR/XNOR/NOT e saídas.
+- Runner experimental que compara bytes VNET/VRES, valores, saídas e ordem topológica entre o fixture independente e o módulo Rust/WASM.
+- Hardening end-to-end da fronteira host/WASM para magic, versão, largura, truncamento, shape, referência, ciclo e capacidade inválidos, com retorno zero e códigos estáveis.
+
+### Validação e limites
+
+- WASM-003 passou localmente e no Quality do GitHub no commit `c91be1c`, com zero imports, capabilities `3` e quatro casos golden executados.
+- A feature `wasm-netlist-abi` continua opt-in e não entra no build produtivo, no navegador, no MCP ou no plugin. O TypeScript continua como runtime produtivo e fallback local-first.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.12] — 2026-08-22
 
 ### Adicionado

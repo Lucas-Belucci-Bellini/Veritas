@@ -1,7 +1,7 @@
 # Aceitação Beta — interoperabilidade MCP
 
 **Produto:** Veritas  
-**Versão candidata:** `v0.9.0-rc.12`
+**Versão candidata:** `v0.9.0-rc.13`
 **Transportes validados:** MCP por stdio local e HTTP local controlado
 **Objetivo:** comprovar que clientes MCP locais conseguem negociar o servidor, descobrir ferramentas, chamar vetores golden e receber erros controlados sem depender de uma sessão específica de IA, além de validar a fronteira HTTP sem publicar um endpoint remoto.
 
@@ -42,7 +42,7 @@ MCP_HTTP_REPORT_PATH=artifacts/mcp-http-acceptance.md npm run beta:mcp:http
 O workflow `.github/workflows/quality.yml` executa `build:mcp`, `build:mcp:http`, `beta:mcp` e `beta:mcp:http` em cada push/pull request. Para agregar a evidência ao manifesto beta:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.12 \
+BETA_EXPECTED_VERSION=0.9.0-rc.13 \
 BETA_MCP_REPORT=artifacts/mcp-acceptance.md \
 BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
 npm run beta:evidence
