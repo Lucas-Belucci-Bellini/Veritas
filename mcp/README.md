@@ -125,6 +125,12 @@ O MCP-014 endurece a superfície HTTP local sem criar uma nova rota: a metadata 
 
 A aceitação combinada mantém os nove checks do MCP-011 e os cinco checks do MCP-013, acrescentando três checks MCP-014 para os métodos CORS da metadata, o preflight do MCP e a rejeição de `POST`. O runner usa apenas localhost e dados sintéticos; isso não constitui suporte OAuth público.
 
+### MCP-015: proteção contra colisão de paths
+
+O servidor rejeita no startup qualquer configuração em que o path do MCP coincida com `/.well-known/oauth-protected-resource`, que é reservado à metadata local. O endpoint padrão `/mcp` continua funcionando normalmente, e a proteção não cria novas rotas nem amplia o transporte para fora do localhost.
+
+O acceptance acrescenta `MCP-015-HTTP-001`, que verifica a rejeição fail-closed da colisão sem registrar tokens ou iniciar um servidor ambíguo.
+
 ## Exemplo
 
 ```
