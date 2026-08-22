@@ -523,3 +523,9 @@ A fatia não inclui latência, arbitragem, tri-state, sinais `X/Z`, edição inl
 Após a integração inicial, o principal gap de usabilidade é que o campo `Canal` da toolbar só define novos nós; documentos importados ou nós já criados não podem corrigir o canal sem serem recriados. A próxima fatia será vertical e limitada: selecionar um nó wireless, editar seu canal em um painel acessível, normalizar o valor, refletir a alteração no canvas/documento e manter os gates existentes bloqueando canais inválidos.
 
 Critérios de aceite: seleção de transmitter/receiver sem alterar seleção de tabela, edição somente para nós wireless, canal vazio e acima de 64 caracteres com feedback em português, histórico undo/redo preservado, persistência local/cloud usando o documento canônico e regressão de acessibilidade sem alterar a semântica de canais ou conexões convencionais.
+
+## Planejamento CHIP-001 — biblioteca local de definições — 2026-08-22
+
+Após estabilizar o editor e os canais wireless, a próxima fatia priorizada do ciclo v0.10 será uma fundação de hierarquia sem alterar ainda o netlist existente: transformar um `CircuitDocument` combinacional válido em uma definição serializável de chip customizado e persistir essa definição localmente no IndexedDB.
+
+Critérios de aceite: somente documentos v1 válidos, acíclicos e combinacionais podem virar chip; entradas e saídas devem ter ordem determinística e nomes normalizados; a definição deve manter o documento original sem mutação; o schema Dexie deve evoluir sem quebrar stores existentes; o editor deve oferecer salvar como chip com feedback em português; ausência de IndexedDB deve degradar sem interromper o circuito; avaliação hierárquica e instanciação no canvas ficam explicitamente para CHIP-002.

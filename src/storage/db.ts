@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Notation } from '../engine'
-import type { CircuitDocument } from '../circuit'
+import type { CircuitDocument, CustomChipDefinition } from '../circuit'
 import type { AlgorithmDocument } from '../algorithms'
 
 /** Um projeto salvo no navegador do usuário. */
@@ -37,6 +37,17 @@ export interface AlgorithmProject {
 
 export type NewAlgorithmProject = Omit<AlgorithmProject, 'id' | 'createdAt' | 'updatedAt'>
 
+/** Uma definição de chip customizado criada a partir de um circuito local. */
+export interface CustomChipProject {
+  id: number
+  name: string
+  definition: CustomChipDefinition
+  createdAt: number
+  updatedAt: number
+}
+
+export type NewCustomChipProject = Omit<CustomChipProject, 'id' | 'createdAt' | 'updatedAt'>
+
 /**
  * O banco vive no IndexedDB do próprio navegador.
  *
@@ -47,6 +58,7 @@ export class VeritasDatabase extends Dexie {
   projects!: EntityTable<Project, 'id'>
   circuitProjects!: EntityTable<CircuitProject, 'id'>
   algorithmProjects!: EntityTable<AlgorithmProject, 'id'>
+  customChipProjects!: EntityTable<CustomChipProject, 'id'>
 
   constructor(name = 'veritas') {
     super(name)
@@ -59,6 +71,12 @@ export class VeritasDatabase extends Dexie {
       projects: '++id, name, updatedAt',
       circuitProjects: '++id, name, updatedAt',
       algorithmProjects: '++id, name, updatedAt',
+    })
+    this.version(4).stores({
+      projects: '++id, name, updatedAt',
+      circuitProjects: '++id, name, updatedAt',
+      algorithmProjects: '++id, name, updatedAt',
+      customChipProjects: '++id, name, updatedAt',
     })
   }
 }

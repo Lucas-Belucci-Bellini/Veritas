@@ -1,6 +1,13 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createCircuitDocument, type CircuitDocument } from '../circuit'
+import {
+  createCustomChipProject,
+  deleteCustomChipProject,
+  getCustomChipProject,
+  listCustomChipProjects,
+  updateCustomChipProject,
+} from './customChips'
 import { db } from './db'
 import {
   createCircuitProject,
@@ -31,6 +38,32 @@ const document: CircuitDocument = {
 beforeEach(async () => {
   await db.open()
   await db.circuitProjects.clear()
+  await db.customChipProjects.clear()
+})
+
+describe('customChipProjects', () => {
+  it('persiste definição válida com portas, atualiza e remove', async () => {
+    const id = await createCustomChipProject({ name: '  Somador local  ', document })
+    const saved = await getCustomChipProject(id)
+
+    expect(saved?.name).toBe('Somador local')
+    expect(saved?.definition.inputs.map((port) => port.name)).toEqual(['A', 'B'])
+    expect(saved?.definition.outputs.map((port) => port.name)).toEqual(['Saída'])
+
+    await updateCustomChipProject(id, { name: 'Somador atualizado' })
+    expect((await getCustomChipProject(id))?.name).toBe('Somador atualizado')
+    expect((await listCustomChipProjects()).map((chip) => chip.name)).toEqual(['Somador atualizado'])
+
+    await deleteCustomChipProject(id)
+    expect(await getCustomChipProject(id)).toBeUndefined()
+  })
+
+  it('recusa salvar circuito inválido como chip', async () => {
+    await expect(createCustomChipProject({
+      name: 'Inválido',
+      document: { ...document, connections: [] },
+    })).rejects.toThrow('entrada')
+  })
 })
 
 describe('circuitProjects', () => {

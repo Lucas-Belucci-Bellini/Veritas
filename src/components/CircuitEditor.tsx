@@ -43,6 +43,7 @@ import { parseBusLiteral, toBinary, type BitVector } from '../bus'
 import { TruthTableView } from './TruthTableView'
 import { VectorTruthTableView } from './VectorTruthTableView'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
+import { useCustomChips } from '../hooks/useCustomChips'
 import type { ValueStyle } from '../lib/values'
 import type { CircuitProject } from '../storage/db'
 import { useAuth } from '../auth/useAuth'
@@ -129,6 +130,7 @@ export function CircuitEditor() {
   const historyRef = useRef<CircuitHistory | null>(null)
   const [historyRevision, setHistoryRevision] = useState(0)
   const storage = useCircuitProjects()
+  const customChips = useCustomChips()
   const { user } = useAuth()
   const cloud = useCloudCircuitProjects()
   const [cloudProjectId, setCloudProjectId] = useState<string | null>(null)
@@ -142,6 +144,7 @@ export function CircuitEditor() {
   const [nextClockPeriod, setNextClockPeriod] = useState(1)
   const [nextDelayTicks, setNextDelayTicks] = useState(1)
   const [nextWirelessChannel, setNextWirelessChannel] = useState('bus-a')
+  const [customChipName, setCustomChipName] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiResult, setAiResult] = useState<CircuitAiResult | null>(null)
   const [sequentialSnapshot, setSequentialSnapshot] = useState<DocumentRuntimeSnapshot | null>(null)
@@ -538,6 +541,48 @@ export function CircuitEditor() {
     })
   }
 
+  const saveAsCustomChip = async () => {
+    if (readOnlyCollaboration) {
+      setNotice('Você está conectado como visualizador e não pode criar um chip customizado.')
+      return
+    }
+    if (hasSequential) {
+      setNotice('Chips customizados desta versão precisam ser combinacionais; remova os componentes sequenciais.')
+      return
+    }
+    if (issues.length > 0) {
+      setNotice('Corrija os problemas de validação antes de salvar este circuito como chip customizado.')
+      return
+    }
+    if (!customChips.ready || customChips.unavailable) {
+      setNotice(customChips.unavailable ?? 'A biblioteca local de chips ainda está carregando.')
+      return
+    }
+    try {
+      const id = await customChips.save({
+        name: customChipName.trim() || projectName.trim() || document.name,
+        document,
+      })
+      setNotice(`Chip customizado salvo localmente (ID ${id}).`)
+      setCustomChipName('')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível salvar o chip customizado.')
+    }
+  }
+
+  const removeCustomChip = async (chipId: number, chipName: string) => {
+    if (readOnlyCollaboration) {
+      setNotice('Você está conectado como visualizador e não pode remover chips customizados.')
+      return
+    }
+    try {
+      await customChips.remove(chipId)
+      setNotice(`Chip customizado "${chipName}" removido da biblioteca local.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível remover o chip customizado.')
+    }
+  }
+
   const updateWirelessChannel = (channel: string) => {
     if (!selectedNodeId) return
     if (readOnlyCollaboration) {
@@ -862,6 +907,13 @@ export function CircuitEditor() {
           <button type="button" className="key text-xs" onClick={() => void syncCloud()} disabled={cloud.loading || readOnlyCollaboration} title={user ? 'Sincronizar este circuito com sua conta Supabase' : 'Entre para sincronizar na nuvem'}>
             {cloud.loading ? 'Sincronizando…' : 'Sincronizar nuvem'}
           </button>
+          <label className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400" htmlFor="custom-chip-name">
+            Nome do chip
+            <input id="custom-chip-name" value={customChipName} onChange={(event) => setCustomChipName(event.target.value)} placeholder={projectName || 'Meu chip'} maxLength={200} className="w-28 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700" />
+          </label>
+          <button type="button" className="key text-xs" onClick={() => void saveAsCustomChip()} disabled={readOnlyCollaboration || hasSequential || issues.length > 0 || !customChips.ready || Boolean(customChips.unavailable)} title="Salvar este circuito combinacional na biblioteca local de chips">
+            Salvar como chip
+          </button>
           <button type="button" className="key text-xs" onClick={exportLocal}>
             Exportar
           </button>
@@ -945,6 +997,35 @@ export function CircuitEditor() {
               </p>
             </section>
           )}
+          <section className="mt-4 rounded-xl border border-slate-200 p-3 dark:border-slate-800" aria-labelledby="custom-chip-library-title">
+            <div className="flex items-center justify-between gap-2">
+              <h3 id="custom-chip-library-title" className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                Biblioteca local
+              </h3>
+              <span className="text-[11px] text-slate-400">{customChips.chips.length} chip{customChips.chips.length === 1 ? '' : 's'}</span>
+            </div>
+            {!customChips.ready && <p className="mt-2 text-[11px] text-slate-400">Carregando biblioteca…</p>}
+            {customChips.unavailable && <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">{customChips.unavailable}</p>}
+            {customChips.error && <p className="mt-2 text-[11px] text-rose-700 dark:text-rose-300">{customChips.error}</p>}
+            {customChips.ready && !customChips.unavailable && customChips.chips.length === 0 && (
+              <p className="mt-2 text-[11px] text-slate-400">Salve um circuito combinacional para reutilizá-lo depois.</p>
+            )}
+            {customChips.chips.length > 0 && (
+              <ul className="mt-2 space-y-2">
+                {customChips.chips.map((chip) => (
+                  <li key={chip.id} className="flex items-start justify-between gap-2 text-[11px]">
+                    <span className="min-w-0">
+                      <strong className="block truncate text-slate-700 dark:text-slate-200">{chip.name}</strong>
+                      <span className="text-slate-400">{chip.definition.inputs.length} entrada{chip.definition.inputs.length === 1 ? '' : 's'} · {chip.definition.outputs.length} saída{chip.definition.outputs.length === 1 ? '' : 's'}</span>
+                    </span>
+                    <button type="button" className="shrink-0 text-rose-600 underline disabled:text-slate-400" onClick={() => void removeCustomChip(chip.id, chip.name)} disabled={readOnlyCollaboration} aria-label={`Remover chip ${chip.name}`}>
+                      Remover
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </aside>
 
         <div>
