@@ -22,7 +22,7 @@ Há, porém, quatro fatos que impedem chamar o estado atual de `1.0.0` sem uma r
 
 | Área | Estado atual | Consequência para o lançamento |
 | --- | --- | --- |
-| Versionamento | `package.json` está em `0.9.0-rc.10`; `v0.9.0-rc.9` está publicada e a RC-10 está em preparação após o RUST-002; ainda não há release estável. | Executar os gates da RC-10 e manter a sequência de pré-releases antes do estável. |
+| Versionamento | `package.json` está em `0.9.0-rc.10`; `v0.9.0-rc.10` está publicada e ainda não há release estável. | Manter as pré-releases até concluir os gates reais de beta e estabilidade. |
 | Distribuição | Existe deployment Vercel público, mas o fluxo de Preview/Production, domínio, headers e rollback ainda precisa ser formalizado. | Tratar o deployment atual como preview até concluir o checklist. |
 | MCP | Ferramentas determinísticas estão disponíveis por `stdio`; transporte HTTP remoto autenticado ainda é roadmap. | Não prometer integração web remota no lançamento inicial. |
 | Colaboração | Broadcast de snapshots e Presence funcionam, mas não são CRDT nem merge campo a campo. | Rotular como colaboração beta/preview e documentar o risco de sobrescrita concorrente. |
