@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.9] — 2026-08-22
+
+### Adicionado
+
+- Núcleo experimental `engine-rs/` em Rust, sem dependências externas, para avaliação combinacional determinística com sinais de 1 a 64 bits.
+- Contrato `Signal`, operadores AND/NAND/OR/NOR/XOR/XNOR/NOT, ordenação topológica estável, erros explícitos e fixture golden compartilhado com as primitivas vetoriais TypeScript.
+- Acceptance `npm run beta:rust`, comandos `test:rust`/`bench:rust`, documentação de arquitetura e gate Rust nos workflows de qualidade e release.
+
+### Limites e validação
+
+- O motor TypeScript continua sendo o runtime de produção; Rust ainda não é carregado pelo navegador, não substitui MCP/HDL/IndexedDB e não habilita WASM automaticamente.
+- `RUST-001` e `RUST-002` passam em modo offline; o benchmark é somente baseline local e não comprova superioridade de desempenho entre runtimes.
+- A referência Digital Logic Sim foi analisada somente em leitura; nenhum código, asset ou binário foi copiado. O beta segue bloqueado por falta de evidência RLS/Realtime cross-user real.
+
 ## [0.9.0-rc.8] — 2026-08-22
 
 ### Segurança e validação

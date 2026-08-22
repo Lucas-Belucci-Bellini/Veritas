@@ -23667,7 +23667,7 @@ function guard(run) {
 		});
 	}
 }
-var VERITAS_MCP_VERSION = "0.9.0-rc.8";
+var VERITAS_MCP_VERSION = "0.9.0-rc.9";
 var VERITAS_MCP_INSTRUCTIONS = "Motor de lógica booleana do Veritas. Use estas ferramentas em vez de calcular tabelas verdade ou simplificações de cabeça: elas são exatas. A biblioteca de chips vem de circuitos reais feitos no Digital Logic Sim.";
 function createVeritasServer() {
 	const server = new McpServer({
