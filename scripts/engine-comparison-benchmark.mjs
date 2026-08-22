@@ -68,7 +68,7 @@ function compareResults(ts, rust) {
   return rows
 }
 
-function renderReport(rows, ts, rust) {
+function renderReport(rows, ts) {
   const lines = [
     '# RUST-002 — benchmark comparativo TypeScript/Rust',
     '',
@@ -135,7 +135,7 @@ try {
     },
   }
   fs.writeFileSync(path.join(artifactDir, 'engine-comparison-benchmark.json'), `${JSON.stringify(report, null, 2)}\n`)
-  fs.writeFileSync(reportPath, renderReport(rows, typescript, rust))
+  fs.writeFileSync(reportPath, renderReport(rows, typescript))
   console.log(`RUST-002 PASS: ${rows.length} cenários com paridade de saída; relatório em ${path.relative(repoRoot, reportPath)}`)
 } catch (error) {
   console.error(`RUST-002 FAIL: ${error instanceof Error ? error.message : String(error)}`)
