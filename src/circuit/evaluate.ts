@@ -180,10 +180,16 @@ function evaluateVectorComponent(
       return componentInputs[0] ?? bitVector(width, 0)
     case 'and':
       return foldVectors(componentInputs, width, bitwiseAnd)
+    case 'nand':
+      return bitwiseNot(foldVectors(componentInputs, width, bitwiseAnd))
     case 'or':
       return foldVectors(componentInputs, width, bitwiseOr)
+    case 'nor':
+      return bitwiseNot(foldVectors(componentInputs, width, bitwiseOr))
     case 'xor':
       return foldVectors(componentInputs, width, bitwiseXor)
+    case 'xnor':
+      return bitwiseNot(foldVectors(componentInputs, width, bitwiseXor))
     case 'not':
       return bitwiseNot(componentInputs[0] ?? bitVector(width, 0))
     default:
@@ -234,9 +240,12 @@ function evaluateComponent(
     case 'receiver':
       return [componentInputs[0] ?? false]
     case 'and':
+    case 'nand':
     case 'or':
+    case 'nor':
     case 'not':
-    case 'xor': {
+    case 'xor':
+    case 'xnor': {
       const result = combinationalResult(component.type, componentInputs)
       if (result === null) {
         throw new Error(`O componente "${component.id}" não é combinacional.`)

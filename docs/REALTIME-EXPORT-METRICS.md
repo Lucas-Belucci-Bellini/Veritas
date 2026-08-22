@@ -27,6 +27,7 @@ O editor exporta circuitos combinacionais válidos para Verilog-2001 (`.v`) e VH
 | Saída | `output` e `assign` | `out std_logic` e atribuição concorrente |
 | Constante | `1'b0`/`1'b1` | `'0'`/`'1'` |
 | AND/OR/XOR | `&`, `|`, `^` | `and`, `or`, `xor` |
+| NAND/NOR/XNOR | `~(A & B)`, `~(A \| B)`, `~(A ^ B)` | `not (A and B)`, `not (A or B)`, `not (A xor B)` |
 | NOT | `~signal` | `not signal` |
 | Fio interno | `wire` | `signal` |
 

@@ -77,6 +77,25 @@ describe('exportCircuit', () => {
     expect(output).toContain('end architecture rtl;')
   })
 
+  it('exporta NAND, NOR e XNOR com negação da operação correta', () => {
+    const cases = [
+      { type: 'nand' as const, verilog: '~(A & B)', vhdl: 'not (A and B)' },
+      { type: 'nor' as const, verilog: '~(A | B)', vhdl: 'not (A or B)' },
+      { type: 'xnor' as const, verilog: '~(A ^ B)', vhdl: 'not (A xor B)' },
+    ]
+
+    for (const { type, verilog, vhdl } of cases) {
+      const gateDocument = {
+        ...document,
+        name: `${type} export`,
+        nodes: document.nodes.map((node) => node.id === 'gate' ? { ...node, type } : node),
+      }
+
+      expect(exportVerilog(gateDocument)).toContain(`assign A_B = ${verilog};`)
+      expect(exportVhdl(gateDocument)).toContain(`A_B <= ${vhdl};`)
+    }
+  })
+
   it('normaliza nome, IDs e referências antes de exportar', () => {
     const spaced = {
       ...document,

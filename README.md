@@ -161,9 +161,11 @@ só depois todos publicam ao mesmo tempo. É o que a eletricidade faz de verdade
 cada porta tem seu atraso de propagação — e é o que permite simular
 realimentação sem o navegador entrar em laço infinito.
 
-Componentes: portas lógicas, `input`, `output`, `constant`, `clock` (com período
-ajustável), flip-flops `dff` e `tff` (disparados na borda de subida, com saídas
-Q e Q̄) e `delay` de N tiques.
+Componentes: portas `and`, `nand`, `or`, `nor`, `not`, `xor` e `xnor`, além de
+`input`, `output`, `constant`, `clock` (com período ajustável), flip-flops `dff`
+e `tff` (disparados na borda de subida, com saídas Q e Q̄) e `delay` de N tiques.
+As portas NAND, NOR e XNOR também são criadas pela paleta visual, avaliadas no
+circuito e exportadas para Verilog/VHDL com a negação da operação correspondente.
 
 Com isso já dá para montar latch SR, contador, divisor de frequência e linhas de
 atraso — os testes cobrem todos eles. E um teste cruzado confere que, para

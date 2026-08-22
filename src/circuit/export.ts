@@ -143,8 +143,9 @@ function verilogExpression(node: CircuitNode, model: ExportModel): string {
   if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))[0] ?? verilogLiteral(nodeWidth(node), false)
   const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
   if (node.type === 'not') return `~${operands[0]}`
-  const operator = node.type === 'and' ? ' & ' : node.type === 'or' ? ' | ' : ' ^ '
-  return operands.join(operator)
+  const operator = node.type === 'and' || node.type === 'nand' ? ' & ' : node.type === 'or' || node.type === 'nor' ? ' | ' : ' ^ '
+  const expression = operands.join(operator)
+  return node.type === 'nand' || node.type === 'nor' || node.type === 'xnor' ? `~(${expression})` : expression
 }
 
 function vhdlExpression(node: CircuitNode, model: ExportModel): string {
@@ -153,8 +154,9 @@ function vhdlExpression(node: CircuitNode, model: ExportModel): string {
   if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))[0] ?? vhdlLiteral(nodeWidth(node), false)
   const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
   if (node.type === 'not') return `not ${operands[0]}`
-  const operator = node.type === 'and' ? ' and ' : node.type === 'or' ? ' or ' : ' xor '
-  return operands.join(operator)
+  const operator = node.type === 'and' || node.type === 'nand' ? ' and ' : node.type === 'or' || node.type === 'nor' ? ' or ' : ' xor '
+  const expression = operands.join(operator)
+  return node.type === 'nand' || node.type === 'nor' || node.type === 'xnor' ? `not (${expression})` : expression
 }
 
 function verilogDirection(node: CircuitNode, direction: 'input' | 'output', model: ExportModel): string {
@@ -206,6 +208,6 @@ function sanitizeIdentifier(value: string, fallback: string): string {
   const cleaned = value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_$]/g, '_').replace(/_+/g, '_')
   const candidate = cleaned.replace(/^_+|_+$/g, '') || fallback
   const prefixed = /^[0-9]/.test(candidate) ? `n_${candidate}` : candidate
-  const reserved = new Set(['module', 'input', 'output', 'wire', 'assign', 'begin', 'end', 'entity', 'architecture', 'signal', 'port', 'in', 'out', 'and', 'or', 'not', 'xor'])
+  const reserved = new Set(['module', 'input', 'output', 'wire', 'assign', 'begin', 'end', 'entity', 'architecture', 'signal', 'port', 'in', 'out', 'and', 'nand', 'or', 'nor', 'not', 'xor', 'xnor'])
   return reserved.has(prefixed.toLowerCase()) ? `v_${prefixed}` : prefixed
 }

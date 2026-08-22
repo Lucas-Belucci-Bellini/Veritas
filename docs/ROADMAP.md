@@ -629,3 +629,15 @@ Critérios de aceite: configuração com path MCP igual ao path reservado falha 
 `normalizeOptions` agora rejeita no startup qualquer path MCP igual a `/.well-known/oauth-protected-resource`, preservando a separação entre o endpoint protegido `/mcp` e a rota reservada de metadata. A rejeição é fail-closed e não altera stdio, schemas, autenticação Bearer ou a disponibilidade da metadata opt-in.
 
 Critérios realizados: teste unitário da colisão, acceptance `MCP-015-HTTP-001` com startup rejeitado, regressão dos checks MCP-011/MCP-013/MCP-014, typecheck e build HTTP aprovados. O resultado não habilita OAuth remoto nem qualquer endpoint público.
+
+## Planejamento EDITOR-001 — paridade visual das portas combinacionais — 2026-08-22
+A auditoria identificou uma divergência concreta: a engine e os símbolos ANSI já conhecem `nand`, `nor` e `xnor`, mas o modelo visual e a paleta do `CircuitEditor` ainda não permitem criá-los. A próxima fatia local-first vai fechar esse contrato de ponta a ponta, sem criar novos tipos persistidos: editor, validação, avaliação, tabela verdade, exportadores e MCP devem reconhecer os mesmos componentes já suportados pelo domínio.
+
+Critérios de aceite: NAND, NOR e XNOR aparecem na paleta com descrições em português; podem ser criados, serializados, reabertos e avaliados no editor; símbolos preservam corpo e bolha de inversão corretos; validação, tabela verdade e HDL não regressam; documentos existentes continuam compatíveis; a suíte e os gates de distribuição permanecem verdes.
+
+## Implementação EDITOR-001 — paridade visual das portas combinacionais — 2026-08-22
+O contrato do editor agora inclui `nand`, `nor` e `xnor` no `EditorComponentType`, na lista de componentes aceitos, na contagem de entradas, na paleta e nos rótulos do `CircuitEditor`. Os símbolos ANSI existentes já diferenciavam as portas por família e bolha de inversão; o editor passou a encaminhar corretamente os três `GateOp`.
+
+A avaliação escalar e vetorial foi alinhada ao domínio: NAND aplica NOT ao AND, NOR aplica NOT ao OR e XNOR aplica NOT ao XOR, preservando widths e a ordem topológica. Verilog e VHDL emitem as expressões negadas correspondentes. O MCP continua aceitando o union completo sem narrowing impossível, e documentos v1 existentes permanecem compatíveis.
+
+Critérios realizados: regressão de modelo com 12 testes, exportação HDL com 9 testes, avaliação vetorial com 7 testes; conjunto focado com 28 PASS, typecheck e lint aprovados. A etapa não altera persistência, Supabase, Realtime ou transporte MCP e não habilita OAuth remoto.

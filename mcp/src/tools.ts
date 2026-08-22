@@ -559,11 +559,9 @@ function expandCustomChipComponents(
   watch: readonly string[],
 ): ComponentSpec[] {
   if (!components.some((component) => component.type === 'custom-chip')) return [...components]
-  const unsupported = components.filter((component) => !isCanonicalComponent(component)).map((component) => component.type)
-  if (unsupported.length > 0) {
-    throw new Error(`Componentes MCP incompatíveis com expansão custom-chip: ${[...new Set(unsupported)].join(', ')}.`)
-  }
-  const canonicalComponents = components.filter(isCanonicalComponent)
+  // ComponentSpec e CircuitDocument compartilham o mesmo union de componentes;
+  // a validação do documento continua sendo a autoridade para tipos inválidos.
+  const canonicalComponents = [...components]
   const document: CircuitDocument = {
     format: 'veritas-circuit',
     version: 1,
@@ -616,9 +614,6 @@ function expandCustomChipComponents(
   return result
 }
 
-function isCanonicalComponent(component: ComponentSpec): component is ComponentSpec & { type: CircuitDocument['nodes'][number]['type'] } {
-  return ['input', 'output', 'constant', 'and', 'or', 'not', 'xor', 'clock', 'dff', 'tff', 'delay', 'transmitter', 'receiver', 'custom-chip'].includes(component.type)
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null

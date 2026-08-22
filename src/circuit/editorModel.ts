@@ -20,9 +20,12 @@ export type EditorComponentType = Extract<
   | 'output'
   | 'constant'
   | 'and'
+  | 'nand'
   | 'or'
+  | 'nor'
   | 'not'
   | 'xor'
+  | 'xnor'
   | 'clock'
   | 'dff'
   | 'tff'
@@ -37,9 +40,12 @@ export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
   'output',
   'constant',
   'and',
+  'nand',
   'or',
+  'nor',
   'not',
   'xor',
+  'xnor',
   'clock',
   'dff',
   'tff',
@@ -139,8 +145,11 @@ export function editorInputCount(type: EditorComponentType): number {
     case 'custom-chip':
       return 0
     case 'and':
+    case 'nand':
     case 'or':
+    case 'nor':
     case 'xor':
+    case 'xnor':
     case 'dff':
     case 'tff':
       return 2

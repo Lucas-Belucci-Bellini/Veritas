@@ -21273,9 +21273,12 @@ var EDITOR_COMPONENT_TYPES = [
 	"output",
 	"constant",
 	"and",
+	"nand",
 	"or",
+	"nor",
 	"not",
 	"xor",
+	"xnor",
 	"clock",
 	"dff",
 	"tff",
@@ -21305,8 +21308,11 @@ function editorInputCount(type) {
 		case "receiver":
 		case "custom-chip": return 0;
 		case "and":
+		case "nand":
 		case "or":
+		case "nor":
 		case "xor":
+		case "xnor":
 		case "dff":
 		case "tff": return 2;
 	}
@@ -21658,8 +21664,11 @@ function evaluateVectorComponent(component, componentInputs, inputs, options) {
 		case "transmitter":
 		case "receiver": return componentInputs[0] ?? bitVector(width, 0);
 		case "and": return foldVectors(componentInputs, width, bitwiseAnd);
+		case "nand": return bitwiseNot(foldVectors(componentInputs, width, bitwiseAnd));
 		case "or": return foldVectors(componentInputs, width, bitwiseOr);
+		case "nor": return bitwiseNot(foldVectors(componentInputs, width, bitwiseOr));
 		case "xor": return foldVectors(componentInputs, width, bitwiseXor);
+		case "xnor": return bitwiseNot(foldVectors(componentInputs, width, bitwiseXor));
 		case "not": return bitwiseNot(componentInputs[0] ?? bitVector(width, 0));
 		default: throw new Error(`O componente "${component.id}" não é suportado no avaliador vetorial.`);
 	}
@@ -21696,9 +21705,12 @@ function evaluateComponent(component, componentInputs, inputs, options) {
 		case "transmitter":
 		case "receiver": return [componentInputs[0] ?? false];
 		case "and":
+		case "nand":
 		case "or":
+		case "nor":
 		case "not":
-		case "xor": {
+		case "xor":
+		case "xnor": {
 			const result = combinationalResult(component.type, componentInputs);
 			if (result === null) throw new Error(`O componente "${component.id}" não é combinacional.`);
 			return [result];
@@ -22100,8 +22112,9 @@ function verilogExpression(node, model) {
 	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"))[0] ?? verilogLiteral(nodeWidth(node), false);
 	const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"));
 	if (node.type === "not") return `~${operands[0]}`;
-	const operator = node.type === "and" ? " & " : node.type === "or" ? " | " : " ^ ";
-	return operands.join(operator);
+	const operator = node.type === "and" || node.type === "nand" ? " & " : node.type === "or" || node.type === "nor" ? " | " : " ^ ";
+	const expression = operands.join(operator);
+	return node.type === "nand" || node.type === "nor" || node.type === "xnor" ? `~(${expression})` : expression;
 }
 function vhdlExpression(node, model) {
 	if (node.type === "input" || node.type === "output") return sourceExpression(node, model);
@@ -22109,8 +22122,9 @@ function vhdlExpression(node, model) {
 	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"))[0] ?? vhdlLiteral(nodeWidth(node), false);
 	const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"));
 	if (node.type === "not") return `not ${operands[0]}`;
-	const operator = node.type === "and" ? " and " : node.type === "or" ? " or " : " xor ";
-	return operands.join(operator);
+	const operator = node.type === "and" || node.type === "nand" ? " and " : node.type === "or" || node.type === "nor" ? " or " : " xor ";
+	const expression = operands.join(operator);
+	return node.type === "nand" || node.type === "nor" || node.type === "xnor" ? `not (${expression})` : expression;
 }
 function verilogDirection(node, direction, model) {
 	return `${direction}${verilogWidth(node)} ${model.names.get(node.id)}`;
@@ -22166,9 +22180,12 @@ function sanitizeIdentifier(value, fallback) {
 		"in",
 		"out",
 		"and",
+		"nand",
 		"or",
+		"nor",
 		"not",
-		"xor"
+		"xor",
+		"xnor"
 	])).has(prefixed.toLowerCase()) ? `v_${prefixed}` : prefixed;
 }
 //#endregion
@@ -23474,9 +23491,7 @@ function normalizeCustomChipLibrary(entries = []) {
 }
 function expandCustomChipComponents(components, customChips, watch) {
 	if (!components.some((component) => component.type === "custom-chip")) return [...components];
-	const unsupported = components.filter((component) => !isCanonicalComponent(component)).map((component) => component.type);
-	if (unsupported.length > 0) throw new Error(`Componentes MCP incompatíveis com expansão custom-chip: ${[...new Set(unsupported)].join(", ")}.`);
-	const canonicalComponents = components.filter(isCanonicalComponent);
+	const canonicalComponents = [...components];
 	const expanded = elaborateCustomChipDocument({
 		format: "veritas-circuit",
 		version: 1,
@@ -23535,24 +23550,6 @@ function expandCustomChipComponents(components, customChips, watch) {
 		});
 	}
 	return result;
-}
-function isCanonicalComponent(component) {
-	return [
-		"input",
-		"output",
-		"constant",
-		"and",
-		"or",
-		"not",
-		"xor",
-		"clock",
-		"dff",
-		"tff",
-		"delay",
-		"transmitter",
-		"receiver",
-		"custom-chip"
-	].includes(component.type);
 }
 function isRecord(value) {
 	return typeof value === "object" && value !== null;

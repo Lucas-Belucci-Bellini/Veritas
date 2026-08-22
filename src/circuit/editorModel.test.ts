@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   CircuitValidationError,
   createCircuitDocument,
+  EDITOR_COMPONENT_TYPES,
+  editorInputCount,
   evaluateCircuit,
   toNetlist,
   validateCircuit,
@@ -68,6 +70,33 @@ describe('editorModel', () => {
     expect(evaluateCircuit(document, { a: false, b: true }).outputs.out).toBe(false)
     expect(evaluateCircuit(document, { a: true, b: false }).outputs.out).toBe(false)
     expect(evaluateCircuit(document, { a: true, b: true }).outputs.out).toBe(true)
+  })
+
+  it('mantém NAND, NOR e XNOR no contrato visual e na avaliação', () => {
+    const cases = [
+      { type: 'nand' as const, expected: [true, true, true, false] },
+      { type: 'nor' as const, expected: [true, false, false, false] },
+      { type: 'xnor' as const, expected: [true, false, false, true] },
+    ]
+
+    for (const { type, expected } of cases) {
+      const document = andCircuit()
+      document.name = `${type} de teste`
+      document.nodes[2].type = type
+
+      expect(EDITOR_COMPONENT_TYPES).toContain(type)
+      expect(editorInputCount(type)).toBe(2)
+      expect(validateCircuit(document)).toEqual([])
+      expect(toNetlist(document).components).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'gate', type, inputs: [{ node: 'a' }, { node: 'b' }] }),
+      ]))
+      expect([
+        evaluateCircuit(document, { a: false, b: false }).outputs.out,
+        evaluateCircuit(document, { a: false, b: true }).outputs.out,
+        evaluateCircuit(document, { a: true, b: false }).outputs.out,
+        evaluateCircuit(document, { a: true, b: true }).outputs.out,
+      ]).toEqual(expected)
+    }
   })
 
   it('resolve canal wireless no netlist e propaga para múltiplos receptores', () => {
