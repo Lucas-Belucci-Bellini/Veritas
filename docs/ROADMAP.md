@@ -493,3 +493,9 @@ O boundary cobre ALGO-002, LogicCaseLab, SequentialWorkspace, CircuitEditor, Pro
 Foi criado `src/circuit/wirelessChannels.ts` com normalização e resolução determinística de canais `transmitter`/`receiver`. A regra aceita um transmissor por canal, ordena receptores por `nodeId`, valida canal vazio, endpoint duplicado, receptor órfão e largura incompatível.
 
 Esta é uma fatia de domínio intencionalmente segura: ainda não adiciona tipos wireless ao documento persistido, ao canvas, ao avaliador ou aos exportadores. A próxima etapa deverá integrar esses tipos de forma coordenada para não aceitar parcialmente circuitos que a validação, o Realtime ou o HDL não consigam representar.
+
+## Atualização da implementação — auditoria Veritas Next — 2026-08-22
+
+A auditoria factual do repositório foi registrada em [`VERITAS_AUDIT.md`](../VERITAS_AUDIT.md). O estado encontrado confirma uma base funcional ampla — engine pura, CircuitDocument v1, editor visual, simulação temporal, IndexedDB, Supabase/Auth/Realtime, HDL, ALGO-001/002/003, MCP stdio e gates de release — mas também identifica contratos duplicados de validação, concentração de responsabilidades no `CircuitEditor.tsx`, divergência de versão do plugin e ausência de evidências cross-user reais para promoção beta.
+
+O próximo incremento foi definido como `FOUNDATION-001`: consolidar contrato runtime do documento, normalização defensiva, limites, migração de schema, topo sort compartilhado, vetores de validação entre TypeScript/SQL/Edge e alinhamento do artefato do plugin. A expansão wireless permanece isolada até atravessar domínio, validação, engine, UI, persistência e HDL com uma fatia vertical completa.
