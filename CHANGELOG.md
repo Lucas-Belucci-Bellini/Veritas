@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.11] — 2026-08-22
+
+### Adicionado
+
+- Gate experimental WASM-001 (`npm run beta:wasm`) com compilação para `wasm32-unknown-unknown` usando Rust 1.75, ABI mínimo versionado e validação por API WASM nativa do Node.
+- Teste determinístico do contrato WASM que aceita somente as duas funções ABI (`veritas_wasm_abi_version` e `veritas_wasm_capabilities`) e os metadados técnicos conhecidos do linker, rejeitando imports e exports desconhecidos.
+- Relatório sanitizado local com tamanho bruto/gzip, imports, exports, cold start e 100 instanciações repetidas; artefatos continuam fora do Git e do bundle do navegador.
+
+### Validação e limites
+
+- WASM-001 passou localmente e no Quality do GitHub; o módulo não recebe documentos, tokens, rede ou IndexedDB, não expõe uma API pública de memória e não avalia netlists.
+- O runtime produtivo continua em TypeScript, com fallback local-first preservado; nenhuma integração WASM no navegador, Web Worker, MCP ou plugin foi habilitada.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.10] — 2026-08-22
 
 ### Adicionado

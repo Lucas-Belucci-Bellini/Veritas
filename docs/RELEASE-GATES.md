@@ -33,7 +33,7 @@ Os testes devem cobrir a tabela verdade canônica, leis de De Morgan, implicaç�
 
 A asserção de determinismo deve comparar duas execuções com o mesmo documento e entradas, removendo apenas campos não determinísticos como timestamp ou identificador de sessão. O documento, trace, estado final, pausa e erro devem ser idênticos.
 
-O `beta:rust` é um gate técnico local/CI: verifica `cargo fmt --check` e os testes do crate `engine-rs` em modo offline. O `beta:wasm` é um gate de prontidão experimental: compila `wasm32-unknown-unknown`, exige zero imports e os dois exports do ABI mínimo, instancia o módulo e registra tamanho/cold start/repetição em relatório sanitizado. O `bench:compare` executa os harnesses TypeScript/Rust sobre fixture compartilhado, exige saídas e checksums independentes iguais e grava relatório sanitizado em `artifacts/`. Nenhum desses gates é evidência de isolamento cross-user, autorização Supabase, compatibilidade de produto WASM, superioridade de desempenho ou promoção beta; essas conclusões exigem seus próprios ensaios.
+O `beta:rust` é um gate técnico local/CI: verifica `cargo fmt --check` e os testes do crate `engine-rs` em modo offline. O `beta:wasm` é um gate de prontidão experimental: compila `wasm32-unknown-unknown`, exige zero imports, os dois exports ABI de função e somente os metadados técnicos conhecidos do linker (`memory`, `__data_end` e `__heap_base`), instancia o módulo e registra tamanho/cold start/repetição em relatório sanitizado. O `bench:compare` executa os harnesses TypeScript/Rust sobre fixture compartilhado, exige saídas e checksums independentes iguais e grava relatório sanitizado em `artifacts/`. Nenhum desses gates é evidência de isolamento cross-user, autorização Supabase, compatibilidade de produto WASM, superioridade de desempenho ou promoção beta; essas conclusões exigem seus próprios ensaios.
 
 ## 3. Smoke test HTTP/PWA
 
@@ -46,7 +46,7 @@ SMOKE_URL=https://veritas-opal-seven.vercel.app npm run smoke:release
 O comando [`npm run beta:preflight`](../scripts/beta-preflight.mjs) consolida versão candidata, árvore Git, suíte, typecheck, lint, build frontend, build MCP, smoke e a presença de um relatório RLS. Para uma promoção beta, execute-o com os gates externos obrigatórios:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.10 \
+BETA_EXPECTED_VERSION=0.9.0-rc.11 \
 SMOKE_URL=https://veritas-opal-seven.vercel.app \
 BETA_PREFLIGHT_REQUIRE_SMOKE=1 \
 BETA_PREFLIGHT_REQUIRE_RLS=1 \
@@ -69,7 +69,7 @@ Exemplo mínimo de estrutura, a ser preenchido somente com resultados reais:
 
 ```json
 {
-  "version": "0.9.0-rc.10",
+  "version": "0.9.0-rc.11",
   "generatedAt": "2026-08-21T02:00:00.000Z",
   "openP0": [],
   "openP1": [],
@@ -129,7 +129,7 @@ Os mesmos JSON de entrada devem ser executados pelo pacote MCP diretamente e por
 
 O workflow [`quality.yml`](../.github/workflows/quality.yml) roda em pull requests e pushes para `main`. Ele executa a suíte, constrói a aplicação, os bundles MCP stdio/HTTP, inicia o preview Vite, executa os runners MCP e executa `npm run smoke:release` contra `http://127.0.0.1:4173`.
 
-O workflow [`release.yml`](../.github/workflows/release.yml) aceita dois modos. No modo automático, o push de uma tag SemVer como `v0.9.0-rc.10` ou `v1.0.0` inicia validação, smoke e publicação; tags com hífen são marcadas como pre-release. No modo manual, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.9.0-rc.10` e marque `prerelease=true`. Em ambos os modos, o job de validação roda antes do job de publicação e `gh release create` gera as notas automaticamente. O workflow não cria tags automaticamente a partir de qualquer commit: a tag continua sendo o ponto explícito de promoção e rastreabilidade.
+O workflow [`release.yml`](../.github/workflows/release.yml) aceita dois modos. No modo automático, o push de uma tag SemVer como `v0.9.0-rc.11` ou `v1.0.0` inicia validação, smoke e publicação; tags com hífen são marcadas como pre-release. No modo manual, abra **Actions → Veritas release → Run workflow**, informe uma versão como `v0.9.0-rc.11` e marque `prerelease=true`. Em ambos os modos, o job de validação roda antes do job de publicação e `gh release create` gera as notas automaticamente. O workflow não cria tags automaticamente a partir de qualquer commit: a tag continua sendo o ponto explícito de promoção e rastreabilidade.
 
 O arquivo [`release.yml`](../.github/release.yml) organiza as notas por labels `breaking-change`, `feature`, `bug`, `security`, `documentation` e `education`. PRs sem categoria caem em `Other changes`.
 
