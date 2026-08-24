@@ -8,6 +8,7 @@ import {
   getChip,
   karnaugh,
   listChips,
+  circuitEquivalence,
   circuitTruthTable,
   circuitVectorTruthTable,
   exportCircuitTool,
@@ -268,6 +269,80 @@ describe('circuit_truth_table', () => {
 
     expect(result.isError).toBe(true)
     expect(result.text).toContain('definição local')
+  })
+})
+
+describe('circuit_equivalence', () => {
+  const gate = (name: string, prefix: string, type: 'xor' | 'or'): CircuitDocument => ({
+    format: 'veritas-circuit',
+    version: 1,
+    name,
+    nodes: [
+      { id: `${prefix}a`, type: 'input', position: { x: 0, y: 0 }, label: 'A' },
+      { id: `${prefix}b`, type: 'input', position: { x: 0, y: 0 }, label: 'B' },
+      { id: `${prefix}g`, type, position: { x: 0, y: 0 } },
+      { id: `${prefix}s`, type: 'output', position: { x: 0, y: 0 }, label: 'S' },
+    ],
+    connections: [
+      { source: { node: `${prefix}a`, port: 0 }, target: { node: `${prefix}g`, port: 0 } },
+      { source: { node: `${prefix}b`, port: 0 }, target: { node: `${prefix}g`, port: 1 } },
+      { source: { node: `${prefix}g`, port: 0 }, target: { node: `${prefix}s`, port: 0 } },
+    ],
+  })
+
+  it('reconhece dois circuitos com o mesmo comportamento', () => {
+    const result = circuitEquivalence({
+      documentA: gate('xor 1', 'x', 'xor'),
+      documentB: gate('xor 2', 'y', 'xor'),
+    })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('Resultado: equivalente')
+    expect(result.text).toContain('Linhas comparadas: 4 de 4')
+  })
+
+  it('devolve contraexemplo em Markdown quando divergem', () => {
+    const result = circuitEquivalence({
+      documentA: gate('xor', 'x', 'xor'),
+      documentB: gate('ou', 'y', 'or'),
+    })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('Resultado: não equivalente')
+    expect(result.text).toContain('Contraexemplo (linha 3)')
+    expect(result.text).toContain('| S | 0 | 1 |')
+  })
+
+  it('recusa documento fora do formato', () => {
+    const result = circuitEquivalence({ documentA: { nope: true }, documentB: gate('xor', 'y', 'xor') })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('documento A não possui o formato')
+  })
+
+  it('não afirma equivalência quando o espaço de entrada excede o limite', () => {
+    const wide = (prefix: string): CircuitDocument => ({
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'largo',
+      nodes: [
+        { id: `${prefix}a`, type: 'input', position: { x: 0, y: 0 }, label: 'A', options: { width: 8 } },
+        { id: `${prefix}b`, type: 'input', position: { x: 0, y: 0 }, label: 'B', options: { width: 8 } },
+        { id: `${prefix}g`, type: 'and', position: { x: 0, y: 0 }, options: { width: 8 } },
+        { id: `${prefix}o`, type: 'output', position: { x: 0, y: 0 }, label: 'R', options: { width: 8 } },
+      ],
+      connections: [
+        { source: { node: `${prefix}a`, port: 0 }, target: { node: `${prefix}g`, port: 0 } },
+        { source: { node: `${prefix}b`, port: 0 }, target: { node: `${prefix}g`, port: 1 } },
+        { source: { node: `${prefix}g`, port: 0 }, target: { node: `${prefix}o`, port: 0 } },
+      ],
+    })
+
+    const result = circuitEquivalence({ documentA: wide('x'), documentB: wide('y'), maxInputBits: 8 })
+
+    expect(result.text).toContain('Resultado: não comparável')
+    expect(result.text).toContain('input-bits-exceeded')
+    expect(result.text).toContain('não afirma nem nega equivalência')
   })
 })
 

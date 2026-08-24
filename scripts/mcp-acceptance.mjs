@@ -104,6 +104,23 @@ const CUSTOM_CHIP_CIRCUIT = {
   ],
 }
 
+const EQUIVALENCE_GATE = (prefix, type) => ({
+  format: 'veritas-circuit',
+  version: 1,
+  name: `Porta ${type} MCP`,
+  nodes: [
+    { id: `${prefix}a`, type: 'input', position: { x: 0, y: 0 }, label: 'A' },
+    { id: `${prefix}b`, type: 'input', position: { x: 0, y: 80 }, label: 'B' },
+    { id: `${prefix}g`, type, position: { x: 120, y: 40 } },
+    { id: `${prefix}s`, type: 'output', position: { x: 240, y: 40 }, label: 'S' },
+  ],
+  connections: [
+    { source: { node: `${prefix}a` }, target: { node: `${prefix}g`, port: 0 } },
+    { source: { node: `${prefix}b` }, target: { node: `${prefix}g`, port: 1 } },
+    { source: { node: `${prefix}g` }, target: { node: `${prefix}s`, port: 0 } },
+  ],
+})
+
 function main() {
   if (!existsSync(SERVER_PATH)) throw new Error('mcp/dist/server.js ausente; execute npm run build:mcp antes do gate')
   const session = runSession([
@@ -137,6 +154,14 @@ function main() {
       max_bits: 12,
       max_rows: 4,
     } }),
+    request(11, 'tools/call', { name: 'circuit_equivalence', arguments: {
+      document_a: EQUIVALENCE_GATE('x', 'xor'),
+      document_b: EQUIVALENCE_GATE('y', 'xor'),
+    } }),
+    request(12, 'tools/call', { name: 'circuit_equivalence', arguments: {
+      document_a: EQUIVALENCE_GATE('x', 'xor'),
+      document_b: EQUIVALENCE_GATE('y', 'or'),
+    } }),
   ])
   const initialize = responseFor(session.responses, 1)
   const listed = responseFor(session.responses, 2)
@@ -148,8 +173,10 @@ function main() {
   const customTruthTable = responseFor(session.responses, 8)
   const customHdl = responseFor(session.responses, 9)
   const vectorTruthTable = responseFor(session.responses, 10)
+  const equivalentPair = responseFor(session.responses, 11)
+  const divergentPair = responseFor(session.responses, 12)
   const toolNames = listed.result?.tools?.map((tool) => tool.name) ?? []
-  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit', 'circuit_truth_table', 'circuit_vector_truth_table', 'export_circuit_hdl']
+  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit', 'circuit_truth_table', 'circuit_vector_truth_table', 'export_circuit_hdl', 'circuit_equivalence']
   const missingTools = expectedTools.filter((name) => !toolNames.includes(name))
   const initializeOk = initialize.result?.serverInfo?.name === 'veritas' && initialize.result?.protocolVersion
   const truthText = textOf(truth)
@@ -160,6 +187,8 @@ function main() {
   const customTruthTableText = textOf(customTruthTable)
   const customHdlText = textOf(customHdl)
   const vectorTruthTableText = textOf(vectorTruthTable)
+  const equivalentText = textOf(equivalentPair)
+  const divergentText = textOf(divergentPair)
   const results = [
     result('MCP-001', initializeOk ? 'PASS' : 'FAIL', 'initialize JSON-RPC', initializeOk ? `servidor ${initialize.result.serverInfo.name} negociou ${initialize.result.protocolVersion}` : JSON.stringify(initialize)),
     result('MCP-002', missingTools.length === 0 ? 'PASS' : 'FAIL', 'tools/list schema', missingTools.length === 0 ? `${toolNames.length} ferramentas listadas com nomes estáveis` : `ferramentas ausentes: ${missingTools.join(', ')}`),
@@ -171,6 +200,8 @@ function main() {
     result('MCP-008', customTruthTable.result?.isError !== true && customTruthTableText.includes('| Entrada | Resultado |') && customTruthTableText.includes('| 0 | 1 |') ? 'PASS' : 'FAIL', 'circuit_truth_table custom-chip golden', customTruthTableText || JSON.stringify(customTruthTable)),
     result('MCP-009', customHdl.result?.isError !== true && customHdlText.includes('module Circuito_NOT_MCP') && customHdlText.includes('output Resultado') ? 'PASS' : 'FAIL', 'export_circuit_hdl custom-chip golden', customHdlText || JSON.stringify(customHdl)),
     result('MCP-010', vectorTruthTable.result?.isError !== true && vectorTruthTableText.includes('| a[3:0] | b[3:0] | out[3:0] |') && vectorTruthTableText.includes('| 0000 | 0000 | 0000 |') ? 'PASS' : 'FAIL', 'circuit_vector_truth_table golden', vectorTruthTableText || JSON.stringify(vectorTruthTable)),
+    result('MCP-EQ-001', equivalentPair.result?.isError !== true && equivalentText.includes('Resultado: equivalente') && equivalentText.includes('Linhas comparadas: 4 de 4') ? 'PASS' : 'FAIL', 'circuit_equivalence golden equivalente', equivalentText || JSON.stringify(equivalentPair)),
+    result('MCP-EQ-002', divergentPair.result?.isError !== true && divergentText.includes('Resultado: não equivalente') && divergentText.includes('Contraexemplo (linha 3)') && divergentText.includes('| S | 0 | 1 |') ? 'PASS' : 'FAIL', 'circuit_equivalence contraexemplo golden', divergentText || JSON.stringify(divergentPair)),
   ]
   if (results.some((item) => !MCP_ACCEPTANCE_IDS.includes(item.id))) throw new Error('IDs MCP fora do contrato')
   mkdirSync(dirname(REPORT_PATH), { recursive: true })

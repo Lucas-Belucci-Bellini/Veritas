@@ -22,10 +22,13 @@ import {
   buildCircuitTruthTable,
   buildCircuitVectorTruthTable,
   buildCustomChipDefinition,
+  compareCircuitEquivalence,
+  MAX_EQUIVALENCE_INPUT_BITS,
   elaborateCustomChipDocument,
   exportCircuit,
   isCircuitDocumentShape,
   type CircuitDocument,
+  type CircuitEquivalenceReport,
   type CustomChipLibraryEntry,
 } from '../../src/circuit/index'
 import { Simulator, type ComponentSpec } from '../../src/simulation/index'
@@ -533,6 +536,77 @@ export interface SimulateCircuitOptions {
 }
 
 export const MAX_CUSTOM_CHIP_LIBRARY_ENTRIES = 128
+
+export interface CircuitEquivalenceToolQuery {
+  documentA: unknown
+  documentB: unknown
+  maxInputBits?: number
+  customChipsA?: readonly CustomChipToolDefinition[]
+  customChipsB?: readonly CustomChipToolDefinition[]
+}
+
+export function circuitEquivalence(query: CircuitEquivalenceToolQuery): ToolResult {
+  try {
+    if (!isCircuitDocumentShape(query.documentA)) {
+      return { isError: true, text: 'O documento A não possui o formato veritas-circuit esperado.' }
+    }
+    if (!isCircuitDocumentShape(query.documentB)) {
+      return { isError: true, text: 'O documento B não possui o formato veritas-circuit esperado.' }
+    }
+    const report = compareCircuitEquivalence(query.documentA, query.documentB, {
+      customChipsA: normalizeCustomChipLibrary(query.customChipsA),
+      customChipsB: normalizeCustomChipLibrary(query.customChipsB),
+      maxInputBits: query.maxInputBits,
+    })
+    return { text: formatEquivalenceReport(report) }
+  } catch (error) {
+    return { isError: true, text: error instanceof Error ? error.message : 'Falha ao comparar os circuitos.' }
+  }
+}
+
+function formatEquivalenceReport(report: CircuitEquivalenceReport): string {
+  if (report.status === 'incomparable') {
+    return [
+      'Resultado: não comparável',
+      '',
+      ...report.issues.map((issue) => `- [${issue.code}] ${issue.message}`),
+      '',
+      'Nenhuma linha foi avaliada; este resultado não afirma nem nega equivalência.',
+    ].join('\n')
+  }
+
+  const interfaceLine = (ports: readonly { name: string; width: number }[]): string =>
+    ports.map((port) => (port.width > 1 ? `${port.name}[${port.width - 1}:0]` : port.name)).join(', ')
+
+  const lines = [
+    report.status === 'equivalent' ? 'Resultado: equivalente' : 'Resultado: não equivalente',
+    '',
+    `Entradas: ${interfaceLine(report.inputs)}`,
+    `Saídas: ${interfaceLine(report.outputs)}`,
+    `Linhas comparadas: ${report.comparedRows} de ${report.totalRows} (comparação exaustiva)`,
+  ]
+
+  if (report.status === 'equivalent') {
+    lines.push('', 'Os dois circuitos concordam em todas as combinações de entrada.')
+    return lines.join('\n')
+  }
+
+  const counterexample = report.counterexample
+  lines.push(`Linhas divergentes: ${report.divergentRows}`)
+  lines.push(`Saídas divergentes: ${report.divergentOutputs.join(', ')}`)
+  if (counterexample) {
+    lines.push('', `Contraexemplo (linha ${counterexample.row}):`)
+    lines.push('', '| Entrada | Valor |', '| --- | --- |')
+    for (const input of counterexample.inputs) lines.push(`| ${input.name} | ${input.value} |`)
+    lines.push('', '| Saída | A | B |', '| --- | --- | --- |')
+    for (const divergence of counterexample.divergences) {
+      lines.push(`| ${divergence.output} | ${divergence.a} | ${divergence.b} |`)
+    }
+  }
+  return lines.join('\n')
+}
+
+export const MCP_MAX_EQUIVALENCE_INPUT_BITS = MAX_EQUIVALENCE_INPUT_BITS
 
 function normalizeCustomChipLibrary(entries: readonly CustomChipToolDefinition[] = []): CustomChipLibraryEntry[] {
   if (entries.length > MAX_CUSTOM_CHIP_LIBRARY_ENTRIES) {

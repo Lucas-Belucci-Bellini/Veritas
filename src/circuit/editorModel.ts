@@ -156,7 +156,7 @@ export function editorInputCount(type: EditorComponentType): number {
   }
 }
 
-function isStatefulEditorType(type: EditorComponentType): boolean {
+export function isStatefulEditorType(type: EditorComponentType): boolean {
   return type === 'clock' || type === 'dff' || type === 'tff' || type === 'delay'
 }
 

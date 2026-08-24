@@ -44,6 +44,9 @@ const SequentialWorkspace = lazy(() =>
 const ProjectsPanel = lazy(() =>
   import('./components/ProjectsPanel').then((module) => ({ default: module.ProjectsPanel })),
 )
+const EquivalencePanel = lazy(() =>
+  import('./components/EquivalencePanel').then((module) => ({ default: module.EquivalencePanel })),
+)
 const ChipLibrary = lazy(() =>
   import('./components/ChipLibrary').then((module) => ({ default: module.ChipLibrary })),
 )
@@ -451,6 +454,12 @@ function AppContent() {
                 setExpression(saved)
               }}
             />
+          </Suspense>
+        </WorkspaceBoundary>
+
+        <WorkspaceBoundary label="a verificação de equivalência">
+          <Suspense fallback={<WorkspaceLoading label="verificação de equivalência" />}>
+            <EquivalencePanel />
           </Suspense>
         </WorkspaceBoundary>
 

@@ -13,5 +13,8 @@ dev-dist
 dist-lib
 mcp/dist
 
+# Relatórios sanitizados dos runners de aceitação
+artifacts
+
 # Rust build artifacts
 engine-rs/target/

@@ -2,6 +2,27 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [Não publicado]
+
+### Adicionado
+
+- Verificador de equivalência comportamental entre dois `CircuitDocument` combinacionais (`compareCircuitEquivalence`), com pareamento de portas por rótulo, ordem canônica e contraexemplo determinístico da primeira combinação divergente.
+- Painel “Equivalência entre circuitos” sobre os circuitos salvos localmente, mostrando veredito, entradas do contraexemplo e o valor produzido por cada lado.
+- Ferramenta MCP `circuit_equivalence`, com Markdown determinístico, bibliotecas `custom_chips_a`/`custom_chips_b` separadas e checks `MCP-EQ-001`/`MCP-EQ-002` no acceptance stdio.
+- `docs/VERIFICATION.md` com o contrato do relatório, a política de exaustividade e os limites medidos.
+
+### Corrigido
+
+- `scripts/mcpAcceptanceContract.d.mts` declarava apenas `MCP-001…MCP-006` enquanto o runner já usava dez cenários; a declaração voltou a espelhar o contrato real.
+
+### Validação e limites
+
+- Suíte com 429 testes, typecheck, lint, build do frontend, builds MCP stdio/HTTP e do plugin aprovados; `npm run beta:mcp` com 12 PASS, 0 FAIL, 0 SKIP e `npm run beta:wasm:isolation` com 5 PASS.
+- O painel foi verificado no navegador (Chromium) nos dois desfechos — equivalente e divergente com contraexemplo — sem erro de console.
+- A comparação é exaustiva por definição: acima de 12 bits de entrada por padrão (teto de 16) ela é **recusada** em vez de truncada, porque uma comparação parcial não prova equivalência. Circuitos com `clock`, `dff`, `tff` ou `delay` não são aceitos.
+- Limites escolhidos por medição local: 12 bits ≈ 85 ms e 16 bits ≈ 776 ms na mesma máquina; são justificativa da escolha, não promessa de desempenho.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.13] — 2026-08-22
 
 ### Adicionado

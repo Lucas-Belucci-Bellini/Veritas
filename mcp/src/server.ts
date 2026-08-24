@@ -2,6 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import {
+  circuitEquivalence,
   circuitTruthTable,
   circuitVectorTruthTable,
   debugAlgorithm,
@@ -257,6 +258,49 @@ server.registerTool(
       maxBits: max_bits,
       maxRows: max_rows,
       customChips: custom_chips,
+    })),
+)
+
+server.registerTool(
+  'circuit_equivalence',
+  {
+    title: 'Equivalência entre circuitos',
+    description:
+      'Compara dois CircuitDocument combinacionais por comportamento e devolve um contraexemplo ' +
+      'determinístico quando eles discordam. A identidade das portas é o rótulo (ou o ID, quando não ' +
+      'houver rótulo), então implementações estruturalmente diferentes da mesma função são reconhecidas ' +
+      'como equivalentes. A comparação é exaustiva: quando o espaço de entrada excede o limite, a ' +
+      'ferramenta recusa em vez de devolver uma prova parcial. Circuitos com clock, DFF, TFF ou delay ' +
+      'não são aceitos.',
+    inputSchema: {
+      document_a: z.unknown().describe('CircuitDocument de referência, no formato veritas-circuit'),
+      document_b: z.unknown().describe('CircuitDocument comparado, no formato veritas-circuit'),
+      max_input_bits: z
+        .number()
+        .int()
+        .min(1)
+        .max(16)
+        .default(12)
+        .describe('Teto de bits de entrada da comparação exaustiva; acima disso a comparação é recusada'),
+      custom_chips_a: z
+        .array(z.object({ id: z.number().int().min(1), definition: z.unknown() }))
+        .max(128)
+        .default([])
+        .describe('Definições veritas-custom-chip usadas pelo documento A'),
+      custom_chips_b: z
+        .array(z.object({ id: z.number().int().min(1), definition: z.unknown() }))
+        .max(128)
+        .default([])
+        .describe('Definições veritas-custom-chip usadas pelo documento B'),
+    },
+  },
+  async ({ document_a, document_b, max_input_bits, custom_chips_a, custom_chips_b }) =>
+    guard(() => circuitEquivalence({
+      documentA: document_a,
+      documentB: document_b,
+      maxInputBits: max_input_bits,
+      customChipsA: custom_chips_a,
+      customChipsB: custom_chips_b,
     })),
 )
 
