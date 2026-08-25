@@ -49,6 +49,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.2** | Chips multi-bit combinacionais DLS | Allowlist estrutural de `4-ADD` e bancos AND/NAND/OR/XOR de 8 bits, biblioteca local e portas heterogêneas | Um chip multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.3** | Comparador multi-bit DLS | `EQUAL-4` com dois barramentos de 4 bits, XNOR, redução AND, portas determinísticas e integração local | Um comparador multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.4** | Somador multi-bit DLS | `8-ADD` com ripple-carry, carry de entrada/saída e ordem de portas preservada | Um somador de 8 bits suportado pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.10.5** | Máscara multi-bit DLS | `8-1AND` com máscara escalar, barramento de 8 bits, oito AND e integração local | Uma máscara vetorial suportada pode ser importada, reutilizada, avaliada e exportada localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -835,3 +836,19 @@ O adaptador usa IDs públicos `input-0-carry`, `input-1-a` e `input-2-b` para qu
 Critérios verificados: fixture real e entrada do catálogo gerado, validação com `allowBuses`, 16 XOR, 16 AND, 8 OR, dois Splitters, um Combiner, cinco casos aritméticos, normalização de portas, integração catálogo → IndexedDB → canvas e cinco alças dimensionadas no DOM. A suíte completa passou com 70 arquivos e 505 testes; os gates MCP, HTTP, acessibilidade, WASM, Rust e HDL também passaram.
 
 O próximo incremento permanece restrito a perfis combinacionais reais. O runtime temporal vetorial continua sendo uma frente separada antes de considerar `8-DELAY`, registradores, contadores ou memória.
+
+
+## Release 0.10.5 — máscara multi-bit 8-1AND — 2026-08-25
+
+A Release 0.10.5 adiciona à allowlist o fixture real `8-1AND` do DLS. Sua assinatura possui duas entradas chamadas `IN`: a primeira é uma máscara escalar de 1 bit e a segunda é um barramento de 8 bits. A saída `OUT` é um barramento de 8 bits. A estrutura de origem contém um `8-1BIT`, oito portas `AND` e um `1-8BIT`.
+
+| Parte do fixture | Materialização Veritas |
+| --- | --- |
+| `8-1BIT` | Um Splitter de 8 bits, em MSB → LSB |
+| Oito `AND` | Uma porta AND escalar por bit, compartilhando a máscara |
+| `1-8BIT` | Um Combiner de 8 bits |
+| Entradas duplicadas `IN` | `IN` de 1 bit e `IN_2` de 8 bits na definição local |
+
+O adaptador só aceita a assinatura conhecida (`2` entradas, `1` saída, `8` AND, `1` Splitter e `1` Combiner). A avaliação exaustiva cobre os 256 valores do barramento em dois estados da máscara: com `0`, a saída é sempre zero; com `1`, a saída é idêntica à entrada. O circuito passa por `validateCircuit(..., { allowBuses: true })` e permanece compatível com a persistência local e as exportações HDL.
+
+Critérios verificados: card publicado na biblioteca, importação para IndexedDB, peça no canvas, três alças com larguras 1/8/8 bits, zero alertas no DOM, 31 testes focados e suíte completa com 70 arquivos e 510 testes. O próximo passo continua sendo outro perfil combinacional real; chips temporais e memória aguardam um runtime vetorial temporal específico.
