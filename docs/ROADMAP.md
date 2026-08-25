@@ -57,6 +57,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.11.0** | Bancos base de barramento DLS | `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT`, com assinaturas diretas e hierárquicas confirmadas | Os quatro bancos reais de 8 bits podem ser importados, reutilizados, avaliados e exportados localmente |
 | **v0.11.1** | Multiplexador vetorial DLS | `1-8MUX`, com seleção escalar, duas entradas de 8 bits e saída de 8 bits, sem tri-state | Um multiplexador vetorial combinacional real pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.11.2** | Inversor vetorial DLS | `NOT-8 Bits`, com uma entrada e uma saída de 8 bits, usando `NAND-8Bits` hierárquico | Um inversor vetorial combinacional real pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.11.3** | Negação condicional DLS | `NEGATE-8`, com entrada de dados de 8 bits, controle escalar e saída de 8 bits, usando oito XOR | Uma negação condicional vetorial real pode ser importada, reutilizada, avaliada e exportada localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -982,3 +983,21 @@ O adaptador só aceita a assinatura conhecida: uma entrada, uma saída, largura 
 Os critérios de aceite foram atendidos com 78 testes focados e 557 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local como ID 12, a instância no canvas, o resumo `IN 8 bits · OUT 8 bits` e duas alças de 8 bits. A instância isolada exibiu um erro de entrada desconectada, como esperado; não houve alertas inesperados no DOM.
 
 Esta release confirma um inversor vetorial hierárquico de 8 bits; não amplia o catálogo para `NEGATE-8`, chips temporais, memória, tri-state ou dependências não mapeadas. O próximo contrato deve continuar sendo escolhido por assinatura real e semântica testável.
+
+
+## Release 0.11.3 — negação condicional vetorial real `NEGATE-8` — 2026-08-25
+
+A Release 0.11.3 adiciona à allowlist o fixture combinacional real `NEGATE-8`. Sua interface pública possui duas entradas na ordem DLS — `IN` de 8 bits e um controle escalar de 1 bit — e uma saída `OUT` de 8 bits. A estrutura observada contém um `8-1BIT`, um `1-8BIT` e oito XOR.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `IN` de 8 bits | Um input vetorial e um Splitter com oito partes escalares |
+| Controle de 1 bit | Um input escalar conectado ao segundo terminal de cada XOR |
+| Oito XOR | Oito portas XOR independentes, uma por posição do barramento |
+| `OUT` de 8 bits | Um Combiner e uma saída vetorial |
+
+A semântica comprovada é `OUT = IN XOR CONTROL` por bit. Com controle `0`, o barramento passa sem alteração; com controle `1`, todos os bits são invertidos. O adaptador só aceita o nome, larguras, contagem e dependências reais conhecidas, passa por `validateCircuit(..., { allowBuses: true })` e pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 86 testes focados e 565 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local como ID 13, a instância no canvas, o resumo `IN 8 + 1 bits · OUT 8 bits` e três alças de largura 8/1/8. A instância isolada exibiu dois problemas de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release cobre somente a negação condicional combinacional `NEGATE-8`; não a interpreta como somador de complemento de dois. `NEGATE-8` é um contrato distinto de `NOT-8 Bits`, e chips temporais, memória, tri-state e dependências não mapeadas permanecem fora da allowlist.

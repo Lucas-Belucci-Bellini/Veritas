@@ -48,6 +48,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.11.0 | Bancos reais AND/NAND/OR/XOR de 8 bits do DLS, com confirmação de assinaturas diretas e hierárquicas |
 | v0.11.1 | Multiplexador real `1-8MUX` do DLS, com seleção escalar e duas entradas vetoriais de 8 bits |
 | v0.11.2 | Inversor real `NOT-8 Bits` do DLS, com entrada e saída vetoriais de 8 bits |
+| v0.11.3 | `NEGATE-8` real do DLS, com entrada 8 bits, controle 1 bit e saída 8 bits |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -193,6 +194,14 @@ A Release 0.11.2 confirma o fixture real `NOT-8 Bits` do DLS. Ele possui uma ent
 O Veritas aceita somente essa assinatura hierárquica e materializa a negação como um **Splitter**, oito portas **NOT** escalares, um **Combiner** e uma saída vetorial, preservando a ordem **MSB → LSB**. O resultado local é equivalente à inversão bit a bit e pode ser salvo no IndexedDB, reutilizado no canvas e exportado para Verilog/VHDL.
 
 O card real aparece como `1 entrada · 1 saída · 1 componente · barramentos de 8 bits`. A importação é allowlist-only: JSON DLS não é executado, dependências não são inferidas e perfis temporais, memória e tri-state permanecem bloqueados.
+
+### `NEGATE-8` vetorial condicional (v0.11.3)
+
+A Release 0.11.3 confirma o fixture real `NEGATE-8` do DLS. Ele possui uma entrada de dados `IN` de 8 bits, uma entrada de controle escalar de 1 bit e uma saída `OUT` de 8 bits. A decomposição publicada contém um `8-1BIT`, um `1-8BIT` e oito XOR.
+
+O Veritas materializa o contrato como um **Splitter**, oito portas **XOR** e um **Combiner**, preservando a ordem **MSB → LSB**. O resultado por bit é `IN XOR CONTROL`: com controle `0`, o barramento permanece igual; com controle `1`, cada bit é invertido. O chip pode ser salvo no IndexedDB, reutilizado no canvas e exportado para Verilog/VHDL.
+
+O card real aparece como `2 entradas · 1 saída · 10 componentes · barramentos de 1, 8 bits`. A importação aceita somente essa assinatura estrutural; `NEGATE-8` não é tratado como somador de complemento de dois. Chips temporais, memória, tri-state e dependências não mapeadas continuam bloqueados.
 
 ### Performance (v0.4.9)
 
