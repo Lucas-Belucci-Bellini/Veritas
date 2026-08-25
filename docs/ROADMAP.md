@@ -749,3 +749,25 @@ Critérios realizados: 19 testes de domínio, 4 testes da ferramenta MCP, checks
 Com o testbench declarativo fechado, os dois caminhos naturais são: um editor de roteiro com expectativas na interface (hoje o painel cobre só o modo combinacional, enquanto o domínio e o MCP já fazem os dois), e a geração de casos a partir da tabela verdade, para transformar o comportamento atual em regressão.
 
 As asserções continuam depois disso, e não antes, porque exigem um avaliador de expressões sobre sinais. A regra que já vale: esse avaliador reusa `src/engine/parser.ts`, nunca `eval` nem `Function`.
+
+## Implementação CHIP-005 — hierarquia de chips destravada — 2026-08-25
+
+O objetivo declarado do projeto é ter um Digital Logic Sim próprio, e o loop central dessa ferramenta é: construir, empacotar, reusar, empacotar de novo. Uma auditoria desse loop encontrou que ele parava no primeiro nível — não por falta de motor, mas por três barreiras que sobreviveram à própria etapa que deveria tê-las removido.
+
+`buildCustomChipDefinition` recusava qualquer documento contendo instâncias `custom-chip`, com o comentário `A execução hierárquica e a instanciação no canvas ficam para CHIP-002`. CHIP-002 foi implementado; a restrição ficou. Enquanto isso, `elaborateCustomChipDocument` já recursava com detecção de ciclo e limite de profundidade, e `evaluateNetlist` já propagava a biblioteca para os filhos chamando `assertCustomChipDepth`. O motor estava construído para oito níveis de hierarquia; o construtor recusava passar do primeiro.
+
+Havia ainda duas cópias da mesma barreira no `CircuitEditor`: uma checagem que devolvia aviso e, mais visível, o próprio botão “Salvar como chip” desabilitado por `hasCustomChipInstances`. As três foram removidas.
+
+Em troca entraram duas guardas que faltavam, ambas na criação. `assertNoCustomChipCycle` recusa uma **atualização** que faria o chip conter a si mesmo — só a atualização precisa disso, porque um chip novo ainda não tem ID e nada pode apontar de volta para ele. `assertCustomChipDepthWithinLimit` recusa ao salvar a hierarquia que estouraria o limite ao simular: falhar aqui é melhor que falhar na primeira simulação. Um teste verifica que as duas guardas concordam — o que é aceito ao salvar realmente roda.
+
+A construção agora exige a biblioteca. `createCustomChipProject` e `updateCustomChipProject` carregam do IndexedDB sozinhos, mantendo a API do storage estável. No MCP, `normalizeCustomChipLibrary` passou a resolver em ordem de dependência com memoização e detecção de ciclo: o payload chega em ordem arbitrária, e construir na ordem recebida falharia sempre que o pai viesse antes do filho.
+
+Critérios realizados: 10 testes de hierarquia, incluindo o somador completo montado com dois meio somadores avaliado nas oito combinações, um somador de dois bits montado com dois somadores completos (terceiro nível), elaboração HDL achatando a árvore inteira, ciclo recusado, ambos os lados do limite de profundidade e a concordância entre os dois guardas. Suíte com 480 testes, typecheck, lint, builds, `beta:mcp` 16 PASS, `beta:mcp:http` 18 PASS e `beta:accessibility` 5 PASS.
+
+A verificação decisiva foi no navegador, pelo caminho real do produto: com um meio somador na biblioteca e um somador completo válido no canvas, o botão “Salvar como chip” — antes desabilitado — ficou habilitado e devolveu `Chip customizado salvo localmente (ID 2)`, sem erro de console. É o loop do Digital Logic Sim funcionando de ponta a ponta.
+
+## Próxima fatia — CHIP-006 chips no runtime temporal
+
+O segundo gap do mesmo loop: `createDocumentRuntime` chama `toNetlist(runtimeDocument)` sem a biblioteca, então instâncias `custom-chip` não atravessam a simulação por tiques. Foi esse buraco que obrigou o testbench a criar a guarda `sequential-custom-chip`. Enquanto ele existir, um contador ou registrador montado com chips não roda no tempo — e sem isso não se chega a uma CPU.
+
+Depois vem CHIP-007: os 1121 chips importados do Digital Logic Sim hoje só viram expressão booleana na calculadora (`ChipLibrary` só expõe `onUseExpression`). Transformá-los em peças instanciáveis no canvas põe a maior biblioteca do projeto dentro da ferramenta de construção.

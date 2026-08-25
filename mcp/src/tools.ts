@@ -750,23 +750,66 @@ export const MCP_MAX_DIFFERENTIAL_TICKS = MAX_DIFFERENTIAL_TICKS
 
 export const MCP_MAX_EQUIVALENCE_INPUT_BITS = MAX_EQUIVALENCE_INPUT_BITS
 
+/**
+ * Constrói a biblioteca em ordem de dependência.
+ *
+ * Um chip pode conter outros chips, e construir a definição de um pai exige as
+ * definições dos filhos. Como o payload chega em ordem arbitrária, cada chip é
+ * resolvido sob demanda, com memoização e detecção de ciclo — construir na
+ * ordem recebida falharia sempre que o pai viesse antes do filho.
+ */
 function normalizeCustomChipLibrary(entries: readonly CustomChipToolDefinition[] = []): CustomChipLibraryEntry[] {
   if (entries.length > MAX_CUSTOM_CHIP_LIBRARY_ENTRIES) {
     throw new Error(`A biblioteca MCP aceita no máximo ${MAX_CUSTOM_CHIP_LIBRARY_ENTRIES} chips customizados por chamada.`)
   }
-  const ids = new Set<number>()
-  return entries.map((entry, index) => {
+
+  const sources = new Map<number, { document: CircuitDocument; name?: string }>()
+  entries.forEach((entry, index) => {
     if (!Number.isSafeInteger(entry.id) || entry.id < 1) throw new Error(`O chip customizado ${index + 1} possui um ID inválido.`)
-    if (ids.has(entry.id)) throw new Error(`O ID de chip customizado ${entry.id} aparece mais de uma vez.`)
-    ids.add(entry.id)
+    if (sources.has(entry.id)) throw new Error(`O ID de chip customizado ${entry.id} aparece mais de uma vez.`)
     if (!isRecord(entry.definition) || !isCircuitDocumentShape(entry.definition.document)) {
       throw new Error(`A definição do chip customizado ${entry.id} não possui um documento veritas-circuit válido.`)
     }
-    return {
-      id: entry.id,
-      definition: buildCustomChipDefinition(entry.definition.document, typeof entry.definition.name === 'string' ? entry.definition.name : undefined),
-    }
+    sources.set(entry.id, {
+      document: entry.definition.document,
+      name: typeof entry.definition.name === 'string' ? entry.definition.name : undefined,
+    })
   })
+
+  const built = new Map<number, CustomChipLibraryEntry['definition']>()
+  const building = new Set<number>()
+
+  const build = (id: number): CustomChipLibraryEntry['definition'] => {
+    const done = built.get(id)
+    if (done) return done
+    if (building.has(id)) {
+      throw new Error(`O chip customizado ${id} participa de uma hierarquia circular.`)
+    }
+    const source = sources.get(id)
+    if (!source) throw new Error(`O chip customizado ${id} foi referenciado mas não veio na biblioteca.`)
+
+    building.add(id)
+    const children: CustomChipLibraryEntry[] = []
+    for (const childId of childChipIds(source.document)) {
+      children.push({ id: childId, definition: build(childId) })
+    }
+    const definition = buildCustomChipDefinition(source.document, source.name, { customChips: children })
+    building.delete(id)
+    built.set(id, definition)
+    return definition
+  }
+
+  return [...sources.keys()].map((id) => ({ id, definition: build(id) }))
+}
+
+function childChipIds(document: CircuitDocument): number[] {
+  const ids = new Set<number>()
+  for (const node of document.nodes) {
+    if (node.type !== 'custom-chip') continue
+    const childId = node.options?.customChipId
+    if (typeof childId === 'number') ids.add(childId)
+  }
+  return [...ids]
 }
 
 function expandCustomChipComponents(
