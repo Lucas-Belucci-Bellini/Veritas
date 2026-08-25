@@ -795,3 +795,70 @@ describe('1-8MUX importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+
+describe('NOT-8 Bits importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'NOT-8 Bits')
+    expect(chip).toMatchObject({
+      name: 'NOT-8 Bits',
+      in: 1,
+      out: 1,
+      widths: [8],
+      pins: { in: ['IN'], out: ['OUT'] },
+      parts: { 'NAND-8Bits': 1 },
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa um Splitter, oito NOT, um Combiner e uma saída vetorial', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'not')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'output')).toHaveLength(1)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [0x00, '11111111'],
+    [0xaa, '01010101'],
+    [0xcc, '00110011'],
+    [0xff, '00000000'],
+  ])('inverte IN=%s para OUT=%s', async (input, expected) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const result = evaluateCircuitVectors(document, { 'input-1': input })
+
+    expect(toBinary(result.outputs['output-1']!)).toBe(expected)
+  })
+
+  it('preserva uma entrada e uma saída de 8 bits no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, 'NOT-8 Bits importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([['IN', 8]])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
+  })
+
+  it('exporta o inversor vetorial para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('recusa o alias quando o NAND-8Bits real está ausente', async () => {
+    const chip = await loadRealChip()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, 'NAND-8Bits': 0 },
+    })).toBeNull()
+  })
+})
