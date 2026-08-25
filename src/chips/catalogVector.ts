@@ -32,6 +32,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (isEightBitAdder(chip)) return buildEightBitAdderDocument(chip)
   if (isEightBitMux(chip)) return buildEightBitMuxDocument(chip)
   if (isEightBitNot(chip)) return buildEightBitNotDocument(chip)
+  if (isEightBitNegate(chip)) return buildEightBitNegateDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
@@ -156,6 +157,16 @@ function isEightBitNot(chip: ChipEntry): boolean {
     && chip.out === 1
     && hasOnlyBusWidth(chip, BUS_WIDTH)
     && chip.parts['NAND-8Bits'] === 1
+}
+
+function isEightBitNegate(chip: ChipEntry): boolean {
+  return chip.name === 'NEGATE-8'
+    && chip.in === 2
+    && chip.out === 1
+    && hasScalarAndBusWidth(chip, BUS_WIDTH)
+    && chip.parts['8-1BIT'] === 1
+    && chip.parts['1-8BIT'] === 1
+    && chip.parts.XOR === BUS_WIDTH
 }
 
 function isEightBitMask(chip: ChipEntry): boolean {
@@ -775,6 +786,75 @@ function buildEightBitNotDocument(chip: ChipEntry): CircuitDocument {
       id: outputId,
       type: 'output',
       position: { x: 920, y: 300 },
+      label: outputLabel,
+      options: { width: BUS_WIDTH },
+    },
+  )
+  connections.push({ source: { node: combinerId }, target: { node: outputId, port: 0 } })
+
+  return { ...document, nodes, connections }
+}
+
+function buildEightBitNegateDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 2 ? chip.pins.in : ['IN', 'CONTROL']
+  const outputLabel = chip.pins?.out?.[0] || 'OUT'
+  const splitterId = 'splitter-1'
+  const combinerId = 'combiner-1'
+  const outputId = 'output-1'
+  const nodes: CircuitNode[] = [
+    {
+      id: 'input-1-bus',
+      type: 'input',
+      position: { x: 0, y: 160 },
+      label: inputLabels[0] || 'IN',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: 'input-2-control',
+      type: 'input',
+      position: { x: 0, y: 680 },
+      label: inputLabels[1] || 'CONTROL',
+    },
+    {
+      id: splitterId,
+      type: 'splitter',
+      position: { x: 190, y: 160 },
+      label: 'Split IN',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+  ]
+  const connections: CircuitDocument['connections'] = [
+    { source: { node: 'input-1-bus' }, target: { node: splitterId, port: 0 } },
+  ]
+
+  for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
+    const xorId = `negate-xor-${bit + 1}`
+    nodes.push({
+      id: xorId,
+      type: 'xor',
+      position: { x: 430, y: 40 + bit * 80 },
+      label: `NEGATE XOR bit ${bit + 1}`,
+    })
+    connections.push(
+      { source: { node: splitterId, port: bit }, target: { node: xorId, port: 0 } },
+      { source: { node: 'input-2-control' }, target: { node: xorId, port: 1 } },
+      { source: { node: xorId }, target: { node: combinerId, port: bit } },
+    )
+  }
+
+  nodes.push(
+    {
+      id: combinerId,
+      type: 'combiner',
+      position: { x: 700, y: 320 },
+      label: 'Combiner OUT',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: outputId,
+      type: 'output',
+      position: { x: 920, y: 320 },
       label: outputLabel,
       options: { width: BUS_WIDTH },
     },

@@ -862,3 +862,76 @@ describe('NOT-8 Bits importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+
+describe('NEGATE-8 importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'NEGATE-8')
+    expect(chip).toMatchObject({
+      name: 'NEGATE-8',
+      in: 2,
+      out: 1,
+      widths: [1, 8],
+      pins: { in: ['IN', 'IN'], out: ['OUT'] },
+      parts: { '8-1BIT': 1, '1-8BIT': 1, XOR: 8 },
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa um Splitter, oito XOR, um Combiner e uma saída vetorial', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(2)
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'xor')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'output')).toHaveLength(1)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [0x00, 0, '00000000'],
+    [0xaa, 0, '10101010'],
+    [0xaa, 1, '01010101'],
+    [0xff, 1, '00000000'],
+  ])('aplica controle %s ao barramento IN=%s e produz OUT=%s', async (input, control, expected) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const result = evaluateCircuitVectors(document, {
+      'input-1-bus': input,
+      'input-2-control': control,
+    })
+
+    expect(toBinary(result.outputs['output-1']!)).toBe(expected)
+  })
+
+  it('preserva as larguras heterogêneas 8/1 e normaliza IN no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, 'NEGATE-8 importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN', 8],
+      ['IN_2', 1],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
+  })
+
+  it('exporta o negador condicional vetorial para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('recusa o alias quando o XOR real está incompleto', async () => {
+    const chip = await loadRealChip()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, XOR: 7 },
+    })).toBeNull()
+  })
+})
