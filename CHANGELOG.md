@@ -2,6 +2,27 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.16] — 2026-08-25
+
+### Alterado
+
+- **Chips customizados podem conter outros chips.** A restrição em `buildCustomChipDefinition` era resquício de antes do CHIP-002 e sobrevivia em três lugares: o domínio, um aviso do editor e o botão “Salvar como chip” desabilitado. O motor já recursava com detecção de ciclo e limite de profundidade; faltava deixar construir. É o loop do Digital Logic Sim — construir, empacotar, reusar — destravado.
+- `createCustomChipProject` e `updateCustomChipProject` carregam a biblioteca local para validar hierarquia, sem mudar a API do storage.
+- `normalizeCustomChipLibrary` (MCP) resolve os chips em ordem de dependência, com memoização e detecção de ciclo; antes falhava quando o pai vinha antes do filho no payload.
+
+### Adicionado
+
+- `assertNoCustomChipCycle`: recusa uma atualização que faria o chip conter a si mesmo, direta ou indiretamente.
+- `assertCustomChipDepthWithinLimit`: recusa ao salvar a hierarquia que estouraria o limite ao simular, em vez de deixar o erro aparecer na primeira execução.
+
+### Validação e limites
+
+- Suíte com 480 testes; 10 deles cobrem a hierarquia, incluindo somador completo com dois meio somadores nas oito combinações, somador de dois bits em terceiro nível, elaboração HDL achatada, ciclo recusado e os dois lados do limite de profundidade.
+- Um teste verifica que o guard de criação e o de avaliação concordam: o que é aceito ao salvar realmente roda.
+- Verificação no navegador pelo caminho real do produto: com o meio somador na biblioteca e um somador completo válido no canvas, “Salvar como chip” ficou habilitado e salvou o chip aninhado, sem erro de console.
+- Chips continuam combinacionais; o aninhamento não muda isso. Instâncias em casos sequenciais ainda dependem de CHIP-006.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.15] — 2026-08-25
 
 ### Adicionado

@@ -230,6 +230,28 @@ Concordar num roteiro não prova que não existe outro que separe os dois
 circuitos, e o painel diz isso junto do resultado positivo. Pelo MCP, é a
 ferramenta `circuit_differential`.
 
+### Chips dentro de chips
+
+O loop de construção do Veritas é o mesmo de um simulador de lógica digital de
+verdade: monte um circuito, empacote como chip, use esse chip para montar o
+próximo, empacote de novo.
+
+```
+meio somador          → chip
+2 meio somadores      → somador completo → chip
+2 somadores completos → somador de 2 bits → chip
+→ ALU → CPU
+```
+
+A hierarquia é por **referência**: o chip guarda o ID do filho, não uma cópia.
+O limite é de 8 níveis, e ele é conferido **ao salvar** — se a hierarquia
+passasse do teto, você descobre na hora, não na primeira simulação. Uma
+atualização que faria um chip conter a si mesmo, direta ou indiretamente, é
+recusada.
+
+Chips continuam combinacionais: clock, flip-flops e atraso ainda não entram em
+um chip.
+
 ### Testes do circuito
 
 Os dois painéis acima comparam circuito com circuito. O painel **Testes do
