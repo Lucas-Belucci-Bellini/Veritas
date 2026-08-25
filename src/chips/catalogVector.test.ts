@@ -318,3 +318,73 @@ describe('8-ADD importado do catálogo DLS', () => {
     expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
   })
 })
+
+
+function eightBitMaskChip(): ChipEntry {
+  return {
+    name: '8-1AND',
+    category: 'Outros',
+    in: 2,
+    out: 1,
+    pins: { in: ['IN', 'IN'], out: ['OUT'] },
+    widths: [1, 8],
+    parts: { AND: 8, '8-1BIT': 1, '1-8BIT': 1 },
+    partCount: 10,
+    wireCount: 26,
+  }
+}
+
+describe('8-1AND importado do catálogo DLS', () => {
+  it('materializa um mascarador escalar com split, oito AND e combiner', () => {
+    const document = catalogVectorChipToCircuitDocument(eightBitMaskChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input').map((node) => node.label)).toEqual(['IN', 'IN'])
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it('aplica a máscara a todos os 256 valores do barramento', () => {
+    const document = catalogVectorChipToCircuitDocument(eightBitMaskChip())!
+    for (let bus = 0; bus < 256; bus += 1) {
+      const enabled = evaluateCircuitVectors(document, { 'input-0-mask': 1, 'input-1-bus': bus })
+      const disabled = evaluateCircuitVectors(document, { 'input-0-mask': 0, 'input-1-bus': bus })
+      expect(Number(enabled.outputs['output-0']!.bits.reduce((value, bit) => (value << 1) | (bit ? 1 : 0), 0))).toBe(bus)
+      expect(Number(disabled.outputs['output-0']!.bits.reduce((value, bit) => (value << 1) | (bit ? 1 : 0), 0))).toBe(0)
+    }
+  })
+
+  it('preserva as larguras e normaliza os dois IN ao virar chip local', () => {
+    const document = catalogVectorChipToCircuitDocument(eightBitMaskChip())!
+    const definition = buildCustomChipDefinition(document, '8-1AND importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN', 1],
+      ['IN_2', 8],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
+  })
+
+  it('exporta o mascarador multi-bit para Verilog e VHDL', () => {
+    const document = catalogVectorChipToCircuitDocument(eightBitMaskChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('module n_8_1AND')
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('entity n_8_1AND is')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('reconhece a entrada 8-1AND do catálogo gerado a partir do DLS', async () => {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === '8-1AND')
+
+    expect(chip).toBeDefined()
+    const document = catalogVectorChipToCircuitDocument(chip!)
+    expect(document).not.toBeNull()
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+})

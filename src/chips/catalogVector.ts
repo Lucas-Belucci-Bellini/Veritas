@@ -28,6 +28,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (gate) return buildVectorGateDocument(chip, gate)
   if (isFourBitAdder(chip)) return buildFourBitAdderDocument(chip)
   if (isEightBitAdder(chip)) return buildEightBitAdderDocument(chip)
+  if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
 }
@@ -95,6 +96,16 @@ function isEightBitAdder(chip: ChipEntry): boolean {
     && hasScalarAndBusWidth(chip, BUS_WIDTH)
     && chip.parts['1-ADD'] === BUS_WIDTH
     && chip.parts['8-1BIT'] === 2
+    && chip.parts['1-8BIT'] === 1
+}
+
+function isEightBitMask(chip: ChipEntry): boolean {
+  return chip.name === '8-1AND'
+    && chip.in === 2
+    && chip.out === 1
+    && hasScalarAndBusWidth(chip, BUS_WIDTH)
+    && chip.parts.AND === BUS_WIDTH
+    && chip.parts['8-1BIT'] === 1
     && chip.parts['1-8BIT'] === 1
 }
 
@@ -400,6 +411,76 @@ function buildEightBitAdderDocument(chip: ChipEntry): CircuitDocument {
     { source: { node: combinerId }, target: { node: outputSumId, port: 0 } },
     { source: { node: incomingCarry }, target: { node: outputCarryId, port: 0 } },
   )
+
+  return { ...document, nodes, connections }
+}
+
+function buildEightBitMaskDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 2 ? chip.pins.in : ['IN', 'IN']
+  const outputLabel = chip.pins?.out?.[0] || 'OUT'
+  const nodes: CircuitNode[] = [
+    {
+      id: 'input-0-mask',
+      type: 'input',
+      position: { x: 0, y: 560 },
+      label: inputLabels[0] || 'IN',
+    },
+    {
+      id: 'input-1-bus',
+      type: 'input',
+      position: { x: 0, y: 120 },
+      label: inputLabels[1] || 'IN',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: 'splitter-bus',
+      type: 'splitter',
+      position: { x: 190, y: 120 },
+      label: 'Split IN',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+  ]
+  const connections: CircuitDocument['connections'] = [
+    { source: { node: 'input-1-bus' }, target: { node: 'splitter-bus', port: 0 } },
+  ]
+
+  for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
+    const andId = `and-mask-${bit}`
+    nodes.push({
+      id: andId,
+      type: 'and',
+      position: { x: 430, y: 30 + bit * 100 },
+      label: `AND mask bit ${bit + 1}`,
+    })
+    connections.push(
+      { source: { node: 'input-0-mask' }, target: { node: andId, port: 0 } },
+      { source: { node: 'splitter-bus', port: bit }, target: { node: andId, port: 1 } },
+    )
+  }
+
+  const combinerId = 'combiner-out'
+  const outputId = 'output-0'
+  nodes.push(
+    {
+      id: combinerId,
+      type: 'combiner',
+      position: { x: 700, y: 380 },
+      label: 'Combiner OUT',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: outputId,
+      type: 'output',
+      position: { x: 920, y: 380 },
+      label: outputLabel,
+      options: { width: BUS_WIDTH },
+    },
+  )
+  for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
+    connections.push({ source: { node: `and-mask-${bit}` }, target: { node: combinerId, port: bit } })
+  }
+  connections.push({ source: { node: combinerId }, target: { node: outputId, port: 0 } })
 
   return { ...document, nodes, connections }
 }
