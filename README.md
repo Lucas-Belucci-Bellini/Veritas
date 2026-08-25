@@ -45,6 +45,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.7 | AND-3 8 bits do DLS, com três barramentos de entrada e redução vetorial em dois estágios |
 | v0.10.8 | Full Adder - 8 Bits do DLS, com três barramentos de entrada, soma e carry vetoriais |
 | v0.10.9 | Alias `(8 Bits) 8-bit Adder` do DLS, com ripple-carry, portas 8/8/1 e saídas 8/1 |
+| v0.11.0 | Bancos reais AND/NAND/OR/XOR de 8 bits do DLS, com confirmação de assinaturas diretas e hierárquicas |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -166,6 +167,14 @@ A Release 0.10.9 confirma o alias real `(8 Bits) 8-bit Adder` do DLS. Ele possui
 A assinatura só é aceita quando coincide: três entradas, duas saídas, larguras `[1, 8]`, dois `8-1BIT`, um `8-bit Adder` e um `1-8BIT`. Ao clicar em **Adicionar ao editor**, o alias é validado, salvo no IndexedDB e aparece na paleta de chips customizados. O canvas exibe `IN 8 + 8 + 1 bits · OUT 8 + 1 bits`, com cinco alças dimensionadas individualmente.
 
 O alias não é tratado como um novo circuito inventado: a diferença desta release é a confirmação de seu contrato real e da ordem pública `IN A`, `IN B`, `Carry IN`. O importador continua sendo uma allowlist verificável, não um executor genérico de JSON DLS; o `8-bit Adder` escalar de 17 entradas, chips temporais, memória e tri-state permanecem fora do escopo.
+
+### Bancos base reais de 8 bits (v0.11.0)
+
+A Release 0.11.0 confirma contra os fixtures reais do DLS os bancos `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT`. Todos possuem duas entradas e uma saída de 8 bits. AND é composto por oito AND e NAND por oito AND mais oito NOT; OR usa um `NAND-8Bits` e dois `NOT-8 Bits`; XOR usa três `NAND-8Bits` e dois `NOT-8 Bits`.
+
+O Veritas valida essas assinaturas na allowlist e materializa documentos vetoriais locais explícitos com dois **Splitter**, oito portas do operador equivalente e um **Combiner**, preservando a ordem **MSB → LSB**. Nos casos hierárquicos OR/XOR, a implementação local usa a semântica booleana equivalente sem executar a hierarquia JSON importada.
+
+A prova automatizada avaliou os quatro fixtures com `0xAA` e `0xCC`: AND produz `0x88`, NAND produz `0x77`, OR produz `0xEE` e XOR produz `0x66`. O smoke manual utilizou `XOR - 8 BIT` como representante: ele foi salvo no IndexedDB e inserido no canvas como `IN 8 + 8 bits · OUT 8 bits`. A importação continua sendo uma allowlist verificável; o restante do catálogo, chips temporais, memória, tri-state e dependências não mapeadas permanecem bloqueados.
 
 ### Performance (v0.4.9)
 

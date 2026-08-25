@@ -54,6 +54,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.7** | AND-3 vetorial DLS | `AND-3 8 bits`, com três barramentos de 8 bits, redução em dois estágios e integração local | Um AND de três entradas suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.8** | Full Adder vetorial DLS | `Full Adder - 8 Bits`, com três barramentos de entrada, soma e carry vetoriais e integração local | Um somador completo paralelo de 8 bits suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.9** | Alias ripple-carry DLS | `(8 Bits) 8-bit Adder`, com entradas 8/8/1, saídas 8/1 e ordem pública preservada | Um alias real de somador ripple-carry suportado pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.11.0** | Bancos base de barramento DLS | `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT`, com assinaturas diretas e hierárquicas confirmadas | Os quatro bancos reais de 8 bits podem ser importados, reutilizados, avaliados e exportados localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -925,3 +926,21 @@ O adaptador só aceita a assinatura conhecida: três entradas, duas saídas, lar
 Os critérios de aceite foram atendidos com 57 testes focados e 536 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 1 bits · OUT 8 + 1 bits` e cinco alças com larguras 8/8/1 → 8/1. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
 
 Esta release confirma um alias de somador já compatível com a topologia ripple-carry do `8-ADD`; não importa o `8-bit Adder` escalar de 17 entradas, não adiciona um novo runtime temporal e não libera memória, tri-state ou dependências não mapeadas por inferência.
+
+
+## Release 0.11.0 — bancos base reais de barramento de 8 bits — 2026-08-25
+
+A Release 0.11.0 fecha a prova de quatro fixtures combinacionais reais do catálogo DLS que já compõem a família vetorial inicial: `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT`. Todos possuem duas entradas `IN` de 8 bits, uma saída `OUT` de 8 bits, largura `[8]` e decomposição verificável.
+
+| Fixture real | Assinatura estrutural observada | Materialização local |
+| --- | --- | --- |
+| `AND-8 Bits` | 2× `8-1BIT`, 8× `AND`, 1× `1-8BIT` | 2 Splitters, 8 AND e 1 Combiner |
+| `NAND-8Bits` | 2× `8-1BIT`, 8× `AND`, 8× `NOT`, 1× `1-8BIT` | 2 Splitters, 8 NAND equivalentes e 1 Combiner |
+| `OR-8 Bits` | 1× `NAND-8Bits`, 2× `NOT-8 Bits` | 2 Splitters, 8 OR equivalentes e 1 Combiner |
+| `XOR - 8 BIT` | 3× `NAND-8Bits`, 2× `NOT-8 Bits` | 2 Splitters, 8 XOR equivalentes e 1 Combiner |
+
+O adaptador valida a assinatura exata na allowlist. Para OR e XOR, a estrutura publicada é hierárquica; o Veritas reconhece os subchips e materializa a função booleana equivalente em componentes locais, sem executar o JSON DLS nem inferir dependências ausentes. A prova usa `0xAA` e `0xCC`: AND produz `0x88`, NAND produz `0x77`, OR produz `0xEE` e XOR produz `0x66`.
+
+Os critérios de aceite foram atendidos com 62 testes focados e 541 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou `XOR - 8 BIT` como representante dos aliases hierárquicos: o card foi persistido localmente como ID 10 e inserido no canvas com `IN 8 + 8 bits · OUT 8 bits`, três alças de 8 bits e dois avisos esperados de entradas desconectadas.
+
+A release confirma contratos de operadores combinacionais de 8 bits; não amplia o catálogo para chips temporais, memória, tri-state ou dependências não mapeadas. O restante do catálogo continua disponível para consulta, mas não é executado automaticamente.

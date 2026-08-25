@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.11.0] — 2026-08-25
+
+### Adicionado
+
+- Confirmação contra os fixtures reais `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT` do catálogo DLS.
+- Reconhecimento seguro das assinaturas hierárquicas de `OR-8 Bits` e `XOR - 8 BIT`, que encapsulam `NAND-8Bits` e `NOT-8 Bits`, sem executar o JSON de origem.
+- Cobertura do fluxo catálogo → IndexedDB → paleta de chips customizados → canvas para um banco representativo `XOR - 8 BIT`, mantendo entradas e saída de 8 bits.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 541 testes aprovados; a nova fatia contém 5 testes focados, cobrindo os quatro fixtures reais, semântica vetorial `0xAA`/`0xCC`, portas locais, HDL e rejeição defensiva.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local manual confirmou o card `XOR - 8 BIT`, sua decomposição `3× NAND-8Bits, 2× NOT-8 Bits`, persistência na biblioteca como ID 10 e a instância no canvas com `IN 8 + 8 bits · OUT 8 bits`; as três alças anunciaram 8 bits e não houve `[role=alert]`. As duas entradas ficaram desconectadas de propósito, portanto a validação exibiu dois problemas acionáveis. AND, NAND e OR foram cobertos pelos testes automatizados, sem afirmação de smoke manual separado.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis sequenciais, memória e tri-state permanecem fora do escopo.
+
 ## [0.10.9] — 2026-08-25
 
 ### Adicionado
