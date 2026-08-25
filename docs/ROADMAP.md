@@ -4,7 +4,7 @@
 
 ## 1. Estado atual
 
-A versão de referência da implementação local é a **Release 0.10.2**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
+A versão de referência da implementação local é a **Release 0.11.4**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
 
 | Área | Situação real | Evidência no repositório |
 | --- | --- | --- |
@@ -58,8 +58,17 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.11.1** | Multiplexador vetorial DLS | `1-8MUX`, com seleção escalar, duas entradas de 8 bits e saída de 8 bits, sem tri-state | Um multiplexador vetorial combinacional real pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.11.2** | Inversor vetorial DLS | `NOT-8 Bits`, com uma entrada e uma saída de 8 bits, usando `NAND-8Bits` hierárquico | Um inversor vetorial combinacional real pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.11.3** | Negação condicional DLS | `NEGATE-8`, com entrada de dados de 8 bits, controle escalar e saída de 8 bits, usando oito XOR | Uma negação condicional vetorial real pode ser importada, reutilizada, avaliada e exportada localmente |
+| **v0.11.4** | Roteador misto de barramentos DLS | `16 para 8 e 4 bits`, com 16 entradas escalares, dez saídas, AND vetorial e divisão `[4,4]` | Um roteador combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem executar JSON DLS |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
+
+### Atualização da implementação — Release 0.11.4
+
+A Release 0.11.4 fecha a allowlist do fixture real `Chips/16 para 8 e 4 bits.json`, da categoria Barramentos. O contrato aceito exige nome exato, 16 entradas, 10 saídas, larguras públicas `[1, 4, 8]` e as dependências `2× 1-8BIT`, `1× 8x2-AND` e `1× 8-4BIT`. O importador continua sendo um adaptador seguro: lê o registro já catalogado e materializa um `CircuitDocument`; não executa JSON, não avalia código e não infere dependências que não estejam na assinatura.
+
+A construção local separa as entradas 1–8 no barramento `A` e as entradas 9–16 no barramento `B`. Cada barramento é dividido em bits, os oito pares passam por AND escalar e o resultado é recombinado e dividido em `[4,4]`. As dez saídas preservam a ordem observada no fixture: `A, A, AND[0], A, AND[0], AND[1], AND[1], B, B, B`, com larguras `[8, 8, 4, 8, 4, 4, 4, 8, 8, 8]` e convenção MSB → LSB.
+
+O critério de saída foi satisfeito por testes focados de estrutura, avaliação com vetor não simétrico, portas de chip customizado, exportação Verilog/VHDL e rejeição defensiva; pela suíte completa, typecheck, lint, builds, acceptance MCP/HTTP, acessibilidade, isolamento WASM, Rust e HDL; e pelo smoke local catálogo → IndexedDB → paleta → canvas. Tri-state, memória e chips com estado continuam em releases posteriores, dependentes de contratos específicos.
 
 ## 4. Histórico do ciclo v0.7.1
 

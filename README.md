@@ -49,6 +49,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.11.1 | Multiplexador real `1-8MUX` do DLS, com seleção escalar e duas entradas vetoriais de 8 bits |
 | v0.11.2 | Inversor real `NOT-8 Bits` do DLS, com entrada e saída vetoriais de 8 bits |
 | v0.11.3 | `NEGATE-8` real do DLS, com entrada 8 bits, controle 1 bit e saída 8 bits |
+| v0.11.4 | Roteador real `16 para 8 e 4 bits`, com 16 entradas escalares, dez saídas e AND dividido em dois nibbles |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -116,6 +117,8 @@ A biblioteca DLS contém muitas definições, mas o Veritas não executa JSON im
 O `4-ADD` preserva três entradas de `4 + 4 + 1` bits, duas saídas de `4 + 1` bits e o carry. Os bancos de portas preservam a estrutura `Splitter → portas escalares → Combiner`, com os canais na convenção MSB → LSB. Ao clicar em **Adicionar ao editor**, o modelo é validado, salvo na biblioteca local do IndexedDB e fica disponível como chip customizado no canvas; as alças anunciam a largura individual de cada porta.
 
 O restante do catálogo continua disponível para consulta. Chips sequenciais, memória, tri-state, conversores e perfis com dependências ou portas fora da allowlist permanecem bloqueados até que exista um contrato vetorial/temporal específico. Assim, a importação não altera o caminho local-first: construir, simular, salvar e exportar continuam funcionando sem conta ou conexão.
+
+A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional e o roteador `16 para 8 e 4 bits`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
 
 ### Comparador multi-bit EQUAL-4 (v0.10.3)
 
@@ -202,6 +205,14 @@ A Release 0.11.3 confirma o fixture real `NEGATE-8` do DLS. Ele possui uma entra
 O Veritas materializa o contrato como um **Splitter**, oito portas **XOR** e um **Combiner**, preservando a ordem **MSB → LSB**. O resultado por bit é `IN XOR CONTROL`: com controle `0`, o barramento permanece igual; com controle `1`, cada bit é invertido. O chip pode ser salvo no IndexedDB, reutilizado no canvas e exportado para Verilog/VHDL.
 
 O card real aparece como `2 entradas · 1 saída · 10 componentes · barramentos de 1, 8 bits`. A importação aceita somente essa assinatura estrutural; `NEGATE-8` não é tratado como somador de complemento de dois. Chips temporais, memória, tri-state e dependências não mapeadas continuam bloqueados.
+
+### Roteador de barramentos `16 para 8 e 4 bits` (v0.11.4)
+
+A Release 0.11.4 confirma o fixture real `16 para 8 e 4 bits` do DLS. Ele possui 16 entradas escalares: as entradas 1–8 formam o barramento `A` e as entradas 9–16 formam o barramento `B`. O catálogo declara `2× 1-8BIT`, `1× 8x2-AND` e `1× 8-4BIT`, sem memória, tri-state ou estado.
+
+O Veritas aceita somente a assinatura `in=16`, `out=10`, larguras públicas `[1, 4, 8]` e essas contagens de partes. A materialização local é explícita: dois Combiners e dois Splitters de 8 bits alimentam oito AND escalares; o resultado passa por um Combiner e por um Splitter `[4,4]`. Os outputs preservam a ordem real `A, A, AND[0], A, AND[0], AND[1], AND[1], B, B, B`, com larguras `[8, 8, 4, 8, 4, 4, 4, 8, 8, 8]` e convenção MSB → LSB.
+
+Ao clicar em **Adicionar ao editor**, o perfil é validado, salvo no IndexedDB e aparece na paleta de chips customizados. No canvas, a instância mostra 16 entradas e dez saídas, com 26 handles acessíveis. Um chip recém-inserido permanece isolado até receber fios; por isso o editor informa as entradas desconectadas como problemas acionáveis, sem considerar a materialização inválida. A importação continua sendo allowlist verificável e não executa o JSON DLS.
 
 ### Performance (v0.4.9)
 
@@ -415,10 +426,12 @@ Resultado: os chips chegam à interface para consulta; os que possuem uma
 expressão escalar completa também podem ser adicionados à **biblioteca local do
 editor** pelo botão “Adicionar ao editor”. O Veritas materializa a expressão em
 um `CircuitDocument`, preserva as portas e faz o novo componente aparecer na
-paleta do canvas, sem conta ou rede. Nesta primeira fatia, 388 entradas do
-catálogo satisfazem esse contrato completo. Chips sequenciais, multi-bit ou com
-alguma saída sem expressão continuam catalogados, mas não são apresentados como
-executáveis — a interface não promete um comportamento que não consegue provar.
+paleta do canvas, sem conta ou rede. No catálogo atual, 445 de 1121 entradas
+possuem expressão escalar; a allowlist multi-bit é mantida separadamente e só
+inclui perfis com contrato vetorial provado, como o roteador `16 para 8 e 4 bits`.
+Chips sequenciais, tri-state ou com alguma saída sem expressão continuam
+catalogados, mas não são apresentados como executáveis — a interface não promete
+um comportamento que não consegue provar.
 
 A biblioteca local também aceita chips criados pelo usuário. Um circuito pode
 ser salvo como chip, reutilizar definições anteriores e depois ser inserido em

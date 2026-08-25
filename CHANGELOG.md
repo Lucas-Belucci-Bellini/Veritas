@@ -2,6 +2,22 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.11.4] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `16 para 8 e 4 bits` do catálogo DLS, com 16 entradas escalares, 10 saídas públicas e larguras de saída `[8, 8, 4, 8, 4, 4, 4, 8, 8, 8]`.
+- Allowlist estrutural fechada para a assinatura `2× 1-8BIT`, `1× 8x2-AND` e `1× 8-4BIT`, sem executar JSON DLS, inferir dependências ou liberar estado/tri-state.
+- Materialização local explícita em dois Combiners de 8 bits, dois Splitters de 8 bits, oito AND escalares, um Combiner do AND e um Splitter `[4,4]`; a ordem pública é `A, A, AND[0], A, AND[0], AND[1], AND[1], B, B, B`.
+- Integração do perfil ao fluxo catálogo → IndexedDB → paleta de chips customizados → canvas, preservando os 26 handles acessíveis e as larguras individuais.
+
+### Validação e limites
+
+- Suíte completa: **70 arquivos e 570 testes aprovados**; a nova fatia contém 5 testes focados, cobrindo estrutura, ordem dos dez outputs com vetor não simétrico, portas locais, HDL e rejeição da assinatura sem `8-4BIT`.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card real, a persistência na biblioteca como **ID 14** e a instância no canvas com 16 entradas, 10 saídas e 26 handles acessíveis. O nó isolado exibiu 16 problemas de entradas desconectadas, comportamento esperado e acionável, não uma falha de materialização.
+- O beta readiness continua em 0 READY, 5 BLOCKED e 1 SKIP por credenciais/evidências externas Supabase ausentes; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis tri-state, sequenciais e memória permanecem fora do escopo.
+
 ## [0.11.3] — 2026-08-25
 
 ### Adicionado

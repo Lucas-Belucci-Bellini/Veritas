@@ -6,7 +6,7 @@ O Veritas é uma ferramenta local-first para estudar, projetar e validar circuit
 
 O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisões de escopo estão em [`docs/ROADMAP.md`](./docs/ROADMAP.md). O [`issue.md`](./issue.md) permanece como histórico de descoberta e visão de longo prazo, não como uma lista linear de tarefas.
 
-## Estado atual — Release 0.11.3 + fundação da V1
+## Estado atual — Release 0.11.4 + fundação da V1
 
 | Entrega | Estado |
 | --- | --- |
@@ -19,8 +19,8 @@ O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisõe
 | PWA offline-first | Concluído |
 | Clock, flip-flops e atrasos no motor sequencial | Concluído no motor e no workspace visual |
 | Chips customizados, composição hierárquica e subcircuitos reutilizáveis | Fundação da V1 concluída; expansão recursiva, runtime temporal e biblioteca local ativos |
-| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4, `8-ADD`, `8-1AND`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `8x2-AND`, `8x2-OR`, `8x2-XOR` e bancos reais `AND-8 Bits`/`NAND-8Bits`/`OR-8 Bits`/`XOR - 8 BIT`, além de `1-8MUX`, `NOT-8 Bits` e `NEGATE-8`, com larguras preservadas |
-| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar; allowlist multi-bit explicitamente nomeada em `4-ADD`, `EQUAL-4`, `8-ADD`, `8-1AND`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT`, `8x2-XOR`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `1-8MUX`, `NOT-8 Bits` e `NEGATE-8`; bancos diretos/hierárquicos foram confirmados na Release 0.11.0, o mux na 0.11.1, o inversor na 0.11.2 e a negação condicional na 0.11.3 |
+| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4, `8-ADD`, `8-1AND`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `8x2-AND`, `8x2-OR`, `8x2-XOR`, bancos reais `AND-8 Bits`/`NAND-8Bits`/`OR-8 Bits`/`XOR - 8 BIT`, `1-8MUX`, `NOT-8 Bits`, `NEGATE-8` e `16 para 8 e 4 bits`, com larguras preservadas e assinaturas verificadas |
+| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar; allowlist multi-bit explicitamente nomeada em `4-ADD`, `EQUAL-4`, `8-ADD`, `8-1AND`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT`, `8x2-XOR`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `1-8MUX`, `NOT-8 Bits`, `NEGATE-8` e `16 para 8 e 4 bits`; bancos diretos/hierárquicos foram confirmados na Release 0.11.0, o mux na 0.11.1, o inversor na 0.11.2, a negação condicional na 0.11.3 e o roteador misto na 0.11.4 |
 | Servidor MCP e plugin do Claude Code | Concluído |
 
 ## Histórico de construção — v0.7.0
@@ -61,6 +61,7 @@ O roadmap executável em `docs/ROADMAP.md` é a fonte de verdade para os increme
 | v0.11.1 | Multiplexador real `1-8MUX`, seleção de 1 bit, entradas 8/8 e saída 8 bits |
 | v0.11.2 | Inversor real `NOT-8 Bits`, uma entrada e uma saída de 8 bits |
 | v0.11.3 | `NEGATE-8` real, entrada vetorial de 8 bits, controle escalar e saída vetorial de 8 bits |
+| v0.11.4 | `16 para 8 e 4 bits` real, 16 entradas escalares, dez saídas e AND dividido em dois nibbles de 4 bits |
 | v0.10.x | Ampliação controlada do catálogo; runtime temporal vetorial permanece como etapa separada |
 | v1.0.0 | API de contexto do canvas e MCP declarativo |
 | v1.x | Sync, desktop, agentes e recursos 3D, somente após validação técnica |
