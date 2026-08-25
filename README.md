@@ -55,6 +55,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.11.7 | Expansor real `ZEXT-4-16`, com quatro entradas escalares, saída de 16 bits e doze zeros explícitos |
 | v0.11.8 | Expansor de sinal real `SEXT-4-16`, com quatro entradas escalares, saída de 16 bits e extensão do bit de sinal |
 | v0.11.9 | Reversor real `BITREV-4`, com quatro entradas e quatro saídas escalares em ordem invertida |
+| v0.12.0 | Reversor real `BITREV-8`, com oito entradas e oito saídas escalares em ordem invertida |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -258,6 +259,14 @@ A Release 0.11.9 confirma o fixture real `Chips/BITREV-4.json` do DLS, da catego
 O Veritas aceita somente essa assinatura e materializa um `CircuitDocument` direto com quatro inputs e quatro outputs escalares. A topologia observada é `A3→O0`, `A2→O1`, `A1→O2` e `A0→O3`, invertendo a ordem dos quatro bits sem introduzir Combiner, Splitter ou dependência inferida. O chip pode ser salvo no IndexedDB, reutilizado no canvas e exportado para Verilog/VHDL.
 
 A implementação não executa o JSON DLS nem transforma as expressões em uma permissão genérica: nome, cardinalidades, larguras, pinos, variáveis, expressões e contagens estruturais precisam coincidir. Chips temporais, memória, tri-state, ULA e conversores sem contrato específico continuam bloqueados.
+
+### Reversor escalar `BITREV-8` (v0.12.0)
+
+A Release 0.12.0 confirma o fixture real `Chips/BITREV-8.json` do DLS, da categoria `Outros`. O registro possui oito entradas escalares `A0…A7`, oito saídas escalares `O0…O7`, oito fios, nenhum subchip, `parts={}`, `partCount=0`, `wireCount=8` e não publica a chave `pins`. As variáveis catalogadas são `A`, `B`, `C`, `D`, `E`, `G`, `H`, `I`; as expressões derivadas são `I`, `H`, `G`, `E`, `D`, `C`, `B`, `A`.
+
+O Veritas aceita somente essa assinatura e materializa um `CircuitDocument` direto com oito inputs e oito outputs escalares. A topologia observada é `A7→O0`, `A6→O1`, `A5→O2`, `A4→O3`, `A3→O4`, `A2→O5`, `A1→O6`, `A0→O7`, invertendo a ordem dos oito bits sem introduzir Combiner, Splitter ou dependência inferida. Como o fixture não possui `pins`, os labels locais de entrada preservam exclusivamente as variáveis catalogadas; as saídas preservam `O0…O7`.
+
+A implementação não executa o JSON DLS nem transforma as expressões em uma permissão genérica: nome, cardinalidades, larguras, ausência de `pins`, variáveis, expressões e contagens estruturais precisam coincidir. O chip pode ser salvo no IndexedDB, reutilizado no canvas e exportado para Verilog/VHDL. Chips temporais, memória, tri-state, ULA e conversores sem contrato específico continuam bloqueados.
 
 ### Performance (v0.4.9)
 

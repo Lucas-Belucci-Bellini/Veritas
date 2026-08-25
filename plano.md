@@ -6,7 +6,7 @@ O Veritas é uma ferramenta local-first para estudar, projetar e validar circuit
 
 O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisões de escopo estão em [`docs/ROADMAP.md`](./docs/ROADMAP.md). O [`issue.md`](./issue.md) permanece como histórico de descoberta e visão de longo prazo, não como uma lista linear de tarefas.
 
-## Estado atual — Release 0.11.9 + fundação da V1
+## Estado atual — Release 0.12.0 + fundação da V1
 
 | Entrega | Estado |
 | --- | --- |
@@ -19,8 +19,8 @@ O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisõe
 | PWA offline-first | Concluído |
 | Clock, flip-flops e atrasos no motor sequencial | Concluído no motor e no workspace visual |
 | Chips customizados, composição hierárquica e subcircuitos reutilizáveis | Fundação da V1 concluída; expansão recursiva, runtime temporal e biblioteca local ativos |
-| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4, `8-ADD`, `8-1AND`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `8x2-AND`, `8x2-OR`, `8x2-XOR`, bancos reais `AND-8 Bits`/`NAND-8Bits`/`OR-8 Bits`/`XOR - 8 BIT`, `1-8MUX`, `NOT-8 Bits`, `NEGATE-8`, `16 para 8 e 4 bits`, `ZEXT-4-8`, `SEXT-4-8`, `ZEXT-4-16`, `SEXT-4-16` e `BITREV-4`, com larguras preservadas e assinaturas verificadas |
-| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar; allowlist multi-bit explicitamente nomeada em `4-ADD`, `EQUAL-4`, `8-ADD`, `8-1AND`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT`, `8x2-XOR`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `1-8MUX`, `NOT-8 Bits`, `NEGATE-8` e `16 para 8 e 4 bits`; bancos diretos/hierárquicos foram confirmados na Release 0.11.0, o mux na 0.11.1, o inversor na 0.11.2, a negação condicional na 0.11.3, o roteador misto na 0.11.4 e o expansor vetorial na 0.11.5; o expansor de sinal, na 0.11.6; o expansor vetorial de 16 bits, na 0.11.7; o expansor de sinal vetorial de 16 bits, na 0.11.8; o reversor escalar, na 0.11.9 |
+| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4, `8-ADD`, `8-1AND`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `8x2-AND`, `8x2-OR`, `8x2-XOR`, bancos reais `AND-8 Bits`/`NAND-8Bits`/`OR-8 Bits`/`XOR - 8 BIT`, `1-8MUX`, `NOT-8 Bits`, `NEGATE-8`, `16 para 8 e 4 bits`, `ZEXT-4-8`, `SEXT-4-8`, `ZEXT-4-16`, `SEXT-4-16`, `BITREV-4` e `BITREV-8`, com larguras preservadas e assinaturas verificadas |
+| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar; allowlist multi-bit explicitamente nomeada em `4-ADD`, `EQUAL-4`, `8-ADD`, `8-1AND`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT`, `8x2-XOR`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `(8 Bits) 8-bit Adder`, `1-8MUX`, `NOT-8 Bits`, `NEGATE-8` e `16 para 8 e 4 bits`; bancos diretos/hierárquicos foram confirmados na Release 0.11.0, o mux na 0.11.1, o inversor na 0.11.2, a negação condicional na 0.11.3, o roteador misto na 0.11.4 e o expansor vetorial na 0.11.5; o expansor de sinal, na 0.11.6; o expansor vetorial de 16 bits, na 0.11.7; o expansor de sinal vetorial de 16 bits, na 0.11.8; o reversor escalar de 4 bits, na 0.11.9; o reversor escalar de 8 bits, na 0.12.0 |
 | Servidor MCP e plugin do Claude Code | Concluído |
 
 ## Histórico de construção — v0.7.0
@@ -67,6 +67,7 @@ O roadmap executável em `docs/ROADMAP.md` é a fonte de verdade para os increme
 | v0.11.7 | `ZEXT-4-16` real, quatro entradas escalares, saída vetorial de 16 bits e doze zeros explícitos |
 | v0.11.8 | `SEXT-4-16` real, quatro entradas escalares, saída vetorial de 16 bits e extensão do bit de sinal |
 | v0.11.9 | `BITREV-4` real, quatro entradas e quatro saídas escalares em ordem invertida |
+| v0.12.0 | `BITREV-8` real, oito entradas e oito saídas escalares em ordem invertida |
 | v0.10.x | Ampliação controlada do catálogo; runtime temporal vetorial permanece como etapa separada |
 | v1.0.0 | API de contexto do canvas e MCP declarativo |
 | v1.x | Sync, desktop, agentes e recursos 3D, somente após validação técnica |

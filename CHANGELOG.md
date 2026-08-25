@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.12.0] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `BITREV-8` do catálogo DLS, na categoria `Outros`, com oito entradas escalares, oito saídas escalares, oito fios, nenhum subchip e nenhum componente catalogado em `parts`.
+- Materialização allowlist explícita como oito inputs escalares e oito outputs escalares, com conexões diretas `A7→O0`, `A6→O1`, `A5→O2`, `A4→O3`, `A3→O4`, `A2→O5`, `A1→O6` e `A0→O7`; não há Combiner, Splitter, dependência ou execução de JSON/código DLS.
+- Contrato fail-closed para nome, cardinalidades, larguras escalares, `parts={}`, `partCount=0`, `wireCount=8`, variáveis `A|B|C|D|E|G|H|I`, ausência de `pins`, nomes derivados `O0…O7` e expressões exatas `I|H|G|E|D|C|B|A`.
+
+### Validação e limites
+
+- Suíte completa: **70 arquivos e 615 testes aprovados**; a nova fatia contém 8 testes focados, cobrindo contrato do catálogo, topologia, quatro vetores de reversão, portas locais, HDL e rejeição de assinatura alterada.
+- Suíte focada do adaptador: **136/136 testes aprovados**; typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card como modelo multi-bit, a persistência na biblioteca como **ID 21** com 20 chips e a instância no canvas com `BITREV-8 · 8 entradas · 8 saídas`; o DOM confirmou 16 handles acessíveis — oito entradas e oito saídas de 1 bit — e zero `[role=alert]`. As oito entradas ficaram desconectadas de propósito, portanto a validação exibiu oito problemas acionáveis.
+- O beta readiness continua em 0 READY, 5 BLOCKED e 1 SKIP por credenciais/evidências externas Supabase ausentes; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis tri-state, sequenciais, memória, ULA e conversores sem contrato permanecem fora do escopo.
+
 ## [0.11.9] — 2026-08-25
 
 ### Adicionado
