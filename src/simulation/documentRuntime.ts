@@ -1,4 +1,9 @@
-import { toNetlist, type CircuitDocument } from '../circuit'
+import {
+  elaborateCustomChipDocument,
+  toNetlist,
+  type CircuitDocument,
+  type CustomChipLibraryEntry,
+} from '../circuit'
 import { Simulator, type SimulatorState } from './simulator'
 
 export interface DocumentRuntimeSnapshot {
@@ -14,6 +19,8 @@ export interface DocumentRuntimeWatch {
 
 export interface DocumentRuntimeOptions {
   clockPeriods?: Readonly<Record<string, number>>
+  /** Definições para expandir instâncias `custom-chip` antes de simular. */
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 export interface DocumentRuntimeState {
@@ -24,9 +31,25 @@ export interface DocumentRuntimeState {
   timeline: DocumentRuntimeSnapshot[]
 }
 
+/**
+ * Monta o simulador temporal de um documento.
+ *
+ * Instâncias `custom-chip` são **achatadas antes** de virar netlist, em vez de
+ * ensinar o simulador a recursar. Chips são combinacionais por contrato, então
+ * achatar preserva o comportamento — e reusa a elaboração que já serve à
+ * exportação HDL, com sua detecção de ciclo e limite de profundidade.
+ *
+ * A elaboração preserva os IDs do nível de topo, então `setInput`, o watch e a
+ * linha do tempo continuam falando dos mesmos nós que o autor vê no canvas.
+ */
 export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
   const runtimeDocument = applyClockPeriods(document, options.clockPeriods)
-  const simulator = new Simulator(toNetlist(runtimeDocument))
+  const flattened = runtimeDocument.nodes.some((node) => node.type === 'custom-chip')
+    ? elaborateCustomChipDocument(runtimeDocument, { customChips: options.customChips })
+    : runtimeDocument
+  const simulator = new Simulator(toNetlist(flattened))
+  // Os valores iniciais vêm do documento original: são os pinos que o autor
+  // declarou, e a elaboração não os renomeia no topo.
   for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {
       simulator.setInput(node.id, node.options.initial)

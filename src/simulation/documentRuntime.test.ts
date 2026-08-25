@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CircuitDocument } from '../circuit'
+import { buildCustomChipDefinition, type CircuitDocument } from '../circuit'
 import {
   createDocumentRuntime,
   documentInputIds,
@@ -25,6 +25,88 @@ function feedbackDocument(): CircuitDocument {
     ],
   }
 }
+
+
+describe('runtime temporal com chips customizados', () => {
+  const chipDoc = (): CircuitDocument => ({
+    format: 'veritas-circuit', version: 1, name: 'inversor',
+    nodes: [
+      { id: 'i', type: 'input', position: { x: 0, y: 0 }, label: 'IN' },
+      { id: 'nn', type: 'not', position: { x: 60, y: 0 } },
+      { id: 'o', type: 'output', position: { x: 120, y: 0 }, label: 'OUT' },
+    ],
+    connections: [
+      { source: { node: 'i', port: 0 }, target: { node: 'nn', port: 0 } },
+      { source: { node: 'nn', port: 0 }, target: { node: 'o', port: 0 } },
+    ],
+  })
+
+  it('propaga o sinal através da instância de chip', () => {
+    const definition = buildCustomChipDefinition(chipDoc(), 'Inversor')
+    const document: CircuitDocument = {
+      format: 'veritas-circuit', version: 1, name: 'usa o chip',
+      nodes: [
+        { id: 'd', type: 'input', position: { x: 0, y: 0 }, label: 'D' },
+        { id: 'chip', type: 'custom-chip', position: { x: 80, y: 0 }, label: 'INV', options: { customChipId: 1 } },
+        { id: 'q', type: 'output', position: { x: 200, y: 0 }, label: 'Q' },
+      ],
+      connections: [
+        { source: { node: 'd', port: 0 }, target: { node: 'chip', port: 0 } },
+        { source: { node: 'chip', port: 0 }, target: { node: 'q', port: 0 } },
+      ],
+    }
+
+    const simulator = createDocumentRuntime(document, { customChips: [{ id: 1, definition }] })
+    simulator.setInput('d', true)
+    simulator.tick(8)
+    // Regressão: antes o simulador ignorava a ligação para o pino interno do
+    // chip elaborado, então o NOT rodava sobre zero e devolvia 1.
+    expect(simulator.read('q')).toBe(false)
+
+    simulator.setInput('d', false)
+    simulator.tick(8)
+    expect(simulator.read('q')).toBe(true)
+  })
+
+  it('preserva os IDs do topo depois de achatar a hierarquia', () => {
+    const definition = buildCustomChipDefinition(chipDoc(), 'Inversor')
+    const document: CircuitDocument = {
+      format: 'veritas-circuit', version: 1, name: 'usa o chip',
+      nodes: [
+        { id: 'entrada', type: 'input', position: { x: 0, y: 0 }, label: 'D' },
+        { id: 'chip', type: 'custom-chip', position: { x: 80, y: 0 }, options: { customChipId: 1 } },
+        { id: 'saida', type: 'output', position: { x: 200, y: 0 }, label: 'Q' },
+      ],
+      connections: [
+        { source: { node: 'entrada', port: 0 }, target: { node: 'chip', port: 0 } },
+        { source: { node: 'chip', port: 0 }, target: { node: 'saida', port: 0 } },
+      ],
+    }
+
+    const simulator = createDocumentRuntime(document, { customChips: [{ id: 1, definition }] })
+    // setInput e read continuam falando dos IDs que o autor vê no canvas.
+    expect(() => simulator.setInput('entrada', true)).not.toThrow()
+    simulator.tick(6)
+    expect(simulator.read('saida')).toBe(false)
+  })
+
+  it('recusa simular quando a definição do chip não veio', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit', version: 1, name: 'sem definição',
+      nodes: [
+        { id: 'd', type: 'input', position: { x: 0, y: 0 }, label: 'D' },
+        { id: 'chip', type: 'custom-chip', position: { x: 80, y: 0 }, options: { customChipId: 42 } },
+        { id: 'q', type: 'output', position: { x: 200, y: 0 }, label: 'Q' },
+      ],
+      connections: [
+        { source: { node: 'd', port: 0 }, target: { node: 'chip', port: 0 } },
+        { source: { node: 'chip', port: 0 }, target: { node: 'q', port: 0 } },
+      ],
+    }
+
+    expect(() => createDocumentRuntime(document)).toThrow()
+  })
+})
 
 describe('documentRuntime', () => {
   it('converte um documento visual e aplica entradas iniciais', () => {

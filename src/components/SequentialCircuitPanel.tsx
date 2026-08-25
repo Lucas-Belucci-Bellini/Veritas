@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CircuitDocument } from '../circuit'
+import type { CircuitDocument, CustomChipLibraryEntry } from '../circuit'
 import {
   createDocumentRuntime,
   documentInputIds,
@@ -54,6 +54,8 @@ function runtimeState(
 
 interface SequentialCircuitPanelProps {
   document: CircuitDocument
+  /** Definições para expandir instâncias `custom-chip` antes de simular. */
+  customChips?: readonly CustomChipLibraryEntry[]
   requestedClockPeriods?: Readonly<Record<string, number>>
   requestedRuntimeState?: DocumentRuntimeState
   requestedRuntimeStateSentAt?: string
@@ -72,7 +74,7 @@ interface SequentialCircuitPanelProps {
   onRuntimeStateApplyFailed?: () => void
 }
 
-export function SequentialCircuitPanel({ document, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
+export function SequentialCircuitPanel({ document, customChips, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
@@ -111,7 +113,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       const saved = clearSaved ? null : readRuntimeCheckpoint(documentKey, storage)
       const defaultClockPeriods = Object.fromEntries(clockIds.map((id) => [id, document.nodes.find((node) => node.id === id)?.options?.period ?? 1]))
       const nextClockPeriods = { ...defaultClockPeriods, ...(saved?.clockPeriods ?? {}), ...(overrideClockPeriods ?? {}) }
-      const simulator = createDocumentRuntime(document, { clockPeriods: nextClockPeriods })
+      const simulator = createDocumentRuntime(document, { clockPeriods: nextClockPeriods, customChips })
       let restored = false
       if (saved) {
         try {
@@ -215,7 +217,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       return
     }
     try {
-      const simulator = createDocumentRuntime(document, { clockPeriods: state.clockPeriods })
+      const simulator = createDocumentRuntime(document, { clockPeriods: state.clockPeriods, customChips })
       simulator.restoreState(state.simulator)
       const snapshot = snapshotDocumentRuntime(simulator)
       simulatorRef.current = simulator

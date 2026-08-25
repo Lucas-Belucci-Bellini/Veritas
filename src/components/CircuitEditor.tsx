@@ -1138,6 +1138,7 @@ export function CircuitEditor() {
       {hasSequential && issues.length === 0 && (
         <SequentialCircuitPanel
           document={document}
+          customChips={customChipEntries}
           requestedClockPeriods={remoteClockPeriods ?? undefined}
           requestedRuntimeState={remoteRuntimeState?.state}
           requestedRuntimeStateSentAt={remoteRuntimeState?.sentAt}

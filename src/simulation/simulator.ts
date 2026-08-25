@@ -234,8 +234,14 @@ export class Simulator {
 
     switch (type) {
       case 'input':
-        // Só muda por setInput.
-        node.next[0] = node.outputs[0]
+        // Um `input` marcado como fronteira interna não é um pino do autor: é o
+        // que sobrou de uma porta de chip depois da elaboração, e se comporta
+        // como passagem. O avaliador combinacional já seguia essa convenção
+        // (`nodeInputCount` conta 1 entrada nesse caso); sem isto o simulador
+        // ignorava a ligação e o chip inteiro rodava com a entrada em zero.
+        node.next[0] = options?.customChipBoundary === 'internal'
+          ? values[0] ?? false
+          : node.outputs[0]
         return
 
       case 'constant':
