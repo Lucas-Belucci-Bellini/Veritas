@@ -11,6 +11,7 @@ import {
   circuitDifferential,
   circuitEquivalence,
   circuitTruthTable,
+  runTestbenchTool,
   circuitVectorTruthTable,
   exportCircuitTool,
   MAX_SIMULATION_TICKS,
@@ -415,6 +416,77 @@ describe('circuit_differential', () => {
 
     expect(result.isError).toBe(true)
     expect(result.text).toContain('documento A não possui o formato')
+  })
+})
+
+describe('run_testbench', () => {
+  const halfAdder = (carry: 'and' | 'or'): CircuitDocument => ({
+    format: 'veritas-circuit',
+    version: 1,
+    name: 'meio somador',
+    nodes: [
+      { id: 'a', type: 'input', position: { x: 0, y: 0 }, label: 'A' },
+      { id: 'b', type: 'input', position: { x: 0, y: 60 }, label: 'B' },
+      { id: 'x', type: 'xor', position: { x: 120, y: 0 } },
+      { id: 'c', type: carry, position: { x: 120, y: 60 } },
+      { id: 's', type: 'output', position: { x: 240, y: 0 }, label: 'SOMA' },
+      { id: 'v', type: 'output', position: { x: 240, y: 60 }, label: 'VAIUM' },
+    ],
+    connections: [
+      { source: { node: 'a', port: 0 }, target: { node: 'x', port: 0 } },
+      { source: { node: 'b', port: 0 }, target: { node: 'x', port: 1 } },
+      { source: { node: 'a', port: 0 }, target: { node: 'c', port: 0 } },
+      { source: { node: 'b', port: 0 }, target: { node: 'c', port: 1 } },
+      { source: { node: 'x', port: 0 }, target: { node: 's', port: 0 } },
+      { source: { node: 'c', port: 0 }, target: { node: 'v', port: 0 } },
+    ],
+  })
+
+  const table = {
+    format: 'veritas-testbench' as const,
+    version: 1 as const,
+    name: 'tabela do meio somador',
+    cases: [
+      { name: '0+1', inputs: { A: false, B: true }, expect: { SOMA: true, VAIUM: false } },
+      { name: '1+1', inputs: { A: true, B: true }, expect: { SOMA: false, VAIUM: true } },
+    ],
+  }
+
+  it('aprova um circuito que satisfaz os vetores', () => {
+    const result = runTestbenchTool({ document: halfAdder('and'), testbench: table })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('Resultado: todos os casos passaram')
+    expect(result.text).toContain('Casos: 2 de 2 passaram')
+    // O resultado positivo precisa dizer o que ele NÃO prova.
+    expect(result.text).toContain('circuit_equivalence')
+  })
+
+  it('tabula os casos que falharam com esperado e obtido', () => {
+    const result = runTestbenchTool({ document: halfAdder('or'), testbench: table })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('Resultado: há casos falhando')
+    expect(result.text).toContain('Casos: 1 de 2 passaram')
+    expect(result.text).toContain('| 0+1 | VAIUM | 0 | 1 | — |')
+  })
+
+  it('recusa documento de teste inválido sem executar nada', () => {
+    const result = runTestbenchTool({
+      document: halfAdder('and'),
+      testbench: { ...table, cases: [{ name: 'vazio', inputs: { A: true } }] },
+    })
+
+    expect(result.text).toContain('documento de teste inválido')
+    expect(result.text).toContain('missing-expectation')
+    expect(result.text).toContain('Nenhum caso foi executado')
+  })
+
+  it('recusa circuito fora do formato', () => {
+    const result = runTestbenchTool({ document: { nope: true }, testbench: table })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('formato veritas-circuit')
   })
 })
 

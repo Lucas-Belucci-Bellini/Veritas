@@ -224,9 +224,120 @@ interface CircuitDifferentialReport {
 - `scripts/mcp-acceptance.mjs` — `MCP-DIFF-001` e `MCP-DIFF-002` pelo transporte
   stdio real.
 
+## VERIFY-003 — testbench declarativo
+
+`runTestbench` roda um documento de teste contra um circuito. A diferença para
+as duas anteriores é o que se compara: em vez de circuito contra circuito, aqui
+é **circuito contra a intenção do autor**.
+
+### O teste é dado, não código
+
+Um caso declara valores, nunca uma expressão. Nada é compilado, nada é avaliado
+fora do avaliador do próprio Veritas, e um documento de teste importado não é
+mais perigoso que um `.veritas`. Essa restrição é deliberada: assim que um
+testbench aceita expressões, ele vira uma linguagem, e uma linguagem precisa de
+um sandbox.
+
+```ts
+interface TestbenchCase {
+  name?: string
+  inputs?: Record<string, boolean>   // modo combinacional
+  expect?: Record<string, boolean>
+  steps?: TestbenchStep[]            // modo sequencial
+}
+
+interface TestbenchStep {
+  set?: Record<string, boolean>
+  ticks?: number                     // padrão 1
+  expect?: Record<string, boolean>   // conferido DEPOIS dos tiques
+}
+```
+
+Um caso é combinacional **ou** sequencial. Misturar `steps` com
+`inputs`/`expect` torna a intenção ambígua e é recusado (`mixed-case-mode`).
+
+### Um caso sem expectativa não é um teste
+
+Um caso que não declara nenhuma saída esperada não pode falhar — e um teste que
+nunca falha não testa nada, só dá uma sensação de cobertura. Por isso ele é
+recusado com `missing-expectation`, em vez de contar como "passou".
+
+### Todos os casos rodam
+
+A execução não para no primeiro caso que falha. O produto útil de um testbench
+é saber **quantos e quais** falharam; parar no primeiro esconde os outros e
+transforma a correção em um jogo de um erro por vez.
+
+### O que passar num testbench significa
+
+Passar cobre **exatamente os casos escritos**. Não é prova sobre o espaço de
+entrada — isso é `compareCircuitEquivalence`. O relatório do MCP e o painel
+dizem isso junto do resultado positivo, pela mesma razão que a comparação
+temporal diz "idêntico neste roteiro".
+
+| | VERIFY-001 | VERIFY-002 | VERIFY-003 |
+| --- | --- | --- | --- |
+| compara | circuito × circuito | circuito × circuito | circuito × intenção |
+| percorre | todo o espaço | o roteiro | os casos escritos |
+| melhor veredito | `equivalent` | `identical` | `passed` |
+
+### Limites e fronteiras
+
+| Limite | Valor |
+| --- | --- |
+| `MAX_TESTBENCH_CASES` | 512 casos |
+| `MAX_TESTBENCH_TICKS` | 1000 tiques somados nos casos sequenciais |
+
+Referências a portas inexistentes (`unknown-input`, `unknown-output`) e rótulos
+duplicados são recusados **antes** de qualquer execução.
+
+Casos sequenciais ainda não expandem instâncias `custom-chip`: o runtime
+temporal não recebe a biblioteca de chips. Em vez de deixar isso virar um
+"componente sem definição" genérico do netlist, existe uma guarda explícita
+(`sequential-custom-chip`) que diz o que fazer. Casos combinacionais aceitam
+chips normalmente.
+
+### Superfícies
+
+| Camada | Entrada |
+| --- | --- |
+| Domínio | `runTestbench` em `src/circuit/testbench.ts` |
+| Interface | painel “Testes do circuito” (`src/components/TestbenchPanel.tsx`) — a tabela **é** o documento de teste; cobre o modo combinacional |
+| MCP | ferramenta `run_testbench`, com os dois modos |
+
+### Cobertura
+
+- `src/circuit/testbench.test.ts` — 19 casos: meio somador aprovado, meio
+  somador com o vai-um errado apontando caso/saída/valores, execução de todos os
+  casos sem parar no primeiro, nomeação por posição, caso sequencial com
+  expectativa por passo, tique e passo no relatório de falha sequencial, mistura
+  de modos, caso sem expectativa (combinacional e sequencial), portas
+  inexistentes, formato inválido, sem casos, limite de casos, limite de tiques,
+  rótulo duplicado, guarda de custom-chip sequencial, passo sem `ticks`,
+  determinismo e ordem canônica das divergências.
+- `mcp/src/tools.test.ts` — golden aprovado (incluindo o aviso sobre o que não
+  prova), golden reprovado tabulado, documento inválido e circuito fora do
+  formato.
+- `scripts/mcp-acceptance.mjs` — `MCP-TB-001` e `MCP-TB-002` pelo transporte
+  stdio real.
+
+## Identidade de portas compartilhada
+
+As três ferramentas pareiam portas pelo mesmo caminho: `collectCircuitPorts` em
+`src/circuit/portIdentity.ts`. Antes dele, `collectPorts` existia duplicado em
+`equivalence.ts` e `differential.ts`, e uma terceira cópia teria criado três
+definições de "identidade de porta" livres para divergir. A ordem canônica
+alfabética, a regra de rótulo-com-reserva-no-ID e a mensagem de rótulo duplicado
+moram nesse módulo.
+
 ## O que estas etapas deliberadamente não entregam
 
-Testbenches declarativos, asserções (`assert ALWAYS`/`NEVER`), verificação de
-propriedades, equivalência **sequencial provada** (não amostrada) e
-auto-correção por IA continuam fora do escopo. Todas dependem destes dois
-contratos e vêm depois deles.
+Asserções (`assert ALWAYS`/`NEVER`), verificação de propriedades, equivalência
+**sequencial provada** (não amostrada), geração automática de casos e
+auto-correção por IA continuam fora do escopo. As asserções precisam de um
+avaliador de expressões sobre sinais — e ele deve reusar o parser da engine, não
+qualquer coisa parecida com `eval`.
+
+O painel de testes cobre o modo combinacional; casos sequenciais existem no
+domínio e no MCP, e a interface deles depende de um editor de roteiro com
+expectativas.

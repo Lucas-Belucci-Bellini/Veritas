@@ -25,6 +25,8 @@ import {
   compareCircuitEquivalence,
   compareCircuitTimelines,
   MAX_DIFFERENTIAL_TICKS,
+  MAX_TESTBENCH_CASES,
+  runTestbench,
   MAX_EQUIVALENCE_INPUT_BITS,
   elaborateCustomChipDocument,
   exportCircuit,
@@ -33,6 +35,8 @@ import {
   type CircuitDifferentialReport,
   type CircuitDifferentialStep,
   type CircuitEquivalenceReport,
+  type TestbenchDocument,
+  type TestbenchReport,
   type CustomChipLibraryEntry,
 } from '../../src/circuit/index'
 import { Simulator, type ComponentSpec } from '../../src/simulation/index'
@@ -680,6 +684,67 @@ function formatDifferentialReport(report: CircuitDifferentialReport): string {
   }
   return lines.join('\n')
 }
+
+export interface RunTestbenchToolQuery {
+  document: unknown
+  testbench: unknown
+  customChips?: readonly CustomChipToolDefinition[]
+}
+
+export function runTestbenchTool(query: RunTestbenchToolQuery): ToolResult {
+  try {
+    if (!isCircuitDocumentShape(query.document)) {
+      return { isError: true, text: 'O documento não possui o formato veritas-circuit esperado.' }
+    }
+    const report = runTestbench(query.document, query.testbench as TestbenchDocument, {
+      customChips: normalizeCustomChipLibrary(query.customChips),
+    })
+    return { text: formatTestbenchReport(report) }
+  } catch (error) {
+    return { isError: true, text: error instanceof Error ? error.message : 'Falha ao rodar o testbench.' }
+  }
+}
+
+function formatTestbenchReport(report: TestbenchReport): string {
+  if (report.status === 'invalid') {
+    return [
+      'Resultado: documento de teste inválido',
+      '',
+      ...report.issues.map((issue) => `- [${issue.code}] ${issue.message}`),
+      '',
+      'Nenhum caso foi executado.',
+    ].join('\n')
+  }
+
+  const lines = [
+    report.status === 'passed' ? 'Resultado: todos os casos passaram' : 'Resultado: há casos falhando',
+    '',
+    `Casos: ${report.passed} de ${report.total} passaram`,
+  ]
+
+  if (report.status === 'passed') {
+    lines.push(
+      '',
+      'O circuito satisfez todos os vetores declarados. Isso cobre exatamente os casos escritos —',
+      'para uma prova sobre todo o espaço de entrada, use circuit_equivalence.',
+    )
+    return lines.join('\n')
+  }
+
+  lines.push('', '| Caso | Saída | Esperado | Obtido | Tique |', '| --- | --- | --- | --- | --- |')
+  for (const item of report.cases) {
+    if (item.status === 'passed') continue
+    for (const mismatch of item.mismatches) {
+      lines.push(
+        `| ${item.name} | ${mismatch.output} | ${mismatch.expected ? 1 : 0} | ${mismatch.actual ? 1 : 0} | ` +
+        `${mismatch.tick === undefined ? '—' : mismatch.tick} |`,
+      )
+    }
+  }
+  return lines.join('\n')
+}
+
+export const MCP_MAX_TESTBENCH_CASES = MAX_TESTBENCH_CASES
 
 export const MCP_MAX_DIFFERENTIAL_TICKS = MAX_DIFFERENTIAL_TICKS
 

@@ -143,6 +143,38 @@ const DIFFERENTIAL_SCRIPT = [
   { set: { CLK: true }, ticks: 2 },
 ]
 
+const TESTBENCH_HALF_ADDER = (carry) => ({
+  format: 'veritas-circuit',
+  version: 1,
+  name: 'Meio somador MCP',
+  nodes: [
+    { id: 'a', type: 'input', position: { x: 0, y: 0 }, label: 'A' },
+    { id: 'b', type: 'input', position: { x: 0, y: 60 }, label: 'B' },
+    { id: 'x', type: 'xor', position: { x: 120, y: 0 } },
+    { id: 'c', type: carry, position: { x: 120, y: 60 } },
+    { id: 's', type: 'output', position: { x: 240, y: 0 }, label: 'SOMA' },
+    { id: 'v', type: 'output', position: { x: 240, y: 60 }, label: 'VAIUM' },
+  ],
+  connections: [
+    { source: { node: 'a' }, target: { node: 'x', port: 0 } },
+    { source: { node: 'b' }, target: { node: 'x', port: 1 } },
+    { source: { node: 'a' }, target: { node: 'c', port: 0 } },
+    { source: { node: 'b' }, target: { node: 'c', port: 1 } },
+    { source: { node: 'x' }, target: { node: 's', port: 0 } },
+    { source: { node: 'c' }, target: { node: 'v', port: 0 } },
+  ],
+})
+
+const TESTBENCH_TABLE = {
+  format: 'veritas-testbench',
+  version: 1,
+  name: 'Tabela do meio somador',
+  cases: [
+    { name: '0+1', inputs: { A: false, B: true }, expect: { SOMA: true, VAIUM: false } },
+    { name: '1+1', inputs: { A: true, B: true }, expect: { SOMA: false, VAIUM: true } },
+  ],
+}
+
 function main() {
   if (!existsSync(SERVER_PATH)) throw new Error('mcp/dist/server.js ausente; execute npm run build:mcp antes do gate')
   const session = runSession([
@@ -194,6 +226,14 @@ function main() {
       document_b: DIFFERENTIAL_FLIPFLOP('y', 1),
       script: DIFFERENTIAL_SCRIPT,
     } }),
+    request(15, 'tools/call', { name: 'run_testbench', arguments: {
+      document: TESTBENCH_HALF_ADDER('and'),
+      testbench: TESTBENCH_TABLE,
+    } }),
+    request(16, 'tools/call', { name: 'run_testbench', arguments: {
+      document: TESTBENCH_HALF_ADDER('or'),
+      testbench: TESTBENCH_TABLE,
+    } }),
   ])
   const initialize = responseFor(session.responses, 1)
   const listed = responseFor(session.responses, 2)
@@ -209,8 +249,10 @@ function main() {
   const divergentPair = responseFor(session.responses, 12)
   const identicalTimeline = responseFor(session.responses, 13)
   const divergentTimeline = responseFor(session.responses, 14)
+  const testbenchPassed = responseFor(session.responses, 15)
+  const testbenchFailed = responseFor(session.responses, 16)
   const toolNames = listed.result?.tools?.map((tool) => tool.name) ?? []
-  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit', 'circuit_truth_table', 'circuit_vector_truth_table', 'export_circuit_hdl', 'circuit_equivalence', 'circuit_differential']
+  const expectedTools = ['truth_table', 'logic_case', 'propositional_truth_table', 'debug_algorithm', 'simulate_circuit', 'circuit_truth_table', 'circuit_vector_truth_table', 'export_circuit_hdl', 'circuit_equivalence', 'circuit_differential', 'run_testbench']
   const missingTools = expectedTools.filter((name) => !toolNames.includes(name))
   const initializeOk = initialize.result?.serverInfo?.name === 'veritas' && initialize.result?.protocolVersion
   const truthText = textOf(truth)
@@ -225,6 +267,8 @@ function main() {
   const divergentText = textOf(divergentPair)
   const identicalTimelineText = textOf(identicalTimeline)
   const divergentTimelineText = textOf(divergentTimeline)
+  const testbenchPassedText = textOf(testbenchPassed)
+  const testbenchFailedText = textOf(testbenchFailed)
   const results = [
     result('MCP-001', initializeOk ? 'PASS' : 'FAIL', 'initialize JSON-RPC', initializeOk ? `servidor ${initialize.result.serverInfo.name} negociou ${initialize.result.protocolVersion}` : JSON.stringify(initialize)),
     result('MCP-002', missingTools.length === 0 ? 'PASS' : 'FAIL', 'tools/list schema', missingTools.length === 0 ? `${toolNames.length} ferramentas listadas com nomes estáveis` : `ferramentas ausentes: ${missingTools.join(', ')}`),
@@ -240,6 +284,8 @@ function main() {
     result('MCP-EQ-002', divergentPair.result?.isError !== true && divergentText.includes('Resultado: não equivalente') && divergentText.includes('Contraexemplo (linha 3)') && divergentText.includes('| S | 0 | 1 |') ? 'PASS' : 'FAIL', 'circuit_equivalence contraexemplo golden', divergentText || JSON.stringify(divergentPair)),
     result('MCP-DIFF-001', identicalTimeline.result?.isError !== true && identicalTimelineText.includes('Resultado: idêntico neste roteiro') && identicalTimelineText.includes('não é prova') ? 'PASS' : 'FAIL', 'circuit_differential golden idêntico', identicalTimelineText || JSON.stringify(identicalTimeline)),
     result('MCP-DIFF-002', divergentTimeline.result?.isError !== true && divergentTimelineText.includes('Resultado: divergente') && divergentTimelineText.includes('Primeira divergência no tique 1') && divergentTimelineText.includes('| Q | 0 | 1 |') ? 'PASS' : 'FAIL', 'circuit_differential primeiro tique divergente', divergentTimelineText || JSON.stringify(divergentTimeline)),
+    result('MCP-TB-001', testbenchPassed.result?.isError !== true && testbenchPassedText.includes('Resultado: todos os casos passaram') && testbenchPassedText.includes('Casos: 2 de 2 passaram') && testbenchPassedText.includes('circuit_equivalence') ? 'PASS' : 'FAIL', 'run_testbench golden aprovado', testbenchPassedText || JSON.stringify(testbenchPassed)),
+    result('MCP-TB-002', testbenchFailed.result?.isError !== true && testbenchFailedText.includes('Resultado: há casos falhando') && testbenchFailedText.includes('| 0+1 | VAIUM | 0 | 1 | — |') ? 'PASS' : 'FAIL', 'run_testbench golden reprovado', testbenchFailedText || JSON.stringify(testbenchFailed)),
   ]
   if (results.some((item) => !MCP_ACCEPTANCE_IDS.includes(item.id))) throw new Error('IDs MCP fora do contrato')
   mkdirSync(dirname(REPORT_PATH), { recursive: true })

@@ -25,6 +25,7 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `circuit_vector_truth_table` | Gera tabela verdade determinística para barramentos de até 12 bits de entrada |
 | `circuit_equivalence` | Compara dois `CircuitDocument` combinacionais em todas as combinações de entrada e devolve o contraexemplo quando divergem |
 | `circuit_differential` | Roda a mesma sequência de entradas em dois `CircuitDocument` e aponta o primeiro tique em que discordam (aceita clock, flip-flops e atrasos) |
+| `run_testbench` | Roda um documento `veritas-testbench` contra um `CircuitDocument` e devolve quais casos falharam, com esperado e obtido |
 | `export_circuit_hdl` | Exporta um `CircuitDocument` validado para Verilog ou VHDL, incluindo chips customizados elaborados |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
@@ -239,6 +240,52 @@ Contraexemplo (linha 3):
 ```
 
 O contrato completo está em [`../docs/VERIFICATION.md`](../docs/VERIFICATION.md).
+
+### `run_testbench`
+
+Compara o circuito com a **intenção declarada**, em vez de com outro circuito.
+O documento de teste é dado puro: valores e expectativas, nenhuma expressão.
+Cada caso é combinacional (`inputs` + `expect`) ou sequencial (`steps` com
+`set`/`ticks`/`expect`), nunca os dois.
+
+```json
+{
+  "name": "run_testbench",
+  "arguments": {
+    "document": { "format": "veritas-circuit", "version": 1, "...": "..." },
+    "testbench": {
+      "format": "veritas-testbench",
+      "version": 1,
+      "name": "Tabela do meio somador",
+      "cases": [
+        { "name": "0+1", "inputs": { "A": false, "B": true }, "expect": { "SOMA": true, "VAIUM": false } },
+        { "name": "carrega na borda", "steps": [
+          { "set": { "D": true, "CLK": false }, "ticks": 2, "expect": { "Q": false } },
+          { "set": { "CLK": true }, "ticks": 2, "expect": { "Q": true } }
+        ] }
+      ]
+    }
+  }
+}
+```
+
+Todos os casos rodam, mesmo depois do primeiro que falha. A resposta reprovada
+tabula caso, saída, esperado, obtido e o tique (vazio no modo combinacional):
+
+```
+Resultado: há casos falhando
+
+Casos: 1 de 2 passaram
+
+| Caso | Saída | Esperado | Obtido | Tique |
+| --- | --- | --- | --- | --- |
+| 0+1 | VAIUM | 0 | 1 | — |
+```
+
+Um caso sem expectativa é recusado: ele não poderia falhar, então não testa
+nada. Casos sequenciais ainda não expandem `custom-chip` — há um erro próprio
+que explica isso em vez de deixar o netlist reclamar de componente sem
+definição.
 
 ### `circuit_differential`
 

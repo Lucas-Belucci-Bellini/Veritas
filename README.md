@@ -230,6 +230,27 @@ Concordar num roteiro não prova que não existe outro que separe os dois
 circuitos, e o painel diz isso junto do resultado positivo. Pelo MCP, é a
 ferramenta `circuit_differential`.
 
+### Testes do circuito
+
+Os dois painéis acima comparam circuito com circuito. O painel **Testes do
+circuito** compara o circuito com a sua intenção: cada linha é um caso, com as
+entradas do estímulo e as saídas que você afirma que deveriam sair.
+
+```
+CASO   A   B   SOMA esperado   VAIUM esperado      RESULTADO
+#1     0   1   1               0  obtido 1         ✗ falhou
+#2     1   1   0               1                   ✓ passou
+```
+
+O teste é **dado, não código** — nenhuma expressão é avaliada, então abrir um
+documento de teste não é mais arriscado que abrir um `.veritas`. Todos os casos
+rodam, mesmo depois do primeiro que falha: o que interessa é saber quantos e
+quais quebraram.
+
+Passar cobre exatamente os casos escritos. Para prova sobre todas as
+combinações, é a equivalência entre circuitos. Pelo MCP, é a ferramenta
+`run_testbench`, que também aceita casos sequenciais com clock e flip-flops.
+
 ### Plugin do Claude Code
 
 Este repositório também é um **marketplace de plugin do Claude Code**. Dá para
@@ -258,7 +279,7 @@ npm run validate:plugin
 `mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
 para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh,
 simulação de circuitos sequenciais, equivalência e comparação temporal entre
-circuitos, casos didáticos, debug de `AlgorithmDocument` e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
+circuitos, testbench declarativo, casos didáticos, debug de `AlgorithmDocument` e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
 expressão ou estado, ele pergunta e recebe a conta/execução feita.
 
 ```bash

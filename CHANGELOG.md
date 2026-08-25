@@ -2,6 +2,27 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.15] — 2026-08-25
+
+### Adicionado
+
+- Testbench declarativo (`runTestbench`): roda um documento `veritas-testbench` contra um circuito e devolve quais casos falharam, com saída, valor esperado e obtido. O teste é dado, não código — nenhuma expressão do usuário é avaliada.
+- Casos combinacionais (`inputs` + `expect`) e sequenciais (`steps` com `set`/`ticks`/`expect`), com recusa explícita de casos que misturam os dois modos ou que não declaram nenhuma expectativa.
+- Painel “Testes do circuito”, em que a tabela **é** o documento de teste: as colunas saem das portas do circuito escolhido.
+- Ferramenta MCP `run_testbench`, com checks `MCP-TB-001`/`MCP-TB-002` no acceptance stdio.
+
+### Alterado
+
+- `collectPorts`, que estava duplicado em `equivalence.ts` e `differential.ts`, foi extraído para `src/circuit/portIdentity.ts`. A ordem canônica, a regra de rótulo-com-reserva-no-ID e a mensagem de rótulo duplicado passam a ter uma definição só; as duas fatias anteriores atravessaram o refactor sem alterar nenhum teste.
+
+### Validação e limites
+
+- Suíte com 470 testes, typecheck, lint, builds de frontend/MCP stdio/MCP HTTP/lib/plugin; `beta:mcp` 16 PASS, `beta:mcp:http` 18 PASS, `beta:accessibility` 5 PASS, `beta:rust` 2 PASS e `beta:wasm:isolation` 5 PASS, todos sem FAIL.
+- O painel foi verificado no Chromium com um meio somador de vai-um errado: o caso que expõe o defeito reprovou e o que não expõe passou, sem erro de console.
+- Passar num testbench cobre exatamente os casos escritos, e o relatório diz isso junto do resultado positivo. Prova sobre todo o espaço de entrada continua sendo `circuit_equivalence`.
+- Casos sequenciais ainda não expandem instâncias `custom-chip`; existe um erro próprio (`sequential-custom-chip`) explicando o que fazer, em vez de um erro genérico do netlist.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.14] — 2026-08-25
 
 ### Adicionado

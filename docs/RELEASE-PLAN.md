@@ -4,7 +4,7 @@
 **Produto:** Veritas — editor e simulador didático de lógica digital
 **Repositório:** https://github.com/Lucas-Belucci-Bellini/Veritas
 **Preview/produção atual:** https://veritas-opal-seven.vercel.app
-**Versão declarada no `package.json`:** `0.9.0-rc.14`
+**Versão declarada no `package.json`:** `0.9.0-rc.15`
 
 ## 1. Decisão de posicionamento
 
@@ -22,7 +22,7 @@ Há, porém, quatro fatos que impedem chamar o estado atual de `1.0.0` sem uma r
 
 | Área | Estado atual | Consequência para o lançamento |
 | --- | --- | --- |
-| Versionamento | `package.json` está em `0.9.0-rc.14`; `v0.9.0-rc.13` está publicada e ainda não há release estável. | Manter as pré-releases até concluir os gates reais de beta e estabilidade. |
+| Versionamento | `package.json` está em `0.9.0-rc.15`; `v0.9.0-rc.14` está publicada e ainda não há release estável. | Manter as pré-releases até concluir os gates reais de beta e estabilidade. |
 | Distribuição | Existe deployment Vercel público, mas o fluxo de Preview/Production, domínio, headers e rollback ainda precisa ser formalizado. | Tratar o deployment atual como preview até concluir o checklist. |
 | MCP | Ferramentas determinísticas estão disponíveis por `stdio`; transporte HTTP remoto autenticado ainda é roadmap. | Não prometer integração web remota no lançamento inicial. |
 | Colaboração | Broadcast de snapshots e Presence funcionam, mas não são CRDT nem merge campo a campo. | Rotular como colaboração beta/preview e documentar o risco de sobrescrita concorrente. |
@@ -50,6 +50,7 @@ A recomendação é usar SemVer e manter os artefatos publicados imutáveis: cor
 | `v0.9.0-rc.12` | Release candidate WASM-002 — adapter/netlist ABI e golden parity | Testadores convidados e mantenedores | Contrato VNET/VRES versionado, feature WASM opt-in, zero imports, paridade de valores/saídas/ordem com fixture golden, testes negativos e nenhum uso no navegador/MCP/plugin; TypeScript continua fallback. |
 | `v0.9.0-rc.13` | Release candidate WASM-003 — matriz golden e hardening de fronteira | Testadores convidados e mantenedores | Matriz VNET/VRES para 1, 8, 32 e 64 bits, paridade byte a byte, códigos de erro host/WASM para payloads inválidos e capacidade, zero imports e nenhum uso no navegador/MCP/plugin; TypeScript continua fallback. |
 | `v0.9.0-rc.14` | Release candidate VERIFY-001/VERIFY-002 — verificação comportamental | Testadores convidados e mantenedores | Equivalência exaustiva entre circuitos combinacionais com contraexemplo determinístico; comparação temporal apontando o primeiro tique divergente em circuitos sequenciais; ferramentas MCP `circuit_equivalence` e `circuit_differential` com golden por stdio; nenhuma prova é afirmada além do que foi verificado — acima do limite a comparação é recusada, não truncada. |
+| `v0.9.0-rc.15` | Release candidate VERIFY-003 — testbench declarativo | Testadores convidados e mantenedores | Documento `veritas-testbench` versionado, com casos combinacionais e sequenciais; teste é dado e não código, sem avaliação de expressões do usuário; casos sem expectativa e casos que misturam modos são recusados; todos os casos rodam e o relatório diz que passar cobre apenas os vetores escritos. |
 | `v0.9.0-beta.1` | Beta público sequencial | Estudantes/professores convidados | Manifesto de evidências completo, RLS/Realtime/HDL/mobile/acessibilidade/rollback aprovados e zero P0/P1. |
 | `v0.8.x` | Correções de beta/RC | Usuários beta | Sem regressão nos quality gates; notas de mudança por release. |
 | `v1.0.0` | Lançamento estável | Público geral | API/documento público estável, política de dados, suporte básico e critérios P0/P1 encerrados. |
