@@ -4,7 +4,7 @@
 
 ## 1. Estado atual
 
-A versão de referência da implementação local é a **Release 0.11.7**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
+A versão de referência da implementação local é a **Release 0.11.8**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
 
 | Área | Situação real | Evidência no repositório |
 | --- | --- | --- |
@@ -62,8 +62,17 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.11.5** | Expansor vetorial DLS | `ZEXT-4-8`, com quatro entradas escalares, uma constante `0`, Combiner de oito partes e saída de 8 bits | Um expansor combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a oito portas escalares |
 | **v0.11.6** | Expansor de sinal vetorial DLS | `SEXT-4-8`, com quatro entradas escalares, fan-out do bit de sinal e saída de 8 bits | Um expansor de sinal combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a oito portas escalares |
 | **v0.11.7** | Expansor vetorial de 16 bits DLS | `ZEXT-4-16`, com quatro entradas escalares, uma constante `0`, Combiner de 16 partes e saída de 16 bits | Um expansor combinacional real de 16 bits pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a portas escalares |
+| **v0.11.8** | Expansor de sinal vetorial de 16 bits DLS | `SEXT-4-16`, com quatro entradas escalares, fan-out de `A3`, Combiner de 16 partes e saída de 16 bits | Um expansor de sinal combinacional real de 16 bits pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a portas escalares |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
+
+### Atualização da implementação — Release 0.11.8
+
+A Release 0.11.8 fecha a allowlist do fixture real `Chips/SEXT-4-16.json`, da categoria `Outros`. O contrato aceito exige nome exato, quatro entradas, 16 saídas derivadas, ausência da chave `pins`, `parts={}`, `partCount=0`, `wireCount=16` e as expressões `A`, `B`, `C`, `D` seguidas por doze ocorrências de `D`. O adaptador lê somente o registro catalogado e materializa um `CircuitDocument`; não executa JSON, não avalia código e não infere dependências.
+
+A construção local cria quatro inputs escalares `A0…A3`, um Combiner com 16 partes e uma saída vetorial `O0` de 16 bits. Os canais 0–2 recebem `A0`, `A1` e `A2`; os canais 3–15 recebem `A3`. A saída comprovada é `A0 A1 A2 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3` em ordem MSB → LSB, preservando a extensão de sinal real observada nas expressões.
+
+Como o registro também publica 16 expressões escalares derivadas, a biblioteca prioriza o documento vetorial quando a assinatura allowlisted coincide. Assim, a persistência local, a paleta e o canvas mostram `IN 1 + 1 + 1 + 1 bits · OUT 16 bits`; a porta pública continua sendo uma saída estrutural de 16 bits, não dezesseis saídas escalares independentes. A suíte focada, a suíte completa, os gates locais e o smoke catálogo → IndexedDB → paleta → canvas foram executados. O beta readiness permanece bloqueado por evidências/credenciais Supabase externas, e `validate:plugin` por `claude` ausente; tri-state, memória e estado continuam fora do escopo.
 
 ### Atualização da implementação — Release 0.11.7
 

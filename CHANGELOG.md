@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.11.8] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `SEXT-4-16` do catálogo DLS, com quatro entradas escalares, dezesseis saídas derivadas `A|B|C|D|D|D|D|D|D|D|D|D|D|D|D|D` e uma saída estrutural local `O0` de 16 bits.
+- Materialização allowlist explícita como quatro inputs escalares, um Combiner de 16 partes e uma saída vetorial de 16 bits; os três primeiros canais recebem `A0…A2` e os treze canais restantes recebem `A3`, preservando `A0 A1 A2 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3 A3` em MSB → LSB.
+- O contrato é fail-closed: exige nome, cardinalidades, `parts={}`, `partCount=0`, `wireCount=16`, ausência de `pins` e expressões exatas; não executa JSON/código DLS nem infere dependências. A biblioteca prioriza o materializador vetorial sobre expressões escalares derivadas.
+
+### Validação e limites
+
+- Suíte completa: **70 arquivos e 599 testes aprovados**; a nova fatia contém 8 testes focados, cobrindo contrato do catálogo, estrutura, quatro vetores de extensão de sinal, portas locais, HDL e rejeição de assinatura alterada.
+- Suíte focada do adaptador: **120/120 testes aprovados**; typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card como modelo multi-bit, a persistência na biblioteca como **ID 19** com 18 chips e a instância no canvas com `IN 1 + 1 + 1 + 1 bits · OUT 16 bits`; o DOM confirmou 5 handles acessíveis — quatro entradas de 1 bit e uma saída de 16 bits — e zero `[role=alert]`. As quatro entradas ficaram desconectadas de propósito, portanto a validação exibiu quatro problemas acionáveis.
+- O beta readiness continua em 0 READY, 5 BLOCKED e 1 SKIP por credenciais/evidências externas Supabase ausentes; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis tri-state, sequenciais, memória e conversores sem contrato permanecem fora do escopo.
+
 ## [0.11.7] — 2026-08-25
 
 ### Adicionado

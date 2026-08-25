@@ -53,6 +53,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.11.5 | Expansor real `ZEXT-4-8`, com quatro entradas escalares, saída de 8 bits e zeros explícitos |
 | v0.11.6 | Expansor de sinal real `SEXT-4-8`, com quatro entradas escalares, saída de 8 bits e fan-out do bit de sinal |
 | v0.11.7 | Expansor real `ZEXT-4-16`, com quatro entradas escalares, saída de 16 bits e doze zeros explícitos |
+| v0.11.8 | Expansor de sinal real `SEXT-4-16`, com quatro entradas escalares, saída de 16 bits e extensão do bit de sinal |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -121,7 +122,7 @@ O `4-ADD` preserva três entradas de `4 + 4 + 1` bits, duas saídas de `4 + 1` b
 
 O restante do catálogo continua disponível para consulta. Chips sequenciais, memória, tri-state, conversores e perfis com dependências ou portas fora da allowlist permanecem bloqueados até que exista um contrato vetorial/temporal específico. Assim, a importação não altera o caminho local-first: construir, simular, salvar e exportar continuam funcionando sem conta ou conexão.
 
-A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional, o roteador `16 para 8 e 4 bits`, os expansores `ZEXT-4-8` e `SEXT-4-8` e o expansor `ZEXT-4-16`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
+A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional, o roteador `16 para 8 e 4 bits`, os expansores `ZEXT-4-8`, `SEXT-4-8`, `ZEXT-4-16` e `SEXT-4-16`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
 
 ### Comparador multi-bit EQUAL-4 (v0.10.3)
 
@@ -240,6 +241,14 @@ A Release 0.11.7 confirma o fixture real `ZEXT-4-16` do DLS. Ele possui quatro e
 O Veritas materializa o contrato como quatro inputs escalares, uma única constante `0` compartilhada por doze conexões, um **Combiner** de 16 partes e uma saída vetorial de 16 bits. A saída é `A0 A1 A2 A3 000000000000` em ordem **MSB → LSB**. A biblioteca continua priorizando o modelo vetorial quando as expressões escalares derivadas e o perfil allowlisted existem ao mesmo tempo, preservando `IN 1 + 1 + 1 + 1 bits · OUT 16 bits` no IndexedDB, na paleta e no canvas.
 
 A assinatura só é aceita quando nome, quantidade de entradas e saídas, ausência de `pins`, dependência `1× 0`, `partCount=1`, 16 fios e as dezesseis expressões `A`, `B`, `C`, `D`, `0…0` coincidem com o registro conhecido. O restante do catálogo, incluindo tri-state, memória, estado e conversores sem contrato específico, permanece bloqueado.
+
+### Expansor de sinal vetorial `SEXT-4-16` (v0.11.8)
+
+A Release 0.11.8 confirma o fixture real `Chips/SEXT-4-16.json` do DLS, da categoria `Outros`. O registro publica quatro entradas, dezesseis expressões escalares derivadas (`A`, `B`, `C`, `D` + `12×D`), `parts={}`, `partCount=0`, `wireCount=16` e não possui a chave `pins`. Essas expressões são evidência do contrato observado; não são convertidas em dezesseis portas públicas independentes.
+
+O Veritas aceita somente essa assinatura exata e materializa um `CircuitDocument` explícito com quatro inputs escalares `A0…A3`, um **Combiner** de 16 partes e uma saída estrutural `O0` de 16 bits. Os três primeiros canais recebem `A0`, `A1` e `A2`; os canais 3–15 recebem `A3`, isto é, o quarto canal e mais doze repetições do bit de sinal. A saída é `A0 A1 A2 A3` seguida por doze `A3`, em ordem **MSB → LSB**.
+
+Como o fixture também possui expressões escalares derivadas, a biblioteca prioriza o materializador vetorial quando a assinatura allowlist coincide. A peça local exibe `IN 1 + 1 + 1 + 1 bits · OUT 16 bits`, pode ser salva no IndexedDB, reutilizada no canvas e exportada para Verilog/VHDL. O importador não executa JSON ou código DLS, não infere dependências ausentes e mantém tri-state, memória, estado e conversores sem contrato fora da allowlist.
 
 ### Performance (v0.4.9)
 
