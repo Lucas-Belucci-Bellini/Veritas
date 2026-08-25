@@ -47,6 +47,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.0** | Abstração e chips customizados | Pinos de entrada/saída; criação de subcircuito; biblioteca local de chips; execução hierárquica com limites de profundidade | Um subcircuito salvo pode ser reutilizado como componente em outro projeto |
 | **v0.10.1** | Barramentos visuais particionáveis | Splitter/Combiner, partições editáveis, avaliação vetorial multi-saída e persistência reversível | Um barramento pode ser dividido, recombinado, salvo e reaberto |
 | **v0.10.2** | Chips multi-bit combinacionais DLS | Allowlist estrutural de `4-ADD` e bancos AND/NAND/OR/XOR de 8 bits, biblioteca local e portas heterogêneas | Um chip multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.10.3** | Comparador multi-bit DLS | `EQUAL-4` com dois barramentos de 4 bits, XNOR, redução AND, portas determinísticas e integração local | Um comparador multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -797,3 +798,21 @@ Critérios verificados nesta release: 70 arquivos e 489 testes Vitest; typecheck
  O smoke local confirmou catálogo → biblioteca local → peça `4-ADD` no canvas, com portas heterogêneas e sem erro de largura. O beta readiness continua bloqueado por credenciais/evidências Supabase externas, e `validate:plugin` não pôde rodar porque o executável `claude` não está instalado no sandbox; nenhum bloqueio altera o modo local-first.
 
 A próxima fatia deve ampliar o contrato de importação apenas para novos perfis combinacionais que possam ser validados por fixtures reais e, em separado, definir o runtime temporal vetorial antes de considerar chips DLS como `8-DELAY`, registradores ou memória. A `main` permanece sem alterações; o trabalho está na branch `feature/chip-hierarchy-v1`, com o incremento funcional no commit `d5b86ae`.
+
+
+## Release 0.10.3 — comparador multi-bit EQUAL-4 — 2026-08-25
+
+A Release 0.10.3 amplia a allowlist estrutural do catálogo DLS com o perfil real `EQUAL-4`. O chip possui dois pinos de entrada de 4 bits, uma saída escalar e nove subcomponentes: dois conversores `4-1BIT`, quatro `XNOR` e três `AND`. O adaptador não executa o JSON de origem; valida a assinatura, mapeia a estrutura para o `CircuitDocument` canônico e mantém o circuito inteiramente local.
+
+| Parte do fixture | Materialização Veritas |
+| --- | --- |
+| Dois `4-1BIT` | Dois Splitters de 4 bits, na ordem MSB → LSB |
+| Quatro `XNOR` | Uma comparação bit a bit por posição |
+| Três `AND` | Redução das quatro comparações para uma saída |
+| `OUT` escalar | `1` somente quando os dois barramentos são iguais |
+
+O DLS usa `IN` nos dois pinos de entrada. Ao construir o chip customizado, `buildCustomChipDefinition()` preserva a ordem por ID e aplica a reserva determinística `IN`/`IN_2`, ambas com largura 4, evitando colisão silenciosa de portas. A biblioteca local e o canvas mostram `IN 4 + 4 · OUT 1 bit`; o modelo pode ser reutilizado e exportado para Verilog/VHDL.
+
+Critérios verificados: fixture real e entrada do catálogo gerado, quatro casos de igualdade/diferença, validação com `allowBuses`, portas duplicadas normalizadas, exportação HDL, integração catálogo → IndexedDB → canvas e zero alertas de interface. A suíte completa passou com 70 arquivos e 497 testes; typecheck, lint, builds e gates permanecem parte da validação final da release.
+
+O próximo incremento deve seguir a mesma regra: novos comparadores ou operadores multi-bit somente com fixture real e semântica verificável. Perfis sequenciais, memória, tri-state e `8-DELAY` continuam fora até a existência de runtime temporal vetorial; a fronteira entre combinacional e temporal não será atravessada por inferência.

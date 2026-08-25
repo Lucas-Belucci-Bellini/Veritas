@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.10.3] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `EQUAL-4` do catálogo DLS, com dois barramentos de 4 bits, quatro XNOR e redução AND para uma saída escalar.
+- Normalização determinística de portas DLS duplicadas: a interface `IN`, `IN` é exposta pelo chip customizado como `IN`, `IN_2`, preservando os dois IDs e suas larguras.
+- Materialização e integração do comparador na biblioteca local e no canvas, mantendo a mesma política allowlist e sem executar JSON importado.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 497 testes aprovados; a fatia EQUAL-4 contém 8 testes focados, com validação, quatro casos de igualdade, portas, exportação e catálogo real.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou catálogo → biblioteca IndexedDB → EQUAL-4 no canvas, com entradas 4/4 bits, saída 1 bit e zero alertas de interface.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Chips sequenciais e memória permanecem fora do escopo.
+
 ## [0.10.2] — 2026-08-25
 
 ### Adicionado

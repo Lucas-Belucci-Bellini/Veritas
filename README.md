@@ -38,6 +38,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.9.0-rc.1 | Workspace sequencial visual, checkpoints temporais, colaboração de runtime e proteção contra ofertas obsoletas |
 | v0.10.1 | Splitter/Combiner visuais, partições editáveis, avaliação vetorial multi-saída e persistência reversível |
 | v0.10.2 | Chips multi-bit combinacionais DLS selecionados, incluindo 4-ADD e bancos de portas de 8 bits, com biblioteca local e portas heterogêneas |
+| v0.10.3 | Comparador multi-bit DLS EQUAL-4, com igualdade vetorial, normalização de portas duplicadas e exportação HDL |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -105,6 +106,12 @@ A biblioteca DLS contém muitas definições, mas o Veritas não executa JSON im
 O `4-ADD` preserva três entradas de `4 + 4 + 1` bits, duas saídas de `4 + 1` bits e o carry. Os bancos de portas preservam a estrutura `Splitter → portas escalares → Combiner`, com os canais na convenção MSB → LSB. Ao clicar em **Adicionar ao editor**, o modelo é validado, salvo na biblioteca local do IndexedDB e fica disponível como chip customizado no canvas; as alças anunciam a largura individual de cada porta.
 
 O restante do catálogo continua disponível para consulta. Chips sequenciais, memória, tri-state, conversores e perfis com dependências ou portas fora da allowlist permanecem bloqueados até que exista um contrato vetorial/temporal específico. Assim, a importação não altera o caminho local-first: construir, simular, salvar e exportar continuam funcionando sem conta ou conexão.
+
+### Comparador multi-bit EQUAL-4 (v0.10.3)
+
+O perfil real `EQUAL-4` do DLS compara dois barramentos de 4 bits. O Veritas o materializa como dois **Splitter**, quatro portas **XNOR** e uma redução com três portas **AND**, produzindo uma saída escalar `1` somente quando todos os bits correspondem. Os testes cobrem casos iguais e diferentes, além do circuito publicado no catálogo.
+
+Como o DLS usa o nome `IN` nos dois pinos de entrada, o chip customizado aplica a regra determinística de reserva por ID: as portas aparecem como `IN` e `IN_2`, ambas com 4 bits. No canvas, a peça mostra `IN 4 + 4 · OUT 1 bit`; a biblioteca local e o arquivo `.veritas` continuam sendo os caminhos de persistência, sem depender de conta ou rede.
 
 ### Performance (v0.4.9)
 
