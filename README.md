@@ -39,6 +39,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.1 | Splitter/Combiner visuais, partições editáveis, avaliação vetorial multi-saída e persistência reversível |
 | v0.10.2 | Chips multi-bit combinacionais DLS selecionados, incluindo 4-ADD e bancos de portas de 8 bits, com biblioteca local e portas heterogêneas |
 | v0.10.3 | Comparador multi-bit DLS EQUAL-4, com igualdade vetorial, normalização de portas duplicadas e exportação HDL |
+| v0.10.4 | Somador multi-bit DLS 8-ADD, com ripple-carry, carry de entrada/saída e ordem de portas preservada |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -112,6 +113,14 @@ O restante do catálogo continua disponível para consulta. Chips sequenciais, m
 O perfil real `EQUAL-4` do DLS compara dois barramentos de 4 bits. O Veritas o materializa como dois **Splitter**, quatro portas **XNOR** e uma redução com três portas **AND**, produzindo uma saída escalar `1` somente quando todos os bits correspondem. Os testes cobrem casos iguais e diferentes, além do circuito publicado no catálogo.
 
 Como o DLS usa o nome `IN` nos dois pinos de entrada, o chip customizado aplica a regra determinística de reserva por ID: as portas aparecem como `IN` e `IN_2`, ambas com 4 bits. No canvas, a peça mostra `IN 4 + 4 · OUT 1 bit`; a biblioteca local e o arquivo `.veritas` continuam sendo os caminhos de persistência, sem depender de conta ou rede.
+
+### Somador multi-bit 8-ADD (v0.10.4)
+
+O perfil real `8-ADD` do DLS soma dois barramentos de 8 bits e um carry de entrada de 1 bit. O Veritas o materializa como oito estágios ripple-carry, cada um com duas operações XOR, duas AND e uma OR; o resultado é recombinado em um barramento de 8 bits e o carry final permanece como saída escalar.
+
+A ordem dos pinos do fixture é preservada como `CARRY`, `IN`, `IN`, e o chip customizado normaliza o segundo nome duplicado para `IN_2`. No canvas, a peça exibe `IN 1 + 8 + 8 bits · OUT 8 + 1 bits`, com cinco alças dimensionadas individualmente. O modelo passa por validação local, pode ser salvo no IndexedDB e continua exportável para Verilog/VHDL.
+
+O 8-ADD só entra na allowlist porque seu fixture real e sua assinatura do catálogo são conhecidos. Chips sequenciais, memória, tri-state e dependências arbitrárias continuam bloqueados até que exista contrato específico e prova correspondente.
 
 ### Performance (v0.4.9)
 

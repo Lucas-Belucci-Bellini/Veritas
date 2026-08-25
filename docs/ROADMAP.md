@@ -48,6 +48,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.1** | Barramentos visuais particionáveis | Splitter/Combiner, partições editáveis, avaliação vetorial multi-saída e persistência reversível | Um barramento pode ser dividido, recombinado, salvo e reaberto |
 | **v0.10.2** | Chips multi-bit combinacionais DLS | Allowlist estrutural de `4-ADD` e bancos AND/NAND/OR/XOR de 8 bits, biblioteca local e portas heterogêneas | Um chip multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.3** | Comparador multi-bit DLS | `EQUAL-4` com dois barramentos de 4 bits, XNOR, redução AND, portas determinísticas e integração local | Um comparador multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.10.4** | Somador multi-bit DLS | `8-ADD` com ripple-carry, carry de entrada/saída e ordem de portas preservada | Um somador de 8 bits suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -816,3 +817,21 @@ O DLS usa `IN` nos dois pinos de entrada. Ao construir o chip customizado, `buil
 Critérios verificados: fixture real e entrada do catálogo gerado, quatro casos de igualdade/diferença, validação com `allowBuses`, portas duplicadas normalizadas, exportação HDL, integração catálogo → IndexedDB → canvas e zero alertas de interface. A suíte completa passou com 70 arquivos e 497 testes; typecheck, lint, builds e gates permanecem parte da validação final da release.
 
 O próximo incremento deve seguir a mesma regra: novos comparadores ou operadores multi-bit somente com fixture real e semântica verificável. Perfis sequenciais, memória, tri-state e `8-DELAY` continuam fora até a existência de runtime temporal vetorial; a fronteira entre combinacional e temporal não será atravessada por inferência.
+
+
+## Release 0.10.4 — somador multi-bit 8-ADD — 2026-08-25
+
+A Release 0.10.4 amplia a allowlist estrutural do catálogo DLS com o perfil real `8-ADD`. O fixture possui três entradas na ordem pública `CARRY` (1 bit), `IN` (8 bits), `IN` (8 bits), duas saídas `OUT` (8 bits) e `CARRY` (1 bit), além de oito subchips `1-ADD`, dois `8-1BIT` e um `1-8BIT`.
+
+| Parte do fixture | Materialização Veritas |
+| --- | --- |
+| Dois `8-1BIT` | Dois Splitters de 8 bits, preservando a ordem MSB → LSB |
+| Oito `1-ADD` | Oito estágios ripple-carry com XOR, AND e OR escalares |
+| Um `1-8BIT` | Um Combiner para o resultado de 8 bits |
+| `CARRY` inicial/final | Entrada e saída escalares mantidas em portas próprias |
+
+O adaptador usa IDs públicos `input-0-carry`, `input-1-a` e `input-2-b` para que a ordem do DLS não seja perdida durante a construção do chip customizado. Quando os dois pinos de origem chamados `IN` são convertidos em uma definição local, a regra determinística de nomes gera `IN` e `IN_2`, ambas com largura 8. A avaliação cobre limites sem carry, overflow, carry de entrada e soma entre metades do barramento.
+
+Critérios verificados: fixture real e entrada do catálogo gerado, validação com `allowBuses`, 16 XOR, 16 AND, 8 OR, dois Splitters, um Combiner, cinco casos aritméticos, normalização de portas, integração catálogo → IndexedDB → canvas e cinco alças dimensionadas no DOM. A suíte completa passou com 70 arquivos e 505 testes; os gates MCP, HTTP, acessibilidade, WASM, Rust e HDL também passaram.
+
+O próximo incremento permanece restrito a perfis combinacionais reais. O runtime temporal vetorial continua sendo uma frente separada antes de considerar `8-DELAY`, registradores, contadores ou memória.

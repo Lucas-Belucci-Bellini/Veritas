@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.10.4] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `8-ADD` do catálogo DLS, com oito somadores completos, dois barramentos de 8 bits, carry de entrada escalar e saída de carry escalar.
+- Preservação da ordem pública do fixture `CARRY`, `IN`, `IN`: a biblioteca local expõe `CARRY`, `IN`, `IN_2`, com larguras 1, 8 e 8 bits.
+- Integração do 8-ADD ao fluxo catálogo → IndexedDB → canvas, com cinco alças que anunciam as larguras individuais.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 505 testes aprovados; a fatia 8-ADD contém 8 testes focados, incluindo casos-limite de soma/carry, ordem dos pinos e catálogo real.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card 8-ADD, sua persistência na biblioteca e a peça no canvas com `CARRY 1 bit`, dois `IN 8 bits`, `OUT 8 bits` e `CARRY 1 bit`.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Chips sequenciais e memória permanecem fora do escopo.
+
 ## [0.10.3] — 2026-08-25
 
 ### Adicionado

@@ -6,7 +6,7 @@ O Veritas é uma ferramenta local-first para estudar, projetar e validar circuit
 
 O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisões de escopo estão em [`docs/ROADMAP.md`](./docs/ROADMAP.md). O [`issue.md`](./issue.md) permanece como histórico de descoberta e visão de longo prazo, não como uma lista linear de tarefas.
 
-## Estado atual — Release 0.10.3 + fundação da V1
+## Estado atual — Release 0.10.4 + fundação da V1
 
 | Entrega | Estado |
 | --- | --- |
@@ -19,8 +19,8 @@ O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisõe
 | PWA offline-first | Concluído |
 | Clock, flip-flops e atrasos no motor sequencial | Concluído no motor e no workspace visual |
 | Chips customizados, composição hierárquica e subcircuitos reutilizáveis | Fundação da V1 concluída; expansão recursiva, runtime temporal e biblioteca local ativos |
-| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4 e bancos AND/NAND/OR/XOR de 8 bits, com larguras preservadas |
-| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar e 8 perfis multi-bit combinacionais materializáveis nesta fatia |
+| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4, `8-ADD` e bancos AND/NAND/OR/XOR de 8 bits, com larguras preservadas |
+| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar e 9 perfis multi-bit combinacionais materializáveis nesta fatia |
 | Servidor MCP e plugin do Claude Code | Concluído |
 
 ## Histórico de construção — v0.7.0
@@ -51,6 +51,7 @@ O roadmap executável em `docs/ROADMAP.md` é a fonte de verdade para os increme
 | v0.10.0 | Chips customizados e subcircuitos |
 | v0.10.2 | Importação segura de chips multi-bit combinacionais DLS e integração com biblioteca/canvas |
 | v0.10.3 | Comparador multi-bit EQUAL-4, normalização de portas duplicadas e exportação HDL |
+| v0.10.4 | Somador multi-bit 8-ADD, ripple-carry, carry e ordem de portas do DLS |
 | v0.10.x | Ampliação controlada do catálogo; runtime temporal vetorial permanece como etapa separada |
 | v1.0.0 | API de contexto do canvas e MCP declarativo |
 | v1.x | Sync, desktop, agentes e recursos 3D, somente após validação técnica |
