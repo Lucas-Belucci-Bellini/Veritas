@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.11.7] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `ZEXT-4-16` do catálogo DLS, com quatro entradas escalares `A0…A3`, dezesseis saídas derivadas no catálogo e uma saída estrutural local `O0` de 16 bits.
+- Materialização allowlist explícita como quatro inputs escalares, uma constante `0` compartilhada por doze conexões, um Combiner de 16 partes e uma saída vetorial de 16 bits.
+- Preservação do caminho vetorial na biblioteca quando o registro também possui expressões escalares derivadas, mantendo a largura pública de 16 bits no IndexedDB, na paleta e no canvas.
+
+### Validação e limites
+
+- Suíte completa: **70 arquivos e 591 testes aprovados**; a nova fatia contém 8 testes focados, cobrindo contrato do catálogo, estrutura, quatro vetores de extensão, portas locais, HDL e rejeição de assinatura alterada.
+- Suíte focada do adaptador: **112/112 testes aprovados**; typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card como modelo multi-bit, a persistência na biblioteca como **ID 18** e a instância no canvas com `IN 1 + 1 + 1 + 1 bits · OUT 16 bits`; o DOM confirmou 5 handles acessíveis e zero `[role=alert]`. As quatro entradas ficaram desconectadas de propósito, portanto a validação exibiu quatro problemas acionáveis.
+- O beta readiness continua em 0 READY, 5 BLOCKED e 1 SKIP por credenciais/evidências externas Supabase ausentes; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis tri-state, sequenciais, memória e conversores sem contrato permanecem fora do escopo.
+
 ## [0.11.6] — 2026-08-25
 
 ### Adicionado

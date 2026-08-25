@@ -52,6 +52,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.11.4 | Roteador real `16 para 8 e 4 bits`, com 16 entradas escalares, dez saídas e AND dividido em dois nibbles |
 | v0.11.5 | Expansor real `ZEXT-4-8`, com quatro entradas escalares, saída de 8 bits e zeros explícitos |
 | v0.11.6 | Expansor de sinal real `SEXT-4-8`, com quatro entradas escalares, saída de 8 bits e fan-out do bit de sinal |
+| v0.11.7 | Expansor real `ZEXT-4-16`, com quatro entradas escalares, saída de 16 bits e doze zeros explícitos |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -120,7 +121,7 @@ O `4-ADD` preserva três entradas de `4 + 4 + 1` bits, duas saídas de `4 + 1` b
 
 O restante do catálogo continua disponível para consulta. Chips sequenciais, memória, tri-state, conversores e perfis com dependências ou portas fora da allowlist permanecem bloqueados até que exista um contrato vetorial/temporal específico. Assim, a importação não altera o caminho local-first: construir, simular, salvar e exportar continuam funcionando sem conta ou conexão.
 
-A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional, o roteador `16 para 8 e 4 bits`, o expansor `ZEXT-4-8` e o expansor `SEXT-4-8`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
+A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional, o roteador `16 para 8 e 4 bits`, os expansores `ZEXT-4-8` e `SEXT-4-8` e o expansor `ZEXT-4-16`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
 
 ### Comparador multi-bit EQUAL-4 (v0.10.3)
 
@@ -231,6 +232,14 @@ A Release 0.11.6 confirma o fixture real `SEXT-4-8` do DLS. Ele publica quatro e
 O Veritas materializa esse contrato como quatro inputs escalares, um Combiner com oito partes e uma saída vetorial de 8 bits. Os três primeiros canais recebem `A0`, `A1` e `A2`; os cinco canais restantes recebem o mesmo `A3`, preservando o fan-out explícito do bit de sinal. A saída é `A0 A1 A2 A3 A3 A3 A3 A3` em ordem **MSB → LSB**.
 
 A biblioteca reconhece o perfil somente quando nome, pinos, quantidade de fios e ausência de dependências coincidem com o fixture real. Apesar das oito expressões escalares derivadas permanecerem disponíveis para consulta, o modelo multi-bit é priorizado no fluxo local: `IN 1 + 1 + 1 + 1 bits · OUT 8 bits`. Chips temporais, memória, tri-state e conversores sem contrato específico continuam bloqueados.
+
+### Expansor vetorial `ZEXT-4-16` (v0.11.7)
+
+A Release 0.11.7 confirma o fixture real `ZEXT-4-16` do DLS. Ele possui quatro entradas escalares `A0`, `A1`, `A2` e `A3`, dezesseis saídas escalares derivadas no catálogo e uma dependência real `1× 0`. Os quatro primeiros fios preservam as entradas; os doze fios restantes recebem a mesma constante `0`.
+
+O Veritas materializa o contrato como quatro inputs escalares, uma única constante `0` compartilhada por doze conexões, um **Combiner** de 16 partes e uma saída vetorial de 16 bits. A saída é `A0 A1 A2 A3 000000000000` em ordem **MSB → LSB**. A biblioteca continua priorizando o modelo vetorial quando as expressões escalares derivadas e o perfil allowlisted existem ao mesmo tempo, preservando `IN 1 + 1 + 1 + 1 bits · OUT 16 bits` no IndexedDB, na paleta e no canvas.
+
+A assinatura só é aceita quando nome, quantidade de entradas e saídas, ausência de `pins`, dependência `1× 0`, `partCount=1`, 16 fios e as dezesseis expressões `A`, `B`, `C`, `D`, `0…0` coincidem com o registro conhecido. O restante do catálogo, incluindo tri-state, memória, estado e conversores sem contrato específico, permanece bloqueado.
 
 ### Performance (v0.4.9)
 
