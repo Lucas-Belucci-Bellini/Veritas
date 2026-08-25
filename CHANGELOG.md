@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.10.8] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `Full Adder - 8 Bits` do catálogo DLS, com três barramentos de entrada de 8 bits e duas saídas de 8 bits para soma e carry.
+- Materialização explícita de oito somadores completos paralelos: três Splitters, 16 XOR, 16 AND, 8 OR e dois Combiners, preservando a convenção MSB → LSB.
+- Integração do perfil ao fluxo catálogo → IndexedDB → paleta de chips customizados → canvas, com entradas `Carry IN`, `IN A` e `IN B` e saídas `BIT-8 Bits` e `Carry Out-8Bits`.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 528 testes aprovados; a nova fatia contém 8 testes focados, com estrutura, quatro casos vetoriais, portas locais, HDL e rejeição de assinatura incompatível.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card `Full Adder - 8 Bits`, sua persistência na biblioteca e a instância no canvas com `IN 8 + 8 + 8 bits · OUT 8 + 8 bits`; as cinco alças anunciaram 8 bits e não houve `[role=alert]`. As três entradas ficaram desconectadas de propósito, portanto a validação exibiu três problemas acionáveis.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis sequenciais, memória e tri-state permanecem fora do escopo.
+
 ## [0.10.7] — 2026-08-25
 
 ### Adicionado

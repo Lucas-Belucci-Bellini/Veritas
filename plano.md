@@ -6,7 +6,7 @@ O Veritas é uma ferramenta local-first para estudar, projetar e validar circuit
 
 O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisões de escopo estão em [`docs/ROADMAP.md`](./docs/ROADMAP.md). O [`issue.md`](./issue.md) permanece como histórico de descoberta e visão de longo prazo, não como uma lista linear de tarefas.
 
-## Estado atual — Release 0.10.7 + fundação da V1
+## Estado atual — Release 0.10.8 + fundação da V1
 
 | Entrega | Estado |
 | --- | --- |
@@ -19,8 +19,8 @@ O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisõe
 | PWA offline-first | Concluído |
 | Clock, flip-flops e atrasos no motor sequencial | Concluído no motor e no workspace visual |
 | Chips customizados, composição hierárquica e subcircuitos reutilizáveis | Fundação da V1 concluída; expansão recursiva, runtime temporal e biblioteca local ativos |
-| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4, `8-ADD`, `8-1AND`, `AND-3 8 bits`, `8x2-AND`, `8x2-OR`, `8x2-XOR` e bancos AND/NAND/OR/XOR, com larguras preservadas |
-| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar; allowlist multi-bit explicitamente nomeada em `4-ADD`, `EQUAL-4`, `8-ADD`, `8-1AND`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT`, `8x2-XOR` e `AND-3 8 bits` |
+| Chips multi-bit combinacionais DLS | Allowlist local ativa: `4-ADD`, EQUAL-4, `8-ADD`, `8-1AND`, `AND-3 8 bits`, `Full Adder - 8 Bits`, `8x2-AND`, `8x2-OR`, `8x2-XOR` e bancos AND/NAND/OR/XOR, com larguras preservadas |
+| Catálogo DLS importado | 1121 descrições; 445 com expressão escalar; allowlist multi-bit explicitamente nomeada em `4-ADD`, `EQUAL-4`, `8-ADD`, `8-1AND`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT`, `8x2-XOR`, `AND-3 8 bits` e `Full Adder - 8 Bits` |
 | Servidor MCP e plugin do Claude Code | Concluído |
 
 ## Histórico de construção — v0.7.0
@@ -55,6 +55,7 @@ O roadmap executável em `docs/ROADMAP.md` é a fonte de verdade para os increme
 | v0.10.5 | Máscara multi-bit 8-1AND, entrada escalar, barramento de 8 bits e saída vetorial |
 | v0.10.6 | Operadores binários 8x2-AND/OR/XOR, dois barramentos de 8 bits e saída vetorial |
 | v0.10.7 | AND-3 8 bits, três barramentos de entrada e redução vetorial em dois estágios |
+| v0.10.8 | Full Adder - 8 Bits, três barramentos de entrada e soma/carry vetoriais |
 | v0.10.x | Ampliação controlada do catálogo; runtime temporal vetorial permanece como etapa separada |
 | v1.0.0 | API de contexto do canvas e MCP declarativo |
 | v1.x | Sync, desktop, agentes e recursos 3D, somente após validação técnica |

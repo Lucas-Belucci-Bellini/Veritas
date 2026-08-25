@@ -43,6 +43,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.5 | Mascarador multi-bit DLS 8-1AND, com entrada escalar, barramento de 8 bits e saída vetorial |
 | v0.10.6 | Operadores binários multi-bit DLS 8x2-AND, 8x2-OR e 8x2-XOR, com dois barramentos de 8 bits e saída vetorial |
 | v0.10.7 | AND-3 8 bits do DLS, com três barramentos de entrada e redução vetorial em dois estágios |
+| v0.10.8 | Full Adder - 8 Bits do DLS, com três barramentos de entrada, soma e carry vetoriais |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -148,6 +149,14 @@ A Release 0.10.7 confirma o fixture real `AND-3 8 bits` do DLS. Ele recebe três
 O perfil só é aceito quando a assinatura estrutural coincide: três entradas vetoriais, uma saída vetorial, três `8-1BIT`, dezesseis `AND` e um `1-8BIT`. Depois de **Adicionar ao editor**, ele é salvo no IndexedDB e aparece na paleta de chips customizados. As portas repetidas `IN` tornam-se `IN`, `IN_2` e `IN_3`, todas com 8 bits; a saída `OUT` também tem 8 bits.
 
 O importador continua sendo uma allowlist verificável, não um executor genérico de JSON DLS. A expansão cobre somente esse fixture real e não libera chips temporais, memória, tri-state ou dependências não mapeadas.
+
+### Full Adder vetorial (v0.10.8)
+
+A Release 0.10.8 confirma o fixture real `Full Adder - 8 Bits` do DLS. Ele recebe `Carry IN`, `IN A` e `IN B`, todos com 8 bits, e produz `BIT-8 Bits` e `Carry Out-8Bits`, também com 8 bits. O Veritas materializa oito somadores completos paralelos como três **Splitter**, dezesseis **XOR**, dezesseis **AND**, oito **OR** e dois **Combiner**, mantendo a ordem **MSB → LSB**.
+
+O perfil só é aceito quando a assinatura estrutural coincide: três entradas vetoriais, duas saídas vetoriais, dois `AND-8 Bits`, dois `XOR - 8 BIT` e um `OR-8 Bits`. Depois de **Adicionar ao editor**, ele é salvo no IndexedDB e aparece na paleta de chips customizados. A peça do canvas exibe `IN 8 + 8 + 8 bits · OUT 8 + 8 bits`, com cinco alças dimensionadas individualmente.
+
+A semântica é combinacional e paralela por bit: para cada posição, a soma é `A XOR B XOR Carry`, e o carry é `(A AND B) OR ((A XOR B) AND Carry)`. O importador continua sendo uma allowlist verificável, não um executor genérico de JSON DLS; chips temporais, memória, tri-state e dependências não mapeadas permanecem bloqueados.
 
 ### Performance (v0.4.9)
 

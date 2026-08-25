@@ -52,6 +52,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.5** | Máscara multi-bit DLS | `8-1AND` com máscara escalar, barramento de 8 bits, oito AND e integração local | Uma máscara vetorial suportada pode ser importada, reutilizada, avaliada e exportada localmente |
 | **v0.10.6** | Operadores binários de barramento DLS | `8x2-AND`, `8x2-OR` e `8x2-XOR`, com dois barramentos de 8 bits e saída vetorial | Operadores binários suportados podem ser importados, reutilizados, avaliados e exportados localmente |
 | **v0.10.7** | AND-3 vetorial DLS | `AND-3 8 bits`, com três barramentos de 8 bits, redução em dois estágios e integração local | Um AND de três entradas suportado pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.10.8** | Full Adder vetorial DLS | `Full Adder - 8 Bits`, com três barramentos de entrada, soma e carry vetoriais e integração local | Um somador completo paralelo de 8 bits suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -887,3 +888,21 @@ A assinatura só é aceita quando coincide com o fixture conhecido: três entrad
 Os critérios de aceite foram atendidos com 41 testes focados e 520 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 8 bits · OUT 8 bits` e quatro alças de 8 bits. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
 
 Esta release não transforma o importador em um executor genérico de N entradas. A generalização do construtor foi limitada à redução estrutural comprovada por este fixture. Chips temporais, memória, tri-state, dependências não mapeadas e outros bancos de portas continuam bloqueados até possuírem contrato e provas próprios.
+
+
+## Release 0.10.8 — Full Adder vetorial DLS — 2026-08-25
+
+A Release 0.10.8 adiciona à allowlist o fixture combinacional real `Full Adder - 8 Bits`. Sua interface publicada possui três entradas vetoriais de 8 bits — `Carry IN`, `IN A` e `IN B` — e duas saídas vetoriais de 8 bits — `BIT-8 Bits` e `Carry Out-8Bits`. A estrutura do fixture contém dois `AND-8 Bits`, dois `XOR - 8 BIT` e um `OR-8 Bits`, combinados para operar oito posições em paralelo.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `Carry IN`, `IN A`, `IN B` | Três Splitters de 8 bits, preservando a ordem MSB → LSB |
+| Dois `XOR - 8 BIT` | XOR de `A` com `B`, seguido de XOR com o carry, para a saída de soma |
+| Dois `AND-8 Bits` e um `OR-8 Bits` | `(A AND B) OR ((A XOR B) AND Carry)`, para a saída de carry |
+| `BIT-8 Bits` e `Carry Out-8Bits` | Dois Combiners de 8 bits e duas saídas vetoriais |
+
+O adaptador só aceita a assinatura conhecida: três entradas, duas saídas, largura 8 em todos os pinos, dois `AND-8 Bits`, dois `XOR - 8 BIT` e um `OR-8 Bits`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 49 testes focados e 528 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 8 bits · OUT 8 + 8 bits` e cinco alças de 8 bits. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release trata o full adder como composição combinacional paralela por bit. Ela não adiciona carry ripple entre posições nem transforma o importador em executor genérico de subchips DLS. Perfis temporais, memória, tri-state e dependências não mapeadas continuam bloqueados até possuírem contratos e provas próprios.
