@@ -36,6 +36,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (isSixteenInputBusRouter(chip)) return buildSixteenInputBusRouterDocument(chip)
   if (isFourToEightZeroExtend(chip)) return buildFourToEightZeroExtendDocument(chip)
   if (isFourToSixteenZeroExtend(chip)) return buildFourToSixteenZeroExtendDocument(chip)
+  if (isFourToSixteenSignExtend(chip)) return buildFourToSixteenSignExtendDocument(chip)
   if (isFourToEightSignExtend(chip)) return buildFourToEightSignExtendDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
@@ -209,6 +210,19 @@ function isFourToSixteenZeroExtend(chip: ChipEntry): boolean {
     && chip.wireCount === 16
     && chip.pins === undefined
     && expressions === 'A|B|C|D|0|0|0|0|0|0|0|0|0|0|0|0'
+}
+
+function isFourToSixteenSignExtend(chip: ChipEntry): boolean {
+  const expressions = chip.derivedOutputs?.map((output) => output.expression).join('|')
+  return chip.name === 'SEXT-4-16'
+    && chip.in === 4
+    && chip.out === 16
+    && chip.widths === undefined
+    && Object.keys(chip.parts).length === 0
+    && chip.partCount === 0
+    && chip.wireCount === 16
+    && chip.pins === undefined
+    && expressions === 'A|B|C|D|D|D|D|D|D|D|D|D|D|D|D|D'
 }
 
 function isFourToEightSignExtend(chip: ChipEntry): boolean {
@@ -1160,6 +1174,64 @@ function buildFourToSixteenZeroExtendDocument(chip: ChipEntry): CircuitDocument 
   for (let combinerPort = 4; combinerPort < width; combinerPort += 1) {
     connections.push({
       source: { node: constantId },
+      target: { node: combinerId, port: combinerPort },
+    })
+  }
+
+  const outputId = 'output-01'
+  nodes.push({
+    id: outputId,
+    type: 'output',
+    position: { x: 720, y: 420 },
+    label: outputLabel,
+    options: { width },
+  })
+  connections.push({
+    source: { node: combinerId },
+    target: { node: outputId, port: 0 },
+  })
+
+  return { ...document, nodes, connections }
+}
+
+function buildFourToSixteenSignExtendDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 4 ? chip.pins.in : ['A0', 'A1', 'A2', 'A3']
+  const outputLabel = chip.pins?.out?.[0] || 'O0'
+  const width = 16
+  const nodes: CircuitNode[] = []
+  const connections: CircuitDocument['connections'] = []
+
+  for (let inputIndex = 0; inputIndex < 4; inputIndex += 1) {
+    nodes.push({
+      id: `input-${String(inputIndex + 1).padStart(2, '0')}`,
+      type: 'input',
+      position: { x: 0, y: 100 + inputIndex * 120 },
+      label: inputLabels[inputIndex] || `A${inputIndex}`,
+    })
+  }
+
+  const combinerId = 'combiner-sext-16'
+  nodes.push({
+    id: combinerId,
+    type: 'combiner',
+    position: { x: 360, y: 420 },
+    label: 'Sign extend 4→16',
+    options: { width, widths: unitWidths(width) },
+  })
+  for (let inputIndex = 0; inputIndex < 3; inputIndex += 1) {
+    connections.push({
+      source: { node: `input-${String(inputIndex + 1).padStart(2, '0')}` },
+      target: { node: combinerId, port: inputIndex },
+    })
+  }
+  connections.push({
+    source: { node: 'input-04' },
+    target: { node: combinerId, port: 3 },
+  })
+  for (let combinerPort = 4; combinerPort < width; combinerPort += 1) {
+    connections.push({
+      source: { node: 'input-04' },
       target: { node: combinerId, port: combinerPort },
     })
   }
