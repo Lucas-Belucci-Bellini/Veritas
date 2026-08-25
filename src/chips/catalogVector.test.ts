@@ -1377,3 +1377,110 @@ describe('SEXT-4-16 importado do catálogo DLS', () => {
     expect(catalogVectorChipToCircuitDocument({ ...chip, name: 'ZEXT-4-16' })).toBeNull()
   })
 })
+
+describe('BITREV-4 importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'BITREV-4')
+    expect(chip).toMatchObject({
+      name: 'BITREV-4',
+      category: 'Outros',
+      in: 4,
+      out: 4,
+      parts: {},
+      partCount: 0,
+      wireCount: 4,
+      pins: {
+        in: ['A0', 'A1', 'A2', 'A3'],
+        out: ['O0', 'O1', 'O2', 'O3'],
+      },
+      variables: ['A', 'B', 'C', 'D'],
+    })
+    expect(chip?.derivedOutputs?.map((output) => [output.name, output.expression])).toEqual([
+      ['O0', 'D'],
+      ['O1', 'C'],
+      ['O2', 'B'],
+      ['O3', 'A'],
+    ])
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa quatro inputs, quatro outputs e quatro conexões diretas', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(4)
+    expect(document?.nodes.filter((node) => node.type === 'output')).toHaveLength(4)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(0)
+    expect(document?.connections.map(({ source, target }) => [source.node, target.node])).toEqual([
+      ['input-04', 'output-01'],
+      ['input-03', 'output-02'],
+      ['input-02', 'output-03'],
+      ['input-01', 'output-04'],
+    ])
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [['1', '0', '1', '0'], ['0', '1', '0', '1']],
+    [['0', '1', '0', '1'], ['1', '0', '1', '0']],
+    [['1', '1', '1', '1'], ['1', '1', '1', '1']],
+    [['0', '0', '0', '0'], ['0', '0', '0', '0']],
+  ] as const)('inverte a ordem dos bits %s, produzindo %s', async (bits, expected) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const inputs = Object.fromEntries(bits.map((bit, index) => [
+      `input-${String(index + 1).padStart(2, '0')}`,
+      Number(bit),
+    ]))
+    const result = evaluateCircuitVectors(document, inputs)
+
+    expect(['output-01', 'output-02', 'output-03', 'output-04'].map((id) => toBinary(result.outputs[id]!))).toEqual(expected)
+  })
+
+  it('preserva as quatro portas escalares e as quatro saídas escalares no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, 'BITREV-4 importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['A0', 1],
+      ['A1', 1],
+      ['A2', 1],
+      ['A3', 1],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([
+      ['O0', 1],
+      ['O1', 1],
+      ['O2', 1],
+      ['O3', 1],
+    ])
+  })
+
+  it('exporta as quatro portas escalares para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('module BITREV_4')
+    expect(verilog).toContain('input A0')
+    expect(verilog).toContain('output O3')
+    expect(vhdl).toContain('entity BITREV_4 is')
+    expect(vhdl).toContain('A0 : in std_logic')
+    expect(vhdl).toContain('O3 : out std_logic')
+  })
+
+  it('recusa o fixture quando a topologia ou assinatura real é alterada', async () => {
+    const chip = await loadRealChip()
+
+    expect(catalogVectorChipToCircuitDocument({ ...chip, wireCount: 3 })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({ ...chip, parts: { AND: 1 } })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      derivedOutputs: chip.derivedOutputs?.map((output, index) => index === 0 ? { ...output, expression: 'A' } : output),
+    })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      pins: { ...chip.pins!, out: ['O0', 'O1', 'O2', 'WRONG'] },
+    })).toBeNull()
+  })
+})

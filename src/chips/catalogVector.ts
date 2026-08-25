@@ -38,6 +38,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (isFourToSixteenZeroExtend(chip)) return buildFourToSixteenZeroExtendDocument(chip)
   if (isFourToSixteenSignExtend(chip)) return buildFourToSixteenSignExtendDocument(chip)
   if (isFourToEightSignExtend(chip)) return buildFourToEightSignExtendDocument(chip)
+  if (isFourBitBitReverse(chip)) return buildFourBitBitReverseDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
@@ -235,6 +236,23 @@ function isFourToEightSignExtend(chip: ChipEntry): boolean {
     && chip.wireCount === 8
     && chip.pins?.in?.join('|') === 'A0|A1|A2|A3'
     && chip.pins?.out?.join('|') === 'O0|O1|O2|O3|O4|O5|O6|O7'
+}
+
+function isFourBitBitReverse(chip: ChipEntry): boolean {
+  const expressions = chip.derivedOutputs?.map((output) => output.expression).join('|')
+  const derivedNames = chip.derivedOutputs?.map((output) => output.name).join('|')
+  return chip.name === 'BITREV-4'
+    && chip.in === 4
+    && chip.out === 4
+    && chip.widths === undefined
+    && Object.keys(chip.parts).length === 0
+    && chip.partCount === 0
+    && chip.wireCount === 4
+    && chip.variables?.join('|') === 'A|B|C|D'
+    && chip.pins?.in?.join('|') === 'A0|A1|A2|A3'
+    && chip.pins?.out?.join('|') === 'O0|O1|O2|O3'
+    && derivedNames === 'O0|O1|O2|O3'
+    && expressions === 'D|C|B|A'
 }
 
 function isEightBitMask(chip: ChipEntry): boolean {
@@ -1303,6 +1321,38 @@ function buildFourToEightSignExtendDocument(chip: ChipEntry): CircuitDocument {
     source: { node: combinerId },
     target: { node: outputId, port: 0 },
   })
+
+  return { ...document, nodes, connections }
+}
+
+function buildFourBitBitReverseDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 4 ? chip.pins.in : ['A0', 'A1', 'A2', 'A3']
+  const outputLabels = chip.pins?.out?.length === 4 ? chip.pins.out : ['O0', 'O1', 'O2', 'O3']
+  const nodes: CircuitNode[] = []
+  const connections: CircuitDocument['connections'] = []
+
+  for (let inputIndex = 0; inputIndex < 4; inputIndex += 1) {
+    nodes.push({
+      id: `input-${String(inputIndex + 1).padStart(2, '0')}`,
+      type: 'input',
+      position: { x: 0, y: 100 + inputIndex * 120 },
+      label: inputLabels[inputIndex] || `A${inputIndex}`,
+    })
+  }
+
+  for (let outputIndex = 0; outputIndex < 4; outputIndex += 1) {
+    nodes.push({
+      id: `output-${String(outputIndex + 1).padStart(2, '0')}`,
+      type: 'output',
+      position: { x: 420, y: 100 + outputIndex * 120 },
+      label: outputLabels[outputIndex] || `O${outputIndex}`,
+    })
+    connections.push({
+      source: { node: `input-${String(4 - outputIndex).padStart(2, '0')}` },
+      target: { node: `output-${String(outputIndex + 1).padStart(2, '0')}`, port: 0 },
+    })
+  }
 
   return { ...document, nodes, connections }
 }
