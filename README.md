@@ -44,6 +44,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.6 | Operadores binários multi-bit DLS 8x2-AND, 8x2-OR e 8x2-XOR, com dois barramentos de 8 bits e saída vetorial |
 | v0.10.7 | AND-3 8 bits do DLS, com três barramentos de entrada e redução vetorial em dois estágios |
 | v0.10.8 | Full Adder - 8 Bits do DLS, com três barramentos de entrada, soma e carry vetoriais |
+| v0.10.9 | Alias `(8 Bits) 8-bit Adder` do DLS, com ripple-carry, portas 8/8/1 e saídas 8/1 |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -157,6 +158,14 @@ A Release 0.10.8 confirma o fixture real `Full Adder - 8 Bits` do DLS. Ele receb
 O perfil só é aceito quando a assinatura estrutural coincide: três entradas vetoriais, duas saídas vetoriais, dois `AND-8 Bits`, dois `XOR - 8 BIT` e um `OR-8 Bits`. Depois de **Adicionar ao editor**, ele é salvo no IndexedDB e aparece na paleta de chips customizados. A peça do canvas exibe `IN 8 + 8 + 8 bits · OUT 8 + 8 bits`, com cinco alças dimensionadas individualmente.
 
 A semântica é combinacional e paralela por bit: para cada posição, a soma é `A XOR B XOR Carry`, e o carry é `(A AND B) OR ((A XOR B) AND Carry)`. O importador continua sendo uma allowlist verificável, não um executor genérico de JSON DLS; chips temporais, memória, tri-state e dependências não mapeadas permanecem bloqueados.
+
+### Alias ripple-carry de 8 bits (v0.10.9)
+
+A Release 0.10.9 confirma o alias real `(8 Bits) 8-bit Adder` do DLS. Ele possui `IN A 1-8` e `IN B 1-8`, ambos com 8 bits, `Carry IN` com 1 bit, e produz `OUT` com 8 bits e `Carry OUT` com 1 bit. O Veritas preserva a topologia ripple-carry já comprovada no `8-ADD`, materializando dois **Splitter**, oito estágios completos com dezesseis **XOR**, dezesseis **AND** e oito **OR**, um **Combiner** para a soma e o carry final escalar.
+
+A assinatura só é aceita quando coincide: três entradas, duas saídas, larguras `[1, 8]`, dois `8-1BIT`, um `8-bit Adder` e um `1-8BIT`. Ao clicar em **Adicionar ao editor**, o alias é validado, salvo no IndexedDB e aparece na paleta de chips customizados. O canvas exibe `IN 8 + 8 + 1 bits · OUT 8 + 1 bits`, com cinco alças dimensionadas individualmente.
+
+O alias não é tratado como um novo circuito inventado: a diferença desta release é a confirmação de seu contrato real e da ordem pública `IN A`, `IN B`, `Carry IN`. O importador continua sendo uma allowlist verificável, não um executor genérico de JSON DLS; o `8-bit Adder` escalar de 17 entradas, chips temporais, memória e tri-state permanecem fora do escopo.
 
 ### Performance (v0.4.9)
 

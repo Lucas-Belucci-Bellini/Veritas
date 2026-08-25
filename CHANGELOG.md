@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.10.9] — 2026-08-25
+
+### Adicionado
+
+- Alias combinacional real `(8 Bits) 8-bit Adder` do catálogo DLS, com duas entradas de 8 bits, carry de entrada escalar, soma de 8 bits e carry de saída escalar.
+- Reutilização controlada da topologia ripple-carry do `8-ADD`, preservando o contrato público `IN A 1-8`, `IN B 1-8`, `Carry IN`, `OUT` e `Carry OUT`.
+- Integração do alias ao fluxo catálogo → IndexedDB → paleta de chips customizados → canvas, com larguras heterogêneas preservadas.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 536 testes aprovados; a nova fatia contém 8 testes focados, com estrutura ripple-carry, quatro casos vetoriais, portas 8/8/1, saídas 8/1, HDL e rejeição de assinatura incompatível.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card `(8 Bits) 8-bit Adder`, sua persistência na biblioteca e a instância no canvas com `IN 8 + 8 + 1 bits · OUT 8 + 1 bits`; as cinco alças anunciaram as larguras heterogêneas e não houve `[role=alert]`. As três entradas ficaram desconectadas de propósito, portanto a validação exibiu três problemas acionáveis.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis sequenciais, memória e tri-state permanecem fora do escopo.
+
 ## [0.10.8] — 2026-08-25
 
 ### Adicionado

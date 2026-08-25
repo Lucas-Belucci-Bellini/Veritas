@@ -53,6 +53,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.6** | Operadores binários de barramento DLS | `8x2-AND`, `8x2-OR` e `8x2-XOR`, com dois barramentos de 8 bits e saída vetorial | Operadores binários suportados podem ser importados, reutilizados, avaliados e exportados localmente |
 | **v0.10.7** | AND-3 vetorial DLS | `AND-3 8 bits`, com três barramentos de 8 bits, redução em dois estágios e integração local | Um AND de três entradas suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.8** | Full Adder vetorial DLS | `Full Adder - 8 Bits`, com três barramentos de entrada, soma e carry vetoriais e integração local | Um somador completo paralelo de 8 bits suportado pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.10.9** | Alias ripple-carry DLS | `(8 Bits) 8-bit Adder`, com entradas 8/8/1, saídas 8/1 e ordem pública preservada | Um alias real de somador ripple-carry suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -906,3 +907,21 @@ O adaptador só aceita a assinatura conhecida: três entradas, duas saídas, lar
 Os critérios de aceite foram atendidos com 49 testes focados e 528 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 8 bits · OUT 8 + 8 bits` e cinco alças de 8 bits. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
 
 Esta release trata o full adder como composição combinacional paralela por bit. Ela não adiciona carry ripple entre posições nem transforma o importador em executor genérico de subchips DLS. Perfis temporais, memória, tri-state e dependências não mapeadas continuam bloqueados até possuírem contratos e provas próprios.
+
+
+## Release 0.10.9 — alias ripple-carry `(8 Bits) 8-bit Adder` — 2026-08-25
+
+A Release 0.10.9 adiciona à allowlist o alias combinacional real `(8 Bits) 8-bit Adder`. Sua interface publicada possui duas entradas de 8 bits (`IN A 1-8` e `IN B 1-8`), uma entrada escalar de carry (`Carry IN`), uma saída de soma de 8 bits (`OUT`) e uma saída escalar de carry (`Carry OUT`). O fixture contém dois `8-1BIT`, um subchip `8-bit Adder` e um `1-8BIT`.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `IN A 1-8` e `IN B 1-8` | Dois Splitters de 8 bits, em MSB → LSB |
+| `8-bit Adder` | Oito estágios ripple-carry com 16 XOR, 16 AND e 8 OR |
+| `1-8BIT` | Um Combiner para a saída `OUT` de 8 bits |
+| `Carry IN` e `Carry OUT` | Entrada e saída escalares preservadas na definição local |
+
+O adaptador só aceita a assinatura conhecida: três entradas, duas saídas, larguras `[1, 8]`, dois `8-1BIT`, um `8-bit Adder` e um `1-8BIT`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 57 testes focados e 536 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 1 bits · OUT 8 + 1 bits` e cinco alças com larguras 8/8/1 → 8/1. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release confirma um alias de somador já compatível com a topologia ripple-carry do `8-ADD`; não importa o `8-bit Adder` escalar de 17 entradas, não adiciona um novo runtime temporal e não libera memória, tri-state ou dependências não mapeadas por inferência.
