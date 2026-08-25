@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.10.7] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `AND-3 8 bits` do catálogo DLS, com três barramentos de entrada de 8 bits e uma saída de 8 bits.
+- Redução vetorial controlada de três entradas: três Splitters, dezesseis portas AND escalares em dois estágios e um Combiner, preservando a convenção MSB → LSB.
+- Integração do perfil ao fluxo catálogo → IndexedDB → paleta de chips customizados → canvas, com entradas duplicadas normalizadas como `IN`, `IN_2` e `IN_3`.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 520 testes aprovados; a nova fatia contém 7 testes focados, com estrutura, casos vetoriais, portas locais, HDL e rejeição de assinatura incompatível.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card `AND-3 8 bits`, sua persistência na biblioteca e a instância no canvas com `IN 8 + 8 + 8 bits · OUT 8 bits`; as quatro alças anunciaram 8 bits e não houve `[role=alert]`. As três entradas ficaram desconectadas de propósito, portanto a validação exibiu três problemas acionáveis.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis sequenciais, memória e tri-state permanecem fora do escopo.
+
 ## [0.10.6] — 2026-08-25
 
 ### Adicionado

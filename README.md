@@ -42,6 +42,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.4 | Somador multi-bit DLS 8-ADD, com ripple-carry, carry de entrada/saída e ordem de portas preservada |
 | v0.10.5 | Mascarador multi-bit DLS 8-1AND, com entrada escalar, barramento de 8 bits e saída vetorial |
 | v0.10.6 | Operadores binários multi-bit DLS 8x2-AND, 8x2-OR e 8x2-XOR, com dois barramentos de 8 bits e saída vetorial |
+| v0.10.7 | AND-3 8 bits do DLS, com três barramentos de entrada e redução vetorial em dois estágios |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -139,6 +140,14 @@ A Release 0.10.6 adiciona três fixtures combinacionais reais do DLS: `8x2-AND`,
 Ao clicar em **Adicionar ao editor**, o perfil passa pela allowlist estrutural, é salvo no IndexedDB e aparece como chip customizado. As entradas duplicadas `IN` tornam-se determinísticamente `IN` e `IN_2`, ambas com 8 bits; a saída `OUT` mantém 8 bits. No canvas, a peça exibe `IN 8 + 8 bits · OUT 8 bits`, e as três alças anunciam suas larguras individualmente.
 
 Os três perfis foram avaliados com entradas `0xAA` e `0xCC`: AND produz `0x88`, OR produz `0xEE` e XOR produz `0x66`. Eles também passam por validação local e exportação HDL. A importação permanece deliberadamente allowlist: chips temporais, memória, tri-state e dependências não mapeadas continuam bloqueados.
+
+### AND-3 vetorial (v0.10.7)
+
+A Release 0.10.7 confirma o fixture real `AND-3 8 bits` do DLS. Ele recebe três entradas de 8 bits e produz uma saída de 8 bits. O Veritas materializa a assinatura conhecida como três **Splitter**, dezesseis portas **AND** escalares organizadas em dois estágios e um **Combiner**, mantendo a ordem **MSB → LSB**.
+
+O perfil só é aceito quando a assinatura estrutural coincide: três entradas vetoriais, uma saída vetorial, três `8-1BIT`, dezesseis `AND` e um `1-8BIT`. Depois de **Adicionar ao editor**, ele é salvo no IndexedDB e aparece na paleta de chips customizados. As portas repetidas `IN` tornam-se `IN`, `IN_2` e `IN_3`, todas com 8 bits; a saída `OUT` também tem 8 bits.
+
+O importador continua sendo uma allowlist verificável, não um executor genérico de JSON DLS. A expansão cobre somente esse fixture real e não libera chips temporais, memória, tri-state ou dependências não mapeadas.
 
 ### Performance (v0.4.9)
 
