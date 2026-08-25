@@ -1426,7 +1426,7 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
         </span>
         {(data.inputWidths?.some((width) => width > 1) || data.outputWidths?.some((width) => width > 1)) && (
           <span className="max-w-full truncate text-[10px] text-violet-700 dark:text-violet-300" title={`IN ${data.inputWidths?.join(' + ') ?? '1'} · OUT ${data.outputWidths?.join(' + ') ?? '1'} bits`}>
-            IN {data.inputWidths?.join(' + ') ?? '1'} · OUT {data.outputWidths?.join(' + ') ?? '1'} bits
+            IN {formatWidthSummary(data.inputWidths)} · OUT {formatWidthSummary(data.outputWidths)}
           </span>
         )}
         {Array.from({ length: outputCount }, (_, index) => (
@@ -1642,6 +1642,11 @@ function createCustomChipNode(entry: CustomChipLibraryEntry, index: number, id: 
 
 function formatBits(width: number): string {
   return `${width} bit${width === 1 ? '' : 's'}`
+}
+
+function formatWidthSummary(widths?: readonly number[]): string {
+  const values = widths?.length ? widths : [1]
+  return `${values.join(' + ')} ${values.length === 1 && values[0] === 1 ? 'bit' : 'bits'}`
 }
 
 function defaultBusParts(width: number): number[] {

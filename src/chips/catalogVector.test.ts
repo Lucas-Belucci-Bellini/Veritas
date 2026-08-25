@@ -176,3 +176,73 @@ describe('4-ADD importado do catálogo DLS', () => {
     expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
   })
 })
+
+
+function fourBitEqualChip(): ChipEntry {
+  return {
+    name: 'EQUAL-4',
+    category: 'Comparadores',
+    in: 2,
+    out: 1,
+    pins: { in: ['IN', 'IN'], out: ['OUT'] },
+    widths: [1, 4],
+    parts: { XNOR: 4, AND: 3, '4-1BIT': 2 },
+    partCount: 9,
+    wireCount: 17,
+  }
+}
+
+describe('EQUAL-4 importado do catálogo DLS', () => {
+  it('materializa dois barramentos, quatro XNOR e uma redução AND', () => {
+    const document = catalogVectorChipToCircuitDocument(fourBitEqualChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(2)
+    expect(document?.nodes.filter((node) => node.type === 'xnor')).toHaveLength(4)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(3)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    ['0101', '0101', '1'],
+    ['0101', '0111', '0'],
+    ['1111', '1111', '1'],
+    ['0000', '1000', '0'],
+  ])('avalia %s == %s como %s', (left, right, expected) => {
+    const document = catalogVectorChipToCircuitDocument(fourBitEqualChip())!
+    const result = evaluateCircuitVectors(document, { 'input-a': left, 'input-b': right })
+    expect(toBinary(result.outputs['output-0']!)).toBe(expected)
+  })
+
+  it('preserva portas duplicadas do DLS com IDs e larguras determinísticos', () => {
+    const document = catalogVectorChipToCircuitDocument(fourBitEqualChip())!
+    const definition = buildCustomChipDefinition(document, 'EQUAL-4 importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN', 4],
+      ['IN_2', 4],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 1]])
+  })
+
+  it('exporta o comparador multi-bit para Verilog e VHDL', () => {
+    const document = catalogVectorChipToCircuitDocument(fourBitEqualChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('module EQUAL_4')
+    expect(verilog).toContain('[3:0]')
+    expect(vhdl).toContain('entity EQUAL_4 is')
+    expect(vhdl).toContain('std_logic_vector(3 downto 0)')
+  })
+
+  it('reconhece a entrada EQUAL-4 do catálogo gerado a partir do DLS', async () => {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'EQUAL-4')
+
+    expect(chip).toBeDefined()
+    const document = catalogVectorChipToCircuitDocument(chip!)
+    expect(document).not.toBeNull()
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+})

@@ -27,6 +27,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   const gate = vectorGateModel(chip)
   if (gate) return buildVectorGateDocument(chip, gate)
   if (isFourBitAdder(chip)) return buildFourBitAdderDocument(chip)
+  if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
 }
 
@@ -84,6 +85,16 @@ function hasOnlyBusWidth(chip: ChipEntry, width: number): boolean {
 
 function hasScalarAndBusWidth(chip: ChipEntry, width: number): boolean {
   return chip.widths?.includes(width) === true && chip.widths.every((candidate) => candidate === 1 || candidate === width)
+}
+
+function isFourBitEqual(chip: ChipEntry): boolean {
+  return chip.name === 'EQUAL-4'
+    && chip.in === 2
+    && chip.out === 1
+    && hasScalarAndBusWidth(chip, ADDER_WIDTH)
+    && chip.parts.XNOR === 4
+    && chip.parts.AND === 3
+    && chip.parts['4-1BIT'] === 2
 }
 
 function buildVectorGateDocument(chip: ChipEntry, model: VectorGateModel): CircuitDocument {
@@ -265,6 +276,83 @@ function buildFourBitAdderDocument(chip: ChipEntry): CircuitDocument {
   connections.push(
     { source: { node: combinerId }, target: { node: outputSumId, port: 0 } },
     { source: { node: incomingCarry }, target: { node: outputCarryId, port: 0 } },
+  )
+
+  return { ...document, nodes, connections }
+}
+
+function buildFourBitEqualDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 2 ? chip.pins.in : ['IN', 'IN']
+  const outputLabel = chip.pins?.out?.[0] || 'OUT'
+  const nodes: CircuitNode[] = [
+    {
+      id: 'input-a',
+      type: 'input',
+      position: { x: 0, y: 120 },
+      label: inputLabels[0] || 'IN',
+      options: { width: ADDER_WIDTH },
+    },
+    {
+      id: 'input-b',
+      type: 'input',
+      position: { x: 0, y: 360 },
+      label: inputLabels[1] || 'IN',
+      options: { width: ADDER_WIDTH },
+    },
+    {
+      id: 'splitter-a',
+      type: 'splitter',
+      position: { x: 190, y: 120 },
+      label: 'Split A',
+      options: { width: ADDER_WIDTH, widths: unitWidths(ADDER_WIDTH) },
+    },
+    {
+      id: 'splitter-b',
+      type: 'splitter',
+      position: { x: 190, y: 360 },
+      label: 'Split B',
+      options: { width: ADDER_WIDTH, widths: unitWidths(ADDER_WIDTH) },
+    },
+  ]
+  const connections: CircuitDocument['connections'] = [
+    { source: { node: 'input-a' }, target: { node: 'splitter-a', port: 0 } },
+    { source: { node: 'input-b' }, target: { node: 'splitter-b', port: 0 } },
+  ]
+
+  for (let bit = 0; bit < ADDER_WIDTH; bit += 1) {
+    const xnorId = `xnor-${bit}`
+    nodes.push({
+      id: xnorId,
+      type: 'xnor',
+      position: { x: 430, y: 40 + bit * 150 },
+      label: `XNOR bit ${bit + 1}`,
+    })
+    connections.push(
+      { source: { node: 'splitter-a', port: bit }, target: { node: xnorId, port: 0 } },
+      { source: { node: 'splitter-b', port: bit }, target: { node: xnorId, port: 1 } },
+    )
+  }
+
+  nodes.push(
+    { id: 'and-01', type: 'and', position: { x: 680, y: 100 }, label: 'AND bits 1+2' },
+    { id: 'and-23', type: 'and', position: { x: 680, y: 400 }, label: 'AND bits 3+4' },
+    { id: 'and-final', type: 'and', position: { x: 850, y: 250 }, label: 'AND igualdade' },
+    {
+      id: 'output-0',
+      type: 'output',
+      position: { x: 1030, y: 250 },
+      label: outputLabel,
+    },
+  )
+  connections.push(
+    { source: { node: 'xnor-0' }, target: { node: 'and-01', port: 0 } },
+    { source: { node: 'xnor-1' }, target: { node: 'and-01', port: 1 } },
+    { source: { node: 'xnor-2' }, target: { node: 'and-23', port: 0 } },
+    { source: { node: 'xnor-3' }, target: { node: 'and-23', port: 1 } },
+    { source: { node: 'and-01' }, target: { node: 'and-final', port: 0 } },
+    { source: { node: 'and-23' }, target: { node: 'and-final', port: 1 } },
+    { source: { node: 'and-final' }, target: { node: 'output-0', port: 0 } },
   )
 
   return { ...document, nodes, connections }
