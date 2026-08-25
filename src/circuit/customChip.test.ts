@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { buildCustomChipDefinition, createCircuitDocument, type CircuitDocument } from './index'
+import {
+  buildCustomChipDefinition,
+  createCircuitDocument,
+  elaborateCustomChipDocument,
+  evaluateCircuit,
+  type CircuitDocument,
+  type CustomChipLibraryEntry,
+} from './index'
 
 function validDocument(): CircuitDocument {
   return {
@@ -14,6 +21,24 @@ function validDocument(): CircuitDocument {
       { source: { node: 'a' }, target: { node: 'gate', port: 0 } },
       { source: { node: 'b' }, target: { node: 'gate', port: 1 } },
       { source: { node: 'gate' }, target: { node: 'sum', port: 0 } },
+    ],
+  }
+}
+
+function singleInputDocument(name: string, childId?: number): CircuitDocument {
+  const child = childId === undefined
+    ? { id: 'gate', type: 'not' as const, position: { x: 160, y: 0 } }
+    : { id: 'chip', type: 'custom-chip' as const, position: { x: 160, y: 0 }, options: { customChipId: childId } }
+  return {
+    ...createCircuitDocument(name),
+    nodes: [
+      { id: 'a', type: 'input', position: { x: 0, y: 0 }, label: 'A' },
+      child,
+      { id: 'y', type: 'output', position: { x: 320, y: 0 }, label: 'Y' },
+    ],
+    connections: [
+      { source: { node: 'a' }, target: { node: child.id, port: 0 } },
+      { source: { node: child.id }, target: { node: 'y', port: 0 } },
     ],
   }
 }
@@ -61,5 +86,59 @@ describe('customChip', () => {
 
   it('limita o nome do chip', () => {
     expect(() => buildCustomChipDefinition(validDocument(), 'x'.repeat(201))).toThrow('no máximo 200')
+  })
+
+  it('permite empacotar, reutilizar e expandir chips compostos', () => {
+    const base: CustomChipLibraryEntry = {
+      id: 1,
+      definition: buildCustomChipDefinition(singleInputDocument('Inversor'), 'Inversor'),
+    }
+    const nestedDocument = singleInputDocument('Inversor composto', base.id)
+    const nested: CustomChipLibraryEntry = {
+      id: 2,
+      definition: buildCustomChipDefinition(nestedDocument, 'Inversor composto', { customChips: [base] }),
+    }
+    const outerDocument = singleInputDocument('Inversor duplo', nested.id)
+    const outer = buildCustomChipDefinition(outerDocument, 'Inversor duplo', { customChips: [base, nested] })
+
+    expect(evaluateCircuit(outer.document, { a: true }, { customChips: [base, nested] }).outputs).toEqual({ y: false })
+    const expanded = elaborateCustomChipDocument(outer.document, { customChips: [base, nested] })
+    expect(expanded.nodes.some((node) => node.type === 'custom-chip')).toBe(false)
+    expect(expanded.nodes.map((node) => node.id)).toContain('chip__chip__gate')
+  })
+
+  it('rejeita referências recursivas entre definições', () => {
+    const recursive: CustomChipLibraryEntry = {
+      id: 9,
+      definition: {
+        format: 'veritas-custom-chip',
+        version: 1,
+        name: 'Recursivo',
+        document: singleInputDocument('Recursivo', 9),
+        inputs: [{ id: 'a', name: 'A', width: 1 }],
+        outputs: [{ id: 'y', name: 'Y', width: 1 }],
+      },
+    }
+
+    expect(() => buildCustomChipDefinition(singleInputDocument('Ciclo', 9), 'Ciclo', { customChips: [recursive] })).toThrow('recursiva')
+  })
+
+  it('rejeita hierarquia acima do limite seguro', () => {
+    const library: CustomChipLibraryEntry[] = []
+    const leaf: CustomChipLibraryEntry = {
+      id: 1,
+      definition: buildCustomChipDefinition(singleInputDocument('N1'), 'N1'),
+    }
+    library.push(leaf)
+    for (let id = 2; id <= 9; id += 1) {
+      const child = library[library.length - 1]
+      library.push({
+        id,
+        definition: buildCustomChipDefinition(singleInputDocument(`N${id}`, child.id), `N${id}`, { customChips: library }),
+      })
+    }
+
+    const tooDeep = singleInputDocument('N10', 9)
+    expect(() => buildCustomChipDefinition(tooDeep, 'N10', { customChips: library, maxDepth: 3 })).toThrow('limite seguro')
   })
 })

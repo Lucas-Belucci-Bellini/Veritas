@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Cpu, Search } from 'lucide-react'
+import { catalogChipToCircuitDocument } from '../chips/catalogCircuit'
 import { loadCatalog, type ChipCatalog, type ChipEntry } from '../chips/types'
+import { createCustomChipProject, listCustomChipProjects } from '../storage/customChips'
 
 interface ChipLibraryProps {
   onUseExpression: (expression: string) => void
@@ -22,6 +24,31 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
   const [category, setCategory] = useState('Todas')
   const [onlyDerived, setOnlyDerived] = useState(true)
   const [limit, setLimit] = useState(PAGE_SIZE)
+  const [importing, setImporting] = useState<string | null>(null)
+  const [notice, setNotice] = useState('')
+
+  async function importChip(chip: ChipEntry): Promise<void> {
+    const document = catalogChipToCircuitDocument(chip)
+    if (!document) {
+      setNotice(`"${chip.name}" não possui um modelo escalar completo para o canvas.`)
+      return
+    }
+    setImporting(chip.name)
+    setNotice('')
+    try {
+      const existing = await listCustomChipProjects()
+      if (existing.some((project) => project.name === document.name)) {
+        setNotice(`"${document.name}" já está disponível na biblioteca local do editor.`)
+        return
+      }
+      const id = await createCustomChipProject({ name: document.name, document })
+      setNotice(`"${document.name}" foi adicionado à biblioteca local (ID ${id}) e já pode ser usado no canvas.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível adicionar o chip ao editor.')
+    } finally {
+      setImporting(null)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -107,6 +134,12 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
         </div>
       </header>
 
+      {notice && (
+        <p role="status" className="mb-4 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-700 dark:border-brand-900/70 dark:bg-brand-950/30 dark:text-brand-200">
+          {notice}
+        </p>
+      )}
+
       {failed ? (
         <p className="py-6 text-center text-sm text-slate-400">
           Não foi possível carregar o catálogo de chips.
@@ -121,7 +154,7 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {matches.slice(0, limit).map((chip) => (
-              <ChipCard key={chip.name} chip={chip} onUse={onUseExpression} />
+              <ChipCard key={chip.name} chip={chip} onUse={onUseExpression} onImport={(selected) => void importChip(selected)} importing={importing === chip.name} />
             ))}
           </div>
 
@@ -152,9 +185,13 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
 function ChipCard({
   chip,
   onUse,
+  onImport,
+  importing,
 }: {
   chip: ChipEntry
   onUse: (expression: string) => void
+  onImport: (chip: ChipEntry) => void
+  importing: boolean
 }) {
   const parts = Object.entries(chip.parts)
 
@@ -179,7 +216,22 @@ function ChipCard({
       )}
 
       {chip.derivedOutputs ? (
-        <ul className="mt-2 space-y-1.5">
+        <>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              {catalogChipToCircuitDocument(chip) ? 'Modelo escalar pronto para o canvas' : 'Modelo não materializável nesta V1'}
+            </span>
+            <button
+              type="button"
+              onClick={() => onImport(chip)}
+              disabled={!catalogChipToCircuitDocument(chip) || importing}
+              className="rounded-md border border-violet-200 px-2 py-0.5 text-[11px] font-medium text-violet-700 transition hover:border-violet-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-800 dark:text-violet-300"
+              title="Adicionar este chip à biblioteca local e disponibilizá-lo no canvas"
+            >
+              {importing ? 'Adicionando…' : 'Adicionar ao editor'}
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1.5">
           {chip.derivedOutputs.map((output) => (
             <li key={output.name} className="text-xs">
               <div className="flex items-center justify-between gap-2">
@@ -201,7 +253,8 @@ function ChipCard({
               </code>
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       ) : (
         <p className="mt-2 text-xs text-slate-400 dark:text-slate-600">
           Sequencial ou multi-bit — sem expressão booleana equivalente.

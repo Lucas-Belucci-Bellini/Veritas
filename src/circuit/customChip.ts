@@ -31,15 +31,26 @@ export interface CustomChipDefinition {
   outputs: CustomChipPort[]
 }
 
+export interface CustomChipDefinitionOptions {
+  /** Biblioteca local usada para resolver instâncias já criadas. */
+  customChips?: readonly CustomChipLibraryEntry[]
+  /** Limite máximo de níveis de chips compostos. */
+  maxDepth?: number
+}
+
 const STATEFUL_TYPES: readonly EditorComponentType[] = ['clock', 'dff', 'tff', 'delay']
+const DEFAULT_MAX_CUSTOM_CHIP_DEPTH = 8
+
 
 /**
  * Cria uma definição serializável sem mutar o documento original.
- * A execução hierárquica e a instanciação no canvas ficam para CHIP-002.
+ * Instâncias de chips existentes podem ser compostas, desde que a biblioteca
+ * fornecida resolva toda a cadeia sem ciclos ou profundidade insegura.
  */
 export function buildCustomChipDefinition(
   document: CircuitDocument,
   name = document.name,
+  options: CustomChipDefinitionOptions = {},
 ): CustomChipDefinition {
   const normalizedDocument = normalizeCircuitDocument(document)
   const normalizedName = name.trim() || normalizedDocument.name
@@ -48,14 +59,15 @@ export function buildCustomChipDefinition(
     throw new Error(`O nome do chip customizado pode ter no máximo ${MAX_CIRCUIT_NAME_LENGTH} caracteres.`)
   }
 
-  if (normalizedDocument.nodes.some((node) => node.type === 'custom-chip')) {
-    throw new Error('Chips customizados desta versão não podem conter outras instâncias de chip.')
-  }
-  const issues = validateCircuit(normalizedDocument, { allowBuses: true })
+  const issues = validateCircuit(normalizedDocument, {
+    allowBuses: true,
+    customChips: options.customChips,
+  })
   if (issues.length > 0) throw new CircuitValidationError(issues)
   if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) {
     throw new Error('Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF ou delay.')
   }
+  validateNestedDefinitions(normalizedDocument, options.customChips ?? [], options.maxDepth ?? DEFAULT_MAX_CUSTOM_CHIP_DEPTH)
 
   const inputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === 'input'))
   const outputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === 'output'))
@@ -69,6 +81,38 @@ export function buildCustomChipDefinition(
     document: normalizedDocument,
     inputs,
     outputs,
+  }
+}
+
+function validateNestedDefinitions(
+  document: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[],
+  maxDepth: number,
+  stack: readonly number[] = [],
+  depth = 0,
+): void {
+  if (!Number.isInteger(maxDepth) || maxDepth < 1) {
+    throw new Error('O limite de profundidade da hierarquia precisa ser um inteiro positivo.')
+  }
+
+  const definitions = new Map(customChips.map((entry) => [entry.id, entry] as const))
+  for (const node of document.nodes) {
+    if (node.type !== 'custom-chip') continue
+    const id = node.options?.customChipId
+    const entry = definitions.get(id ?? NaN)
+    if (!entry) continue
+    if (stack.includes(entry.id)) {
+      throw new Error(`A definição do chip "${entry.definition.name}" contém uma referência recursiva.`)
+    }
+    if (depth >= maxDepth) {
+      throw new Error(`A hierarquia de chips excede o limite seguro de ${maxDepth} níveis.`)
+    }
+    const childIssues = validateCircuit(entry.definition.document, { allowBuses: true, customChips })
+    if (childIssues.length > 0) throw new CircuitValidationError(childIssues)
+    if (entry.definition.document.nodes.some((child) => STATEFUL_TYPES.includes(child.type))) {
+      throw new Error('Chips customizados desta versão precisam ser combinacionais; remova os componentes sequenciais.')
+    }
+    validateNestedDefinitions(entry.definition.document, customChips, maxDepth, [...stack, entry.id], depth + 1)
   }
 }
 

@@ -749,3 +749,16 @@ Critérios realizados: 19 testes de domínio, 4 testes da ferramenta MCP, checks
 Com o testbench declarativo fechado, os dois caminhos naturais são: um editor de roteiro com expectativas na interface (hoje o painel cobre só o modo combinacional, enquanto o domínio e o MCP já fazem os dois), e a geração de casos a partir da tabela verdade, para transformar o comportamento atual em regressão.
 
 As asserções continuam depois disso, e não antes, porque exigem um avaliador de expressões sobre sinais. A regra que já vale: esse avaliador reusa `src/engine/parser.ts`, nunca `eval` nem `Function`.
+
+
+## Atualização da implementação — CHIP-005/006/007 — fundação da V1 — 2026-08-25
+
+O loop central do Digital Logic Sim foi desbloqueado no repositório existente. `buildCustomChipDefinition()` agora aceita instâncias de chips locais já validadas, percorre a cadeia de dependências, rejeita referências recursivas e aplica limite seguro de profundidade. O storage IndexedDB e o hook `useCustomChips()` passam a fornecer a biblioteca ao validar criação e atualização; o editor não bloqueia mais o salvamento de um circuito composto.
+
+O elaborador hierárquico transforma instâncias em namespaces determinísticos e converte entradas internas em fronteiras dirigíveis pelo netlist expandido. Isso permite que o mesmo documento seja usado no runtime temporal, no testbench sequencial, na comparação temporal e nos exportadores sem duplicar a engine. A biblioteca é sempre explícita; nenhuma definição ausente é inferida ou executada silenciosamente.
+
+`createDocumentRuntime()` recebeu `customChips` e expande a hierarquia antes de instanciar o `Simulator`. O painel temporal do editor encaminha a biblioteca local, e o testbench passou a executar casos sequenciais com chips em vez de recusar o documento. Checkpoints, reset, períodos de clock e aplicação de estado remoto continuam usando o mesmo contrato `SimulatorState`.
+
+O catálogo DLS ganhou um adaptador que converte chips escalares com expressões completas em `CircuitDocument`. O botão “Adicionar ao editor” salva uma cópia na biblioteca local e o editor recebe a mudança por evento local, sem autenticação ou rede. O catálogo completo continua disponível para consulta; chips multi-bit, sequenciais ou com alguma expressão ausente permanecem explicitamente não executáveis nesta fatia, evitando uma falsa promessa de comportamento.
+
+Critérios verificados nesta fatia: composição, avaliação, expansão, ciclo, profundidade, runtime temporal e testbench sequencial cobertos por regressões; typecheck e lint limpos. A validação completa de release ainda será executada antes de abrir a próxima etapa da V1.

@@ -14,6 +14,7 @@ import {
   type CircuitDocument,
   type CircuitNode,
 } from './editorModel'
+import { buildCustomChipDefinition, type CustomChipLibraryEntry } from './customChip'
 
 function doc(name: string, nodes: CircuitNode[], connections: CircuitConnection[]): CircuitDocument {
   return { format: CIRCUIT_DOCUMENT_FORMAT, version: CIRCUIT_DOCUMENT_VERSION, name, nodes, connections }
@@ -28,6 +29,15 @@ function link(source: string, target: string, port = 0, sourcePort = 0): Circuit
 }
 
 /** Meio somador: SOMA = A xor B, VAIUM = A `carry` B. */
+function invertChip(): CustomChipLibraryEntry {
+  const definition = doc(
+    'inversor',
+    [node('in', 'input', 'IN'), node('n', 'not'), node('out', 'output', 'OUT')],
+    [link('in', 'n'), link('n', 'out')],
+  )
+  return { id: 1, definition: buildCustomChipDefinition(definition, 'Inversor') }
+}
+
 function halfAdder(carry: 'and' | 'or'): CircuitDocument {
   return doc(
     'meio somador',
@@ -247,26 +257,31 @@ describe('runTestbench', () => {
     expect(report.issues[0]?.code).toBe('duplicate-port-name')
   })
 
-  it('explica que casos sequenciais ainda não expandem custom-chip', () => {
+  it('executa chip composto em caso sequencial com a biblioteca local', () => {
     const withChip = doc(
       'circuito com chip',
       [
         node('i', 'input', 'IN'),
         node('c', 'input', 'CLK'),
         node('chip', 'custom-chip', undefined, { customChipId: 1 }),
+        node('ff', 'dff'),
         node('o', 'output', 'OUT'),
       ],
-      [link('i', 'chip', 0), link('chip', 'o')],
+      [link('i', 'chip'), link('chip', 'ff', 0), link('c', 'ff', 1), link('ff', 'o')],
     )
 
     const report = runTestbench(withChip, bench([
-      { steps: [{ set: { IN: true }, ticks: 1, expect: { OUT: true } }] },
-    ], 'chip'))
+      {
+        steps: [
+          { set: { IN: false, CLK: false }, ticks: 2, expect: { OUT: false } },
+          { set: { CLK: true }, ticks: 2, expect: { OUT: true } },
+        ],
+      },
+    ], 'chip'), { customChips: [invertChip()] })
 
-    expect(report.status).toBe('invalid')
-    expect(report.issues[0]?.code).toBe('sequential-custom-chip')
-    // A mensagem precisa dizer o que fazer, não só o que falhou.
-    expect(report.issues[0]?.message).toContain('combinacionais')
+    expect(report.status).toBe('passed')
+    expect(report.cases[0]?.mode).toBe('sequential')
+    expect(report.cases[0]?.mismatches).toEqual([])
   })
 
   it('trata passo sem ticks como um único tique', () => {

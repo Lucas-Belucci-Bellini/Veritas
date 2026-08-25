@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { CircuitDocument } from '../circuit'
+import {
+  buildCustomChipDefinition,
+  type CircuitDocument,
+  type CustomChipLibraryEntry,
+} from '../circuit'
 import {
   createDocumentRuntime,
   documentInputIds,
@@ -7,6 +11,24 @@ import {
   runtimeValue,
   snapshotDocumentRuntime,
 } from './documentRuntime'
+
+function inverterChip(): CustomChipLibraryEntry {
+  const document: CircuitDocument = {
+    format: 'veritas-circuit',
+    version: 1,
+    name: 'Inversor',
+    nodes: [
+      { id: 'in', type: 'input', position: { x: 0, y: 0 } },
+      { id: 'not', type: 'not', position: { x: 100, y: 0 } },
+      { id: 'out', type: 'output', position: { x: 200, y: 0 } },
+    ],
+    connections: [
+      { source: { node: 'in' }, target: { node: 'not', port: 0 } },
+      { source: { node: 'not' }, target: { node: 'out', port: 0 } },
+    ],
+  }
+  return { id: 1, definition: buildCustomChipDefinition(document, 'Inversor') }
+}
 
 function feedbackDocument(): CircuitDocument {
   return {
@@ -62,6 +84,39 @@ describe('documentRuntime', () => {
     expect(simulator.read('tx')).toBe(true)
     expect(simulator.read('rx')).toBe(true)
     expect(simulator.read('out')).toBe(true)
+  })
+
+  it('expande chip customizado antes de simular um caminho temporal', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'DFF com inversor',
+      nodes: [
+        { id: 'd', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'clk', type: 'input', position: { x: 0, y: 100 } },
+        { id: 'chip', type: 'custom-chip', position: { x: 150, y: 0 }, options: { customChipId: 1 } },
+        { id: 'ff', type: 'dff', position: { x: 350, y: 0 } },
+        { id: 'out', type: 'output', position: { x: 500, y: 0 } },
+      ],
+      connections: [
+        { source: { node: 'd' }, target: { node: 'chip', port: 0 } },
+        { source: { node: 'chip' }, target: { node: 'ff', port: 0 } },
+        { source: { node: 'clk' }, target: { node: 'ff', port: 1 } },
+        { source: { node: 'ff' }, target: { node: 'out', port: 0 } },
+      ],
+    }
+    const simulator = createDocumentRuntime(document, { customChips: [inverterChip()] })
+
+    simulator.setInput('d', false)
+    simulator.setInput('clk', false)
+    simulator.tick(2)
+    simulator.setInput('clk', true)
+    simulator.tick()
+    simulator.tick()
+
+    const snapshot = snapshotDocumentRuntime(simulator, document, [inverterChip()])
+    expect(simulator.read('out')).toBe(true)
+    expect(runtimeValue(snapshot, 'chip')).toBe(true)
   })
 
   it('mantém a realimentação e atualiza Q no pulso de clock', () => {

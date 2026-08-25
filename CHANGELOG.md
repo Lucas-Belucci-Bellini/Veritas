@@ -2,6 +2,20 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [Unreleased] — fundação da V1
+
+### Adicionado
+
+- Composição hierárquica de chips customizados: uma definição pode reutilizar chips locais existentes, com validação recursiva, detecção de ciclos e limite seguro de profundidade.
+- Runtime temporal, testbench sequencial e comparação temporal preparados para expandir chips customizados antes da simulação.
+- Adaptador do catálogo DLS que materializa chips escalares com expressões completas em `CircuitDocument` e os adiciona à biblioteca local do editor.
+- Evento local de atualização da biblioteca para que chips importados na seção de catálogo apareçam na paleta do canvas sem exigir autenticação ou rede.
+
+### Limites conhecidos
+
+- O catálogo versionado contém 1121 descrições, mas nesta fatia somente chips escalares com todas as saídas derivadas podem ser materializados com segurança; chips multi-bit, sequenciais ou com expressões ausentes continuam catalogados para consulta.
+- A biblioteca local continua sendo a fonte executável do canvas. Nenhuma definição importada é enviada para a nuvem automaticamente.
+
 ## [0.9.0-rc.15] — 2026-08-25
 
 ### Adicionado
@@ -20,7 +34,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - Suíte com 470 testes, typecheck, lint, builds de frontend/MCP stdio/MCP HTTP/lib/plugin; `beta:mcp` 16 PASS, `beta:mcp:http` 18 PASS, `beta:accessibility` 5 PASS, `beta:rust` 2 PASS e `beta:wasm:isolation` 5 PASS, todos sem FAIL.
 - O painel foi verificado no Chromium com um meio somador de vai-um errado: o caso que expõe o defeito reprovou e o que não expõe passou, sem erro de console.
 - Passar num testbench cobre exatamente os casos escritos, e o relatório diz isso junto do resultado positivo. Prova sobre todo o espaço de entrada continua sendo `circuit_equivalence`.
-- Casos sequenciais ainda não expandem instâncias `custom-chip`; existe um erro próprio (`sequential-custom-chip`) explicando o que fazer, em vez de um erro genérico do netlist.
+- Casos sequenciais agora expandem instâncias `custom-chip` com a biblioteca local antes de criar o runtime; a antiga guarda `sequential-custom-chip` foi removida.
 - O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
 
 ## [0.9.0-rc.14] — 2026-08-25

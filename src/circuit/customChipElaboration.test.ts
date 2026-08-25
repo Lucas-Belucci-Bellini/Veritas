@@ -55,6 +55,7 @@ describe('customChipElaboration', () => {
     expect(ids).toContain('left__a')
     expect(ids).toContain('right__a')
     expect(ids).not.toContain('a')
+    expect(expanded.nodes.find((node) => node.id === 'left__a')?.type).toBe('output')
     expect(expanded.nodes.find((node) => node.id === 'left__a')?.options?.customChipBoundary).toBe('internal')
     expect(expanded.nodes.find((node) => node.id === 'right__y')?.options?.customChipBoundary).toBe('internal')
     expect(expanded.connections).toEqual(expect.arrayContaining([

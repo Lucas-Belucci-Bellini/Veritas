@@ -6,7 +6,7 @@ O Veritas é uma ferramenta local-first para estudar, projetar e validar circuit
 
 O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisões de escopo estão em [`docs/ROADMAP.md`](./docs/ROADMAP.md). O [`issue.md`](./issue.md) permanece como histórico de descoberta e visão de longo prazo, não como uma lista linear de tarefas.
 
-## Estado atual — v0.6.2
+## Estado atual — v0.9.0-rc.15 + fundação da V1
 
 | Entrega | Estado |
 | --- | --- |
@@ -17,7 +17,9 @@ O roadmap detalhado, o backlog priorizado, os critérios de aceite e as decisõe
 | Circuito derivado da expressão com React Flow e Dagre | Concluído |
 | Projetos locais, IndexedDB e arquivos `.veritas` | Concluído |
 | PWA offline-first | Concluído |
-| Clock, flip-flops e atrasos no motor sequencial | Concluído no motor; edição visual pendente |
+| Clock, flip-flops e atrasos no motor sequencial | Concluído no motor e no workspace visual |
+| Chips customizados, composição hierárquica e subcircuitos reutilizáveis | Fundação da V1 concluída; expansão recursiva, runtime temporal e biblioteca local ativos |
+| Catálogo DLS importado | 1121 descrições; 388 chips escalares completos materializáveis no editor nesta fatia |
 | Servidor MCP e plugin do Claude Code | Concluído |
 
 ## Próximo incremento — v0.7.0
@@ -37,6 +39,8 @@ O usuário deverá conseguir criar um circuito simples sem digitar uma expressã
 
 ## Roadmap resumido
 
+O roadmap executável em `docs/ROADMAP.md` é a fonte de verdade para os incrementos atuais. A branch de trabalho `feature/chip-hierarchy-v1` consolidou a fundação da V1 sem alterar a `main`.
+
 | Versão | Objetivo |
 | --- | --- |
 | v0.7.0 | Editor visual combinacional |
@@ -44,6 +48,7 @@ O usuário deverá conseguir criar um circuito simples sem digitar uma expressã
 | v0.8.0 | Barramentos multi-bit e Splitter |
 | v0.9.0 | Workspace sequencial visual |
 | v0.10.0 | Chips customizados e subcircuitos |
+| v0.10.x | Composição hierárquica, runtime temporal e catálogo instanciável — incremento atual |
 | v1.0.0 | API de contexto do canvas e MCP declarativo |
 | v1.x | Sync, desktop, agentes e recursos 3D, somente após validação técnica |
 

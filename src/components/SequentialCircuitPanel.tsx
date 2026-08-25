@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CircuitDocument } from '../circuit'
+import type { CircuitDocument, CustomChipLibraryEntry } from '../circuit'
 import {
   createDocumentRuntime,
   documentInputIds,
@@ -54,6 +54,7 @@ function runtimeState(
 
 interface SequentialCircuitPanelProps {
   document: CircuitDocument
+  customChips?: readonly CustomChipLibraryEntry[]
   requestedClockPeriods?: Readonly<Record<string, number>>
   requestedRuntimeState?: DocumentRuntimeState
   requestedRuntimeStateSentAt?: string
@@ -72,7 +73,7 @@ interface SequentialCircuitPanelProps {
   onRuntimeStateApplyFailed?: () => void
 }
 
-export function SequentialCircuitPanel({ document, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
+export function SequentialCircuitPanel({ document, customChips = [], requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
@@ -111,7 +112,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       const saved = clearSaved ? null : readRuntimeCheckpoint(documentKey, storage)
       const defaultClockPeriods = Object.fromEntries(clockIds.map((id) => [id, document.nodes.find((node) => node.id === id)?.options?.period ?? 1]))
       const nextClockPeriods = { ...defaultClockPeriods, ...(saved?.clockPeriods ?? {}), ...(overrideClockPeriods ?? {}) }
-      const simulator = createDocumentRuntime(document, { clockPeriods: nextClockPeriods })
+      const simulator = createDocumentRuntime(document, { clockPeriods: nextClockPeriods, customChips })
       let restored = false
       if (saved) {
         try {
@@ -125,7 +126,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       const nextInputs = Object.fromEntries(
         inputIds.map((id) => [id, saved?.inputs[id] ?? document.nodes.find((node) => node.id === id)?.options?.initial ?? false]),
       )
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       const nextTimeline = restored && saved?.timeline.length ? saved.timeline : [snapshot]
       setInputs(nextInputs)
       setClockPeriods(nextClockPeriods)
@@ -174,7 +175,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
     try {
       for (const [id, value] of Object.entries(inputs)) simulator.setInput(id, value)
       simulator.tick()
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       const nextTimeline = appendTimeline(timeline, [snapshot])
       setTimeline(nextTimeline)
       persist(simulator, inputs, clockPeriods, nextTimeline)
@@ -194,7 +195,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       const next: DocumentRuntimeSnapshot[] = []
       for (let index = 0; index < RUN_TICKS; index += 1) {
         simulator.tick()
-        next.push(snapshotDocumentRuntime(simulator))
+        next.push(snapshotDocumentRuntime(simulator, document, customChips))
       }
       const nextTimeline = appendTimeline(timeline, next)
       setTimeline(nextTimeline)
@@ -215,9 +216,9 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
       return
     }
     try {
-      const simulator = createDocumentRuntime(document, { clockPeriods: state.clockPeriods })
+      const simulator = createDocumentRuntime(document, { clockPeriods: state.clockPeriods, customChips })
       simulator.restoreState(state.simulator)
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       simulatorRef.current = simulator
       setInputs({ ...state.inputs })
       setClockPeriods({ ...state.clockPeriods })
@@ -240,7 +241,7 @@ export function SequentialCircuitPanel({ document, requestedClockPeriods, reques
     try {
       simulator.setInput(id, value)
       const nextInputs = { ...inputs, [id]: value }
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       const nextTimeline = timeline.length ? [...timeline.slice(0, -1), snapshot] : [snapshot]
       setInputs(nextInputs)
       setTimeline(nextTimeline)

@@ -1,4 +1,9 @@
-import { toNetlist, type CircuitDocument } from '../circuit'
+import {
+  elaborateCustomChipDocument,
+  toNetlist,
+  type CircuitDocument,
+  type CustomChipLibraryEntry,
+} from '../circuit'
 import { Simulator, type SimulatorState } from './simulator'
 
 export interface DocumentRuntimeSnapshot {
@@ -14,6 +19,8 @@ export interface DocumentRuntimeWatch {
 
 export interface DocumentRuntimeOptions {
   clockPeriods?: Readonly<Record<string, number>>
+  /** Definições locais usadas para expandir chips em circuitos sequenciais. */
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 export interface DocumentRuntimeState {
@@ -26,7 +33,10 @@ export interface DocumentRuntimeState {
 
 export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
   const runtimeDocument = applyClockPeriods(document, options.clockPeriods)
-  const simulator = new Simulator(toNetlist(runtimeDocument))
+  const executableDocument = runtimeDocument.nodes.some((node) => node.type === 'custom-chip')
+    ? elaborateCustomChipDocument(runtimeDocument, { customChips: options.customChips })
+    : runtimeDocument
+  const simulator = new Simulator(toNetlist(executableDocument))
   for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {
       simulator.setInput(node.id, node.options.initial)
@@ -50,10 +60,33 @@ function applyClockPeriods(
   }
 }
 
-export function snapshotDocumentRuntime(simulator: Simulator): DocumentRuntimeSnapshot {
+export function snapshotDocumentRuntime(
+  simulator: Simulator,
+  document?: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[] = [],
+): DocumentRuntimeSnapshot {
+  const values = simulator.snapshot()
+  if (document) projectCustomChipValues(values, document, customChips)
   return {
     tick: simulator.tickCount,
-    values: simulator.snapshot(),
+    values,
+  }
+}
+
+function projectCustomChipValues(
+  values: Record<string, boolean[]>,
+  document: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[],
+): void {
+  const definitions = new Map(customChips.map((entry) => [entry.id, entry] as const))
+  for (const node of document.nodes) {
+    if (node.type !== 'custom-chip') continue
+    const definition = definitions.get(node.options?.customChipId ?? NaN)?.definition
+    if (!definition) continue
+    const outputNodes = definition.document.nodes
+      .filter((child) => child.type === 'output')
+      .sort((left, right) => left.id.localeCompare(right.id))
+    values[node.id] = outputNodes.map((output) => values[`${node.id}__${output.id}`]?.[0] ?? false)
   }
 }
 

@@ -297,12 +297,20 @@ resolve os sub-chips recursivamente, simula cada chip combinacional em todas as
 combinações de entrada e destila cada saída em uma expressão booleana mínima
 via Quine-McCluskey.
 
-Resultado: 445 chips chegam à interface com expressão pronta — um clique em
-"Abrir na calculadora" e você vê a tabela verdade e o circuito do somador
-completo, do multiplexador, do comparador de 2 bits. Chips sequenciais
-(registradores, contadores, RAM) e multi-bit aparecem catalogados, mas sem
-expressão equivalente, porque a saída deles depende do tempo e não só das
-entradas.
+Resultado: os chips chegam à interface para consulta; os que possuem uma
+expressão escalar completa também podem ser adicionados à **biblioteca local do
+editor** pelo botão “Adicionar ao editor”. O Veritas materializa a expressão em
+um `CircuitDocument`, preserva as portas e faz o novo componente aparecer na
+paleta do canvas, sem conta ou rede. Nesta primeira fatia, 388 entradas do
+catálogo satisfazem esse contrato completo. Chips sequenciais, multi-bit ou com
+alguma saída sem expressão continuam catalogados, mas não são apresentados como
+executáveis — a interface não promete um comportamento que não consegue provar.
+
+A biblioteca local também aceita chips criados pelo usuário. Um circuito pode
+ser salvo como chip, reutilizar definições anteriores e depois ser inserido em
+outro circuito. A elaboração expande a hierarquia com namespaces determinísticos,
+recusa ciclos e limita a profundidade para manter simulação, exportação e
+arquivos `.veritas` previsíveis.
 
 ```bash
 npm run chips:import                      # usa ../UMBRA-LIMA-ALFA/Chips

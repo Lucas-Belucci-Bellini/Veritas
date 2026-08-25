@@ -1,4 +1,5 @@
 import { createDocumentRuntime } from '../simulation/documentRuntime'
+import type { CustomChipLibraryEntry } from './customChip'
 import { CircuitValidationError, type CircuitDocument } from './editorModel'
 import { normalizeCircuitDocument } from './documentContract'
 import {
@@ -80,6 +81,8 @@ export interface CircuitDifferentialReport {
 export interface CircuitDifferentialOptions {
   /** Teto de tiques desta execução; o máximo absoluto é MAX_DIFFERENTIAL_TICKS. */
   maxTicks?: number
+  /** Definições locais usadas para expandir chips nos dois runtimes. */
+  customChips?: readonly CustomChipLibraryEntry[]
 }
 
 /**
@@ -172,8 +175,8 @@ export function compareCircuitTimelines(
     )
   }
 
-  const runtimeA = buildRuntime(normalizedA, 'A')
-  const runtimeB = buildRuntime(normalizedB, 'B')
+  const runtimeA = buildRuntime(normalizedA, 'A', options)
+  const runtimeB = buildRuntime(normalizedB, 'B', options)
 
   // O contraexemplo precisa refletir o estado real das entradas, e o runtime
   // aplica `options.initial` antes do primeiro tique. Sem semear isso aqui, uma
@@ -239,9 +242,9 @@ export function compareCircuitTimelines(
   }
 }
 
-function buildRuntime(document: CircuitDocument, side: 'A' | 'B') {
+function buildRuntime(document: CircuitDocument, side: 'A' | 'B', options: CircuitDifferentialOptions) {
   try {
-    return createDocumentRuntime(document)
+    return createDocumentRuntime(document, { customChips: options.customChips })
   } catch (error) {
     const detail = error instanceof CircuitValidationError
       ? error.issues[0]?.message ?? error.message

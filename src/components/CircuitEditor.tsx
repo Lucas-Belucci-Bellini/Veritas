@@ -254,7 +254,6 @@ export function CircuitEditor() {
     () => document.nodes.some((node) => node.type === 'clock' || node.type === 'dff' || node.type === 'tff' || node.type === 'delay'),
     [document],
   )
-  const hasCustomChipInstances = useMemo(() => document.nodes.some((node) => node.type === 'custom-chip'), [document])
   const issues = useMemo(() => validateCircuit(document, { allowBuses: true, customChips: customChipEntries }), [customChipEntries, document])
   const scalarIssues = useMemo(() => validateCircuit(document, { customChips: customChipEntries }), [customChipEntries, document])
   const wirelessResolution = useMemo(
@@ -576,10 +575,6 @@ export function CircuitEditor() {
     }
     if (hasSequential) {
       setNotice('Chips customizados desta versão precisam ser combinacionais; remova os componentes sequenciais.')
-      return
-    }
-    if (hasCustomChipInstances) {
-      setNotice('Chips customizados desta versão não podem conter outras instâncias de chip.')
       return
     }
     if (issues.length > 0) {
@@ -943,7 +938,7 @@ export function CircuitEditor() {
             Nome do chip
             <input id="custom-chip-name" value={customChipName} onChange={(event) => setCustomChipName(event.target.value)} placeholder={projectName || 'Meu chip'} maxLength={200} className="w-28 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700" />
           </label>
-          <button type="button" className="key text-xs" onClick={() => void saveAsCustomChip()} disabled={readOnlyCollaboration || hasSequential || hasCustomChipInstances || issues.length > 0 || !customChips.ready || Boolean(customChips.unavailable)} title="Salvar este circuito combinacional na biblioteca local de chips">
+          <button type="button" className="key text-xs" onClick={() => void saveAsCustomChip()} disabled={readOnlyCollaboration || hasSequential || issues.length > 0 || !customChips.ready || Boolean(customChips.unavailable)} title="Salvar este circuito combinacional, inclusive com chips compostos, na biblioteca local de chips">
             Salvar como chip
           </button>
           <button type="button" className="key text-xs" onClick={exportLocal}>
@@ -1143,6 +1138,7 @@ export function CircuitEditor() {
       {hasSequential && issues.length === 0 && (
         <SequentialCircuitPanel
           document={document}
+          customChips={customChipEntries}
           requestedClockPeriods={remoteClockPeriods ?? undefined}
           requestedRuntimeState={remoteRuntimeState?.state}
           requestedRuntimeStateSentAt={remoteRuntimeState?.sentAt}

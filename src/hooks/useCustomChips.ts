@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { storageAvailable, type CustomChipProject } from '../storage/db'
+import type { CustomChipLibraryEntry } from '../circuit'
 import {
   createCustomChipProject,
+  CUSTOM_CHIP_LIBRARY_EVENT,
   deleteCustomChipProject,
   listCustomChipProjects,
   updateCustomChipProject,
@@ -44,6 +46,10 @@ export function useCustomChips(): UseCustomChips {
 
   useEffect(() => {
     void refresh()
+    if (typeof window === 'undefined') return
+    const handleLibraryChanged = () => void refresh()
+    window.addEventListener(CUSTOM_CHIP_LIBRARY_EVENT, handleLibraryChanged)
+    return () => window.removeEventListener(CUSTOM_CHIP_LIBRARY_EVENT, handleLibraryChanged)
   }, [refresh])
 
   return {
@@ -53,12 +59,14 @@ export function useCustomChips(): UseCustomChips {
     error,
     refresh,
     save: async (input) => {
-      const id = await createCustomChipProject(input)
+      const library = chips.map<CustomChipLibraryEntry>((chip) => ({ id: chip.id, definition: chip.definition }))
+      const id = await createCustomChipProject(input, library)
       await refresh()
       return id
     },
     update: async (id, patch) => {
-      await updateCustomChipProject(id, patch)
+      const library = chips.map<CustomChipLibraryEntry>((chip) => ({ id: chip.id, definition: chip.definition }))
+      await updateCustomChipProject(id, patch, library)
       await refresh()
     },
     remove: async (id) => {

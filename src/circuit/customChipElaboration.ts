@@ -66,6 +66,9 @@ function elaborate(
 
   const nodes: CircuitNode[] = nativeNodes.map((node) => ({
     ...node,
+    // Uma entrada interna deixa de ser uma fonte externa após a expansão: ela
+    // vira uma fronteira dirigível pelo fio que alimenta a instância.
+    type: prefix && node.type === 'input' ? 'output' : node.type,
     id: idMap.get(node.id)!,
     position: { x: node.position.x, y: node.position.y },
     options: markInternalBoundary(node, prefix),
@@ -101,8 +104,14 @@ function elaborate(
   return {
     document: { ...normalized, nodes, connections },
     boundary: {
-      inputs: normalized.nodes.filter((node) => node.type === 'input').map((node) => idMap.get(node.id)!),
-      outputs: normalized.nodes.filter((node) => node.type === 'output').map((node) => idMap.get(node.id)!),
+      inputs: normalized.nodes
+        .filter((node) => node.type === 'input')
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((node) => idMap.get(node.id)!),
+      outputs: normalized.nodes
+        .filter((node) => node.type === 'output')
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((node) => idMap.get(node.id)!),
     },
   }
 }
