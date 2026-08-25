@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.11.2] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `NOT-8 Bits` do catálogo DLS, com uma entrada de 8 bits e uma saída de 8 bits.
+- Reconhecimento seguro da assinatura hierárquica `1× NAND-8Bits`, com materialização local como um Splitter, oito NOT e um Combiner.
+- Integração do perfil ao fluxo catálogo → IndexedDB → paleta de chips customizados → canvas, preservando a largura `8 → 8`.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 557 testes aprovados; a nova fatia contém 8 testes focados, com estrutura, quatro casos de negação vetorial, portas locais, HDL e rejeição de assinatura incompatível.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card `NOT-8 Bits`, sua persistência na biblioteca como ID 12 e a instância no canvas com `IN 8 bits · OUT 8 bits`; as duas alças anunciaram 8 bits e não houve `[role=alert]`. A entrada ficou desconectada de propósito, portanto a validação exibiu um problema acionável.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis temporais, memória e tri-state permanecem fora do escopo.
+
 ## [0.11.1] — 2026-08-25
 
 ### Adicionado

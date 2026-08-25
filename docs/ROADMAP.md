@@ -56,6 +56,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.9** | Alias ripple-carry DLS | `(8 Bits) 8-bit Adder`, com entradas 8/8/1, saídas 8/1 e ordem pública preservada | Um alias real de somador ripple-carry suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.11.0** | Bancos base de barramento DLS | `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT`, com assinaturas diretas e hierárquicas confirmadas | Os quatro bancos reais de 8 bits podem ser importados, reutilizados, avaliados e exportados localmente |
 | **v0.11.1** | Multiplexador vetorial DLS | `1-8MUX`, com seleção escalar, duas entradas de 8 bits e saída de 8 bits, sem tri-state | Um multiplexador vetorial combinacional real pode ser importado, reutilizado, avaliado e exportado localmente |
+| **v0.11.2** | Inversor vetorial DLS | `NOT-8 Bits`, com uma entrada e uma saída de 8 bits, usando `NAND-8Bits` hierárquico | Um inversor vetorial combinacional real pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -964,3 +965,20 @@ O adaptador só aceita a assinatura conhecida: três entradas, uma saída, largu
 Os critérios de aceite foram atendidos com 70 testes focados e 549 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 1 + 8 + 8 bits · OUT 8 bits` e quatro alças com larguras `1/8/8 → 8`. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
 
 Esta release não libera os muxes `2-8MUX` e `4-8MUX`, porque seus fixtures usam buffers tri-state. O escopo permanece combinacional, local-first e allowlist-only; chips temporais, memória, tri-state e dependências não mapeadas continuam bloqueados.
+
+
+## Release 0.11.2 — inversor vetorial real `NOT-8 Bits` — 2026-08-25
+
+A Release 0.11.2 adiciona à allowlist o fixture combinacional real `NOT-8 Bits`. Sua interface publicada possui uma entrada `IN` de 8 bits e uma saída `OUT` de 8 bits. A estrutura observada contém uma instância `NAND-8Bits`, com a mesma entrada conectada às suas duas entradas.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `IN` de 8 bits | Um input vetorial e um Splitter com oito partes escalares |
+| `NAND-8Bits` hierárquico | Oito NOT escalares, representando `NOT(bit)` sem executar o JSON DLS |
+| `OUT` de 8 bits | Um Combiner e uma saída vetorial |
+
+O adaptador só aceita a assinatura conhecida: uma entrada, uma saída, largura `[8]` e exatamente uma dependência `NAND-8Bits`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 78 testes focados e 557 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local como ID 12, a instância no canvas, o resumo `IN 8 bits · OUT 8 bits` e duas alças de 8 bits. A instância isolada exibiu um erro de entrada desconectada, como esperado; não houve alertas inesperados no DOM.
+
+Esta release confirma um inversor vetorial hierárquico de 8 bits; não amplia o catálogo para `NEGATE-8`, chips temporais, memória, tri-state ou dependências não mapeadas. O próximo contrato deve continuar sendo escolhido por assinatura real e semântica testável.

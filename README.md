@@ -47,6 +47,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.9 | Alias `(8 Bits) 8-bit Adder` do DLS, com ripple-carry, portas 8/8/1 e saídas 8/1 |
 | v0.11.0 | Bancos reais AND/NAND/OR/XOR de 8 bits do DLS, com confirmação de assinaturas diretas e hierárquicas |
 | v0.11.1 | Multiplexador real `1-8MUX` do DLS, com seleção escalar e duas entradas vetoriais de 8 bits |
+| v0.11.2 | Inversor real `NOT-8 Bits` do DLS, com entrada e saída vetoriais de 8 bits |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -184,6 +185,14 @@ A Release 0.11.1 confirma o fixture real `1-8MUX` do DLS. Ele possui três entra
 O Veritas materializa a seleção por bit como `(select AND A) OR ((NOT select) AND B)`: dois **Splitter**, uma **NOT**, dezesseis **AND**, oito **OR** e um **Combiner**, preservando a ordem **MSB → LSB**. O card é aceito somente quando sua assinatura estrutural coincide; depois de **Adicionar ao editor**, o chip é salvo no IndexedDB e aparece na paleta local.
 
 No canvas, a peça exibe `IN 1 + 8 + 8 bits · OUT 8 bits`, com três alças de entrada heterogêneas e uma saída vetorial. A implementação cobre apenas o `1-8MUX` real; muxes com buffers tri-state, como `2-8MUX` e `4-8MUX`, continuam bloqueados até existir um contrato seguro de tri-state.
+
+### Inversor vetorial `NOT-8 Bits` (v0.11.2)
+
+A Release 0.11.2 confirma o fixture real `NOT-8 Bits` do DLS. Ele possui uma entrada `IN` de 8 bits, uma saída `OUT` de 8 bits e encapsula uma instância `NAND-8Bits` com a mesma entrada conectada às duas entradas do NAND.
+
+O Veritas aceita somente essa assinatura hierárquica e materializa a negação como um **Splitter**, oito portas **NOT** escalares, um **Combiner** e uma saída vetorial, preservando a ordem **MSB → LSB**. O resultado local é equivalente à inversão bit a bit e pode ser salvo no IndexedDB, reutilizado no canvas e exportado para Verilog/VHDL.
+
+O card real aparece como `1 entrada · 1 saída · 1 componente · barramentos de 8 bits`. A importação é allowlist-only: JSON DLS não é executado, dependências não são inferidas e perfis temporais, memória e tri-state permanecem bloqueados.
 
 ### Performance (v0.4.9)
 
