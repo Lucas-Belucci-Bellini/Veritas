@@ -63,8 +63,17 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.11.6** | Expansor de sinal vetorial DLS | `SEXT-4-8`, com quatro entradas escalares, fan-out do bit de sinal e saída de 8 bits | Um expansor de sinal combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a oito portas escalares |
 | **v0.11.7** | Expansor vetorial de 16 bits DLS | `ZEXT-4-16`, com quatro entradas escalares, uma constante `0`, Combiner de 16 partes e saída de 16 bits | Um expansor combinacional real de 16 bits pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a portas escalares |
 | **v0.11.8** | Expansor de sinal vetorial de 16 bits DLS | `SEXT-4-16`, com quatro entradas escalares, fan-out de `A3`, Combiner de 16 partes e saída de 16 bits | Um expansor de sinal combinacional real de 16 bits pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a portas escalares |
+| **v0.11.9** | Reversor escalar DLS | `BITREV-4`, com quatro entradas, quatro saídas e conexões diretas em ordem invertida | Um reversor combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem executar JSON DLS |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
+
+### Atualização da implementação — Release 0.11.9
+
+A Release 0.11.9 fecha a allowlist do fixture real `Chips/BITREV-4.json`, da categoria `Outros`. O contrato aceito exige nome exato, quatro entradas e quatro saídas escalares, larguras `[1,1,1,1]`, `parts={}`, `partCount=0`, `wireCount=4`, variáveis `A|B|C|D`, pinos `A0|A1|A2|A3`/`O0|O1|O2|O3` e expressões derivadas `D|C|B|A`. A inspeção do fixture bruto também confirmou zero subchips e os quatro fios `A3→O0`, `A2→O1`, `A1→O2`, `A0→O3`; o adaptador não executa JSON, não avalia código e não infere dependências.
+
+A construção local cria quatro inputs escalares, quatro outputs escalares e quatro conexões diretas na topologia observada. Não há Combiner, Splitter ou componente interno a materializar. Os testes comprovam os quatro vetores de reversão, as portas locais, a exportação HDL e a rejeição quando qualquer parte da assinatura allowlist diverge.
+
+A suíte focada, a suíte completa, os gates locais e o smoke catálogo → IndexedDB → paleta → canvas foram executados. O beta readiness permanece bloqueado por evidências/credenciais Supabase externas, e `validate:plugin` por `claude` ausente; tri-state, memória, estado, ULA e conversores sem contrato continuam fora do escopo.
 
 ### Atualização da implementação — Release 0.11.8
 

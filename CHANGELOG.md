@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.11.9] — 2026-08-25
+
+### Adicionado
+
+- Perfil combinacional real `BITREV-4` do catálogo DLS, na categoria `Outros`, com quatro entradas escalares `A0…A3`, quatro saídas escalares `O0…O3`, quatro fios e nenhum subchip ou componente catalogado.
+- Materialização allowlist explícita como quatro inputs escalares e quatro outputs escalares, com conexões diretas `A3→O0`, `A2→O1`, `A1→O2` e `A0→O3`; não há Combiner, Splitter, dependência ou execução de JSON/código DLS.
+- Contrato fail-closed para nome, cardinalidades, larguras escalares, `parts={}`, `partCount=0`, `wireCount=4`, variáveis, pinos e expressões derivadas exatas `D|C|B|A`; a reversão é preservada no `CircuitDocument`, na biblioteca, no canvas e nos exportadores HDL.
+
+### Validação e limites
+
+- Suíte completa: **70 arquivos e 607 testes aprovados**; a nova fatia contém 8 testes focados, cobrindo contrato do catálogo, topologia, quatro vetores de reversão, portas locais, HDL e rejeição de assinatura alterada.
+- Suíte focada do adaptador: **128/128 testes aprovados**; typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card como modelo multi-bit, a persistência na biblioteca como **ID 20** com 19 chips e a instância no canvas com `BITREV-4 · 4 entradas · 4 saídas`; o DOM confirmou 8 handles acessíveis — quatro entradas e quatro saídas de 1 bit — e zero `[role=alert]`. As quatro entradas ficaram desconectadas de propósito, portanto a validação exibiu quatro problemas acionáveis.
+- O beta readiness continua em 0 READY, 5 BLOCKED e 1 SKIP por credenciais/evidências externas Supabase ausentes; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis tri-state, sequenciais, memória e conversores sem contrato permanecem fora do escopo.
+
 ## [0.11.8] — 2026-08-25
 
 ### Adicionado

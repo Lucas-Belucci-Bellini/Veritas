@@ -54,6 +54,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.11.6 | Expansor de sinal real `SEXT-4-8`, com quatro entradas escalares, saída de 8 bits e fan-out do bit de sinal |
 | v0.11.7 | Expansor real `ZEXT-4-16`, com quatro entradas escalares, saída de 16 bits e doze zeros explícitos |
 | v0.11.8 | Expansor de sinal real `SEXT-4-16`, com quatro entradas escalares, saída de 16 bits e extensão do bit de sinal |
+| v0.11.9 | Reversor real `BITREV-4`, com quatro entradas e quatro saídas escalares em ordem invertida |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -122,7 +123,7 @@ O `4-ADD` preserva três entradas de `4 + 4 + 1` bits, duas saídas de `4 + 1` b
 
 O restante do catálogo continua disponível para consulta. Chips sequenciais, memória, tri-state, conversores e perfis com dependências ou portas fora da allowlist permanecem bloqueados até que exista um contrato vetorial/temporal específico. Assim, a importação não altera o caminho local-first: construir, simular, salvar e exportar continuam funcionando sem conta ou conexão.
 
-A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional, o roteador `16 para 8 e 4 bits`, os expansores `ZEXT-4-8`, `SEXT-4-8`, `ZEXT-4-16` e `SEXT-4-16`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
+A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional, o roteador `16 para 8 e 4 bits`, os expansores `ZEXT-4-8`, `SEXT-4-8`, `ZEXT-4-16` e `SEXT-4-16`. A mesma fronteira segura agora inclui o reversor escalar real `BITREV-4`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
 
 ### Comparador multi-bit EQUAL-4 (v0.10.3)
 
@@ -249,6 +250,14 @@ A Release 0.11.8 confirma o fixture real `Chips/SEXT-4-16.json` do DLS, da categ
 O Veritas aceita somente essa assinatura exata e materializa um `CircuitDocument` explícito com quatro inputs escalares `A0…A3`, um **Combiner** de 16 partes e uma saída estrutural `O0` de 16 bits. Os três primeiros canais recebem `A0`, `A1` e `A2`; os canais 3–15 recebem `A3`, isto é, o quarto canal e mais doze repetições do bit de sinal. A saída é `A0 A1 A2 A3` seguida por doze `A3`, em ordem **MSB → LSB**.
 
 Como o fixture também possui expressões escalares derivadas, a biblioteca prioriza o materializador vetorial quando a assinatura allowlist coincide. A peça local exibe `IN 1 + 1 + 1 + 1 bits · OUT 16 bits`, pode ser salva no IndexedDB, reutilizada no canvas e exportada para Verilog/VHDL. O importador não executa JSON ou código DLS, não infere dependências ausentes e mantém tri-state, memória, estado e conversores sem contrato fora da allowlist.
+
+### Reversor escalar `BITREV-4` (v0.11.9)
+
+A Release 0.11.9 confirma o fixture real `Chips/BITREV-4.json` do DLS, da categoria `Outros`. O registro possui quatro entradas escalares `A0…A3`, quatro saídas escalares `O0…O3`, quatro fios, nenhum subchip, `parts={}`, `partCount=0`, `wireCount=4` e os pinos públicos correspondentes. As expressões derivadas são `D`, `C`, `B`, `A`, em ordem de saída.
+
+O Veritas aceita somente essa assinatura e materializa um `CircuitDocument` direto com quatro inputs e quatro outputs escalares. A topologia observada é `A3→O0`, `A2→O1`, `A1→O2` e `A0→O3`, invertendo a ordem dos quatro bits sem introduzir Combiner, Splitter ou dependência inferida. O chip pode ser salvo no IndexedDB, reutilizado no canvas e exportado para Verilog/VHDL.
+
+A implementação não executa o JSON DLS nem transforma as expressões em uma permissão genérica: nome, cardinalidades, larguras, pinos, variáveis, expressões e contagens estruturais precisam coincidir. Chips temporais, memória, tri-state, ULA e conversores sem contrato específico continuam bloqueados.
 
 ### Performance (v0.4.9)
 
