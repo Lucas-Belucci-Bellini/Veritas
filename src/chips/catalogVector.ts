@@ -9,7 +9,7 @@ type VectorGate = 'and' | 'or' | 'xor' | 'nand'
 
 interface VectorGateModel {
   gate: VectorGate
-  inputCount: 2
+  inputCount: number
   primitive: string
 }
 
@@ -41,8 +41,18 @@ export function isCatalogMultiBitChipImportable(chip: ChipEntry): boolean {
 }
 
 function vectorGateModel(chip: ChipEntry): VectorGateModel | null {
-  if (chip.in !== 2 || chip.out !== 1 || !hasOnlyBusWidth(chip, BUS_WIDTH)) return null
-  if (chip.parts['8-1BIT'] !== 2 || chip.parts['1-8BIT'] !== 1) return null
+  if (chip.out !== 1 || !hasOnlyBusWidth(chip, BUS_WIDTH)) return null
+
+  if (chip.name === 'AND-3 8 bits') {
+    return chip.in === 3
+      && chip.parts.AND === BUS_WIDTH * 2
+      && chip.parts['8-1BIT'] === 3
+      && chip.parts['1-8BIT'] === 1
+      ? { gate: 'and', inputCount: 3, primitive: 'AND' }
+      : null
+  }
+
+  if (chip.in !== 2 || chip.parts['8-1BIT'] !== 2 || chip.parts['1-8BIT'] !== 1) return null
 
   if (chip.name === 'AND-8 Bits' || chip.name === '8x2-AND') {
     return chip.parts.AND === BUS_WIDTH ? { gate: 'and', inputCount: 2, primitive: 'AND' } : null
@@ -151,18 +161,25 @@ function buildVectorGateDocument(chip: ChipEntry, model: VectorGateModel): Circu
   }
 
   for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
-    const gateId = `gate-${bit + 1}`
-    nodes.push({
-      id: gateId,
-      type: model.gate,
-      position: { x: 430, y: 40 + bit * 70 },
-      label: `${model.gate.toUpperCase()} bit ${bit + 1}`,
-    })
-    for (let inputIndex = 0; inputIndex < model.inputCount; inputIndex += 1) {
-      connections.push({
-        source: { node: `splitter-${inputIndex + 1}`, port: bit },
-        target: { node: gateId, port: inputIndex },
+    let sourceNode = `splitter-1`
+    for (let inputIndex = 1; inputIndex < model.inputCount; inputIndex += 1) {
+      const gateId = model.inputCount === 2
+        ? `gate-${bit + 1}`
+        : `gate-${bit + 1}-${inputIndex}`
+      nodes.push({
+        id: gateId,
+        type: model.gate,
+        position: { x: 430 + (inputIndex - 1) * 170, y: 40 + bit * 70 },
+        label: `${model.gate.toUpperCase()} bit ${bit + 1}${model.inputCount > 2 ? ` stage ${inputIndex}` : ''}`,
       })
+      const leftSource = sourceNode.startsWith('splitter-')
+        ? { node: sourceNode, port: bit }
+        : { node: sourceNode }
+      connections.push(
+        { source: leftSource, target: { node: gateId, port: 0 } },
+        { source: { node: `splitter-${inputIndex + 1}`, port: bit }, target: { node: gateId, port: 1 } },
+      )
+      sourceNode = gateId
     }
   }
 
@@ -185,7 +202,10 @@ function buildVectorGateDocument(chip: ChipEntry, model: VectorGateModel): Circu
     },
   )
   for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
-    connections.push({ source: { node: `gate-${bit + 1}` }, target: { node: combinerId, port: bit } })
+    const finalGateId = model.inputCount === 2
+      ? `gate-${bit + 1}`
+      : `gate-${bit + 1}-${model.inputCount - 1}`
+    connections.push({ source: { node: finalGateId }, target: { node: combinerId, port: bit } })
   }
   connections.push({ source: { node: combinerId }, target: { node: outputId, port: 0 } })
 

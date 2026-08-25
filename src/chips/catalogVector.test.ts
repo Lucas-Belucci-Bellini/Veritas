@@ -426,3 +426,77 @@ describe('operadores binários de barramento do catálogo DLS', () => {
     expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
   })
 })
+
+describe('AND-3 8 bits importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'AND-3 8 bits')
+    expect(chip).toMatchObject({
+      name: 'AND-3 8 bits',
+      in: 3,
+      out: 1,
+      widths: [8],
+      pins: { in: ['IN', 'IN', 'IN'], out: ['OUT'] },
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa três Splitters, dezesseis AND e um Combiner', async () => {
+    const chip = await loadRealChip()
+    const document = catalogVectorChipToCircuitDocument(chip)
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [0xaa, 0xcc, 0xf0, '10000000'],
+    [0xff, 0xaa, 0x0f, '00001010'],
+    [0xff, 0xff, 0xff, '11111111'],
+  ])('avalia %s AND %s AND %s como %s', async (a, b, c, expected) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const result = evaluateCircuitVectors(document, {
+      'input-1': a,
+      'input-2': b,
+      'input-3': c,
+    })
+
+    expect(toBinary(result.outputs['output-1']!)).toBe(expected)
+  })
+
+  it('preserva três entradas de 8 bits e normaliza IN duplicado no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, 'AND-3 8 bits importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN', 8],
+      ['IN_2', 8],
+      ['IN_3', 8],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
+  })
+
+  it('exporta o AND-3 vetorial para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('module AND_3_8_bits')
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('entity AND_3_8_bits is')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('recusa a assinatura quando falta um AND do fixture real', async () => {
+    const chip = await loadRealChip()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, AND: 15 },
+    })).toBeNull()
+  })
+})
