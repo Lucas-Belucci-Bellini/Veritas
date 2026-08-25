@@ -935,3 +935,93 @@ describe('NEGATE-8 importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+
+describe('16 para 8 e 4 bits importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === '16 para 8 e 4 bits')
+    expect(chip).toMatchObject({
+      name: '16 para 8 e 4 bits',
+      in: 16,
+      out: 10,
+      widths: [1, 4, 8],
+      parts: { '1-8BIT': 2, '8-4BIT': 1, '8x2-AND': 1 },
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa os dois barramentos, AND vetorial, nibbles e dez saídas públicas', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'output')).toHaveLength(10)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it('preserva a ordem real dos dez outputs e as duplicações de barramento', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const values = '11110011' + '10101111'
+    const inputs = Object.fromEntries([...values].map((bit, index) => [
+      `input-${String(index + 1).padStart(2, '0')}`,
+      Number(bit),
+    ]))
+    const result = evaluateCircuitVectors(document, inputs)
+
+    expect(toBinary(result.outputs['output-01']!)).toBe('11110011')
+    expect(toBinary(result.outputs['output-02']!)).toBe('11110011')
+    expect(toBinary(result.outputs['output-03']!)).toBe('1010')
+    expect(toBinary(result.outputs['output-04']!)).toBe('11110011')
+    expect(toBinary(result.outputs['output-05']!)).toBe('1010')
+    expect(toBinary(result.outputs['output-06']!)).toBe('0011')
+    expect(toBinary(result.outputs['output-07']!)).toBe('0011')
+    expect(toBinary(result.outputs['output-08']!)).toBe('10101111')
+    expect(toBinary(result.outputs['output-09']!)).toBe('10101111')
+    expect(toBinary(result.outputs['output-10']!)).toBe('10101111')
+  })
+
+  it('preserva as dezesseis entradas escalares e as larguras públicas mistas', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, '16 para 8 e 4 bits importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual(
+      Array.from({ length: 16 }, (_, index) => [`IN${index === 0 ? '' : `_${index + 1}`}`, 1]),
+    )
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([
+      ['OUT', 8],
+      ['OUT_2', 8],
+      ['OUT_3', 4],
+      ['OUT_4', 8],
+      ['OUT_5', 4],
+      ['OUT_6', 4],
+      ['OUT_7', 4],
+      ['OUT_8', 8],
+      ['OUT_9', 8],
+      ['OUT_10', 8],
+    ])
+  })
+
+  it('exporta os barramentos e os nibbles para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('[7:0]')
+    expect(verilog).toContain('[3:0]')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+    expect(vhdl).toContain('std_logic_vector(3 downto 0)')
+  })
+
+  it('recusa o roteador quando a dependência 8-4BIT real está ausente', async () => {
+    const chip = await loadRealChip()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, '8-4BIT': 0 },
+    })).toBeNull()
+  })
+})

@@ -33,6 +33,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (isEightBitMux(chip)) return buildEightBitMuxDocument(chip)
   if (isEightBitNot(chip)) return buildEightBitNotDocument(chip)
   if (isEightBitNegate(chip)) return buildEightBitNegateDocument(chip)
+  if (isSixteenInputBusRouter(chip)) return buildSixteenInputBusRouterDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
@@ -167,6 +168,17 @@ function isEightBitNegate(chip: ChipEntry): boolean {
     && chip.parts['8-1BIT'] === 1
     && chip.parts['1-8BIT'] === 1
     && chip.parts.XOR === BUS_WIDTH
+}
+
+function isSixteenInputBusRouter(chip: ChipEntry): boolean {
+  const widths = [...(chip.widths || [])].sort((left, right) => left - right)
+  return chip.name === '16 para 8 e 4 bits'
+    && chip.in === 16
+    && chip.out === 10
+    && widths.join(',') === '1,4,8'
+    && chip.parts['1-8BIT'] === 2
+    && chip.parts['8-4BIT'] === 1
+    && chip.parts['8x2-AND'] === 1
 }
 
 function isEightBitMask(chip: ChipEntry): boolean {
@@ -860,6 +872,142 @@ function buildEightBitNegateDocument(chip: ChipEntry): CircuitDocument {
     },
   )
   connections.push({ source: { node: combinerId }, target: { node: outputId, port: 0 } })
+
+  return { ...document, nodes, connections }
+}
+
+function buildSixteenInputBusRouterDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 16
+    ? chip.pins.in
+    : Array.from({ length: 16 }, () => 'IN')
+  const outputLabels = chip.pins?.out?.length === 10
+    ? chip.pins.out
+    : Array.from({ length: 10 }, () => 'OUT')
+  const nodes: CircuitNode[] = []
+  const connections: CircuitDocument['connections'] = []
+
+  for (let inputIndex = 0; inputIndex < 16; inputIndex += 1) {
+    nodes.push({
+      id: `input-${String(inputIndex + 1).padStart(2, '0')}`,
+      type: 'input',
+      position: { x: 0, y: 40 + inputIndex * 55 },
+      label: inputLabels[inputIndex] || 'IN',
+    })
+  }
+
+  const combinerA = 'combiner-a'
+  const combinerB = 'combiner-b'
+  const splitterA = 'splitter-a'
+  const splitterB = 'splitter-b'
+  const andCombiner = 'combiner-and'
+  const andSplitter = 'splitter-and'
+  nodes.push(
+    {
+      id: combinerA,
+      type: 'combiner',
+      position: { x: 210, y: 180 },
+      label: 'Combiner A',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: combinerB,
+      type: 'combiner',
+      position: { x: 210, y: 580 },
+      label: 'Combiner B',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: splitterA,
+      type: 'splitter',
+      position: { x: 430, y: 180 },
+      label: 'Split A',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: splitterB,
+      type: 'splitter',
+      position: { x: 430, y: 580 },
+      label: 'Split B',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+  )
+
+  for (let inputIndex = 0; inputIndex < 16; inputIndex += 1) {
+    const combinerId = inputIndex < BUS_WIDTH ? combinerA : combinerB
+    const port = inputIndex % BUS_WIDTH
+    connections.push({
+      source: { node: `input-${String(inputIndex + 1).padStart(2, '0')}` },
+      target: { node: combinerId, port },
+    })
+  }
+  connections.push(
+    { source: { node: combinerA }, target: { node: splitterA, port: 0 } },
+    { source: { node: combinerB }, target: { node: splitterB, port: 0 } },
+  )
+
+  for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
+    const gateId = `router-and-${bit + 1}`
+    nodes.push({
+      id: gateId,
+      type: 'and',
+      position: { x: 660, y: 40 + bit * 90 },
+      label: `AND bit ${bit + 1}`,
+    })
+    connections.push(
+      { source: { node: splitterA, port: bit }, target: { node: gateId, port: 0 } },
+      { source: { node: splitterB, port: bit }, target: { node: gateId, port: 1 } },
+      { source: { node: gateId }, target: { node: andCombiner, port: bit } },
+    )
+  }
+
+  nodes.push(
+    {
+      id: andCombiner,
+      type: 'combiner',
+      position: { x: 900, y: 280 },
+      label: 'Combiner AND',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: andSplitter,
+      type: 'splitter',
+      position: { x: 1100, y: 280 },
+      label: 'Split AND 4+4',
+      options: { width: BUS_WIDTH, widths: [4, 4] },
+    },
+  )
+  connections.push({ source: { node: andCombiner }, target: { node: andSplitter, port: 0 } })
+
+  const outputWidths = [8, 8, 4, 8, 4, 4, 4, 8, 8, 8]
+  for (let outputIndex = 0; outputIndex < outputWidths.length; outputIndex += 1) {
+    const outputId = `output-${String(outputIndex + 1).padStart(2, '0')}`
+    nodes.push({
+      id: outputId,
+      type: 'output',
+      position: { x: 1540, y: 40 + outputIndex * 90 },
+      label: outputLabels[outputIndex] || 'OUT',
+      options: { width: outputWidths[outputIndex] },
+    })
+  }
+  const outputSources = [
+    { node: combinerA },
+    { node: combinerA },
+    { node: andSplitter, port: 0 },
+    { node: combinerA },
+    { node: andSplitter, port: 0 },
+    { node: andSplitter, port: 1 },
+    { node: andSplitter, port: 1 },
+    { node: combinerB },
+    { node: combinerB },
+    { node: combinerB },
+  ]
+  for (let outputIndex = 0; outputIndex < outputSources.length; outputIndex += 1) {
+    connections.push({
+      source: outputSources[outputIndex],
+      target: { node: `output-${String(outputIndex + 1).padStart(2, '0')}`, port: 0 },
+    })
+  }
 
   return { ...document, nodes, connections }
 }
