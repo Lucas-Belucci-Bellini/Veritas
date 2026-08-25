@@ -46,6 +46,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.8 | Full Adder - 8 Bits do DLS, com três barramentos de entrada, soma e carry vetoriais |
 | v0.10.9 | Alias `(8 Bits) 8-bit Adder` do DLS, com ripple-carry, portas 8/8/1 e saídas 8/1 |
 | v0.11.0 | Bancos reais AND/NAND/OR/XOR de 8 bits do DLS, com confirmação de assinaturas diretas e hierárquicas |
+| v0.11.1 | Multiplexador real `1-8MUX` do DLS, com seleção escalar e duas entradas vetoriais de 8 bits |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -175,6 +176,14 @@ A Release 0.11.0 confirma contra os fixtures reais do DLS os bancos `AND-8 Bits`
 O Veritas valida essas assinaturas na allowlist e materializa documentos vetoriais locais explícitos com dois **Splitter**, oito portas do operador equivalente e um **Combiner**, preservando a ordem **MSB → LSB**. Nos casos hierárquicos OR/XOR, a implementação local usa a semântica booleana equivalente sem executar a hierarquia JSON importada.
 
 A prova automatizada avaliou os quatro fixtures com `0xAA` e `0xCC`: AND produz `0x88`, NAND produz `0x77`, OR produz `0xEE` e XOR produz `0x66`. O smoke manual utilizou `XOR - 8 BIT` como representante: ele foi salvo no IndexedDB e inserido no canvas como `IN 8 + 8 bits · OUT 8 bits`. A importação continua sendo uma allowlist verificável; o restante do catálogo, chips temporais, memória, tri-state e dependências não mapeadas permanecem bloqueados.
+
+### Multiplexador vetorial `1-8MUX` (v0.11.1)
+
+A Release 0.11.1 confirma o fixture real `1-8MUX` do DLS. Ele possui três entradas na ordem publicada — seleção escalar, duas entradas de 8 bits — e uma saída de 8 bits. A decomposição conhecida é `2× 8-1AND`, `1× NOT` e `1× 8x2-OR`, sem tri-state ou memória.
+
+O Veritas materializa a seleção por bit como `(select AND A) OR ((NOT select) AND B)`: dois **Splitter**, uma **NOT**, dezesseis **AND**, oito **OR** e um **Combiner**, preservando a ordem **MSB → LSB**. O card é aceito somente quando sua assinatura estrutural coincide; depois de **Adicionar ao editor**, o chip é salvo no IndexedDB e aparece na paleta local.
+
+No canvas, a peça exibe `IN 1 + 8 + 8 bits · OUT 8 bits`, com três alças de entrada heterogêneas e uma saída vetorial. A implementação cobre apenas o `1-8MUX` real; muxes com buffers tri-state, como `2-8MUX` e `4-8MUX`, continuam bloqueados até existir um contrato seguro de tri-state.
 
 ### Performance (v0.4.9)
 

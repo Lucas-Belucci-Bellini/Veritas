@@ -55,6 +55,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.8** | Full Adder vetorial DLS | `Full Adder - 8 Bits`, com três barramentos de entrada, soma e carry vetoriais e integração local | Um somador completo paralelo de 8 bits suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.9** | Alias ripple-carry DLS | `(8 Bits) 8-bit Adder`, com entradas 8/8/1, saídas 8/1 e ordem pública preservada | Um alias real de somador ripple-carry suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.11.0** | Bancos base de barramento DLS | `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT`, com assinaturas diretas e hierárquicas confirmadas | Os quatro bancos reais de 8 bits podem ser importados, reutilizados, avaliados e exportados localmente |
+| **v0.11.1** | Multiplexador vetorial DLS | `1-8MUX`, com seleção escalar, duas entradas de 8 bits e saída de 8 bits, sem tri-state | Um multiplexador vetorial combinacional real pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -944,3 +945,22 @@ O adaptador valida a assinatura exata na allowlist. Para OR e XOR, a estrutura p
 Os critérios de aceite foram atendidos com 62 testes focados e 541 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou `XOR - 8 BIT` como representante dos aliases hierárquicos: o card foi persistido localmente como ID 10 e inserido no canvas com `IN 8 + 8 bits · OUT 8 bits`, três alças de 8 bits e dois avisos esperados de entradas desconectadas.
 
 A release confirma contratos de operadores combinacionais de 8 bits; não amplia o catálogo para chips temporais, memória, tri-state ou dependências não mapeadas. O restante do catálogo continua disponível para consulta, mas não é executado automaticamente.
+
+
+## Release 0.11.1 — multiplexador vetorial real `1-8MUX` — 2026-08-25
+
+A Release 0.11.1 adiciona à allowlist o fixture combinacional real `1-8MUX`. Sua interface publicada possui três entradas na ordem DLS: uma seleção escalar de 1 bit e duas entradas `IN` de 8 bits, além de uma saída `OUT` de 8 bits. A estrutura observada contém duas instâncias `8-1AND`, uma `NOT` e uma `8x2-OR`.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| Entrada 1 de 1 bit | Seleção `select`, com fan-out para a NOT e as oito máscaras AND |
+| Entradas 2 e 3 de 8 bits | Dois Splitters, preservando a ordem MSB → LSB |
+| 2× `8-1AND` + `NOT` | `(select AND A)` e `((NOT select) AND B)` por posição |
+| `8x2-OR` | Oito OR escalares para combinar as duas máscaras |
+| `OUT` de 8 bits | Um Combiner e uma saída vetorial |
+
+O adaptador só aceita a assinatura conhecida: três entradas, uma saída, larguras `[1, 8]`, duas dependências `8-1AND`, uma `8x2-OR` e uma `NOT`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 70 testes focados e 549 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 1 + 8 + 8 bits · OUT 8 bits` e quatro alças com larguras `1/8/8 → 8`. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release não libera os muxes `2-8MUX` e `4-8MUX`, porque seus fixtures usam buffers tri-state. O escopo permanece combinacional, local-first e allowlist-only; chips temporais, memória, tri-state e dependências não mapeadas continuam bloqueados.
