@@ -50,6 +50,7 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.10.3** | Comparador multi-bit DLS | `EQUAL-4` com dois barramentos de 4 bits, XNOR, redução AND, portas determinísticas e integração local | Um comparador multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.4** | Somador multi-bit DLS | `8-ADD` com ripple-carry, carry de entrada/saída e ordem de portas preservada | Um somador de 8 bits suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v0.10.5** | Máscara multi-bit DLS | `8-1AND` com máscara escalar, barramento de 8 bits, oito AND e integração local | Uma máscara vetorial suportada pode ser importada, reutilizada, avaliada e exportada localmente |
+| **v0.10.6** | Operadores binários de barramento DLS | `8x2-AND`, `8x2-OR` e `8x2-XOR`, com dois barramentos de 8 bits e saída vetorial | Operadores binários suportados podem ser importados, reutilizados, avaliados e exportados localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
@@ -852,3 +853,18 @@ A Release 0.10.5 adiciona à allowlist o fixture real `8-1AND` do DLS. Sua assin
 O adaptador só aceita a assinatura conhecida (`2` entradas, `1` saída, `8` AND, `1` Splitter e `1` Combiner). A avaliação exaustiva cobre os 256 valores do barramento em dois estados da máscara: com `0`, a saída é sempre zero; com `1`, a saída é idêntica à entrada. O circuito passa por `validateCircuit(..., { allowBuses: true })` e permanece compatível com a persistência local e as exportações HDL.
 
 Critérios verificados: card publicado na biblioteca, importação para IndexedDB, peça no canvas, três alças com larguras 1/8/8 bits, zero alertas no DOM, 31 testes focados e suíte completa com 70 arquivos e 510 testes. O próximo passo continua sendo outro perfil combinacional real; chips temporais e memória aguardam um runtime vetorial temporal específico.
+
+
+## Release 0.10.6 — operadores binários de barramento 8x2 — 2026-08-25
+
+A Release 0.10.6 adiciona três fixtures combinacionais reais do DLS: `8x2-AND`, `8x2-OR` e `8x2-XOR`. Cada um recebe dois barramentos de 8 bits chamados `IN` e produz um barramento `OUT` de 8 bits. As portas duplicadas são preservadas na origem e normalizadas para `IN` e `IN_2` somente na definição de chip customizado local.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| Dois `8-1BIT` | Dois Splitters, um por entrada de 8 bits |
+| Oito operadores escalares | Oito AND, OR ou XOR, conforme o fixture real |
+| Um `1-8BIT` | Um Combiner de 8 bits |
+
+O adaptador só materializa os nomes e as assinaturas conhecidas. Para prova de semântica, as entradas `0xAA` e `0xCC` produzem `0x88` no AND, `0xEE` no OR e `0x66` no XOR. Cada documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser convertido em chip customizado local e permanece exportável para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 34 testes focados, suíte completa, builds, gates MCP/HTTP, acessibilidade, isolamento WASM, Rust, HDL e smoke no navegador. O smoke confirmou `8x2-AND` na biblioteca local e no canvas com três alças de 8 bits e zero alertas inesperados. A expansão não inclui tri-state, memória, conversores ou chips temporais; `8-DELAY` continua bloqueado até o runtime temporal vetorial existir.

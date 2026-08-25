@@ -41,6 +41,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.10.3 | Comparador multi-bit DLS EQUAL-4, com igualdade vetorial, normalização de portas duplicadas e exportação HDL |
 | v0.10.4 | Somador multi-bit DLS 8-ADD, com ripple-carry, carry de entrada/saída e ordem de portas preservada |
 | v0.10.5 | Mascarador multi-bit DLS 8-1AND, com entrada escalar, barramento de 8 bits e saída vetorial |
+| v0.10.6 | Operadores binários multi-bit DLS 8x2-AND, 8x2-OR e 8x2-XOR, com dois barramentos de 8 bits e saída vetorial |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -130,6 +131,14 @@ O perfil real `8-1AND` do DLS aplica uma entrada escalar a cada bit de um barram
 A assinatura dos pinos de origem é preservada como `IN` de 1 bit e `IN` de 8 bits. Ao virar chip customizado local, a segunda porta recebe o nome determinístico `IN_2`, e a saída `OUT` mantém 8 bits. No canvas, a peça exibe `IN 1 + 8 bits · OUT 8 bits`, com três alças dimensionadas individualmente. O perfil pode ser salvo no IndexedDB e exportado para Verilog/VHDL.
 
 O 8-1AND entra na allowlist somente porque o fixture real, a assinatura do catálogo e a semântica combinacional foram comprovados. Chips sequenciais, memória, tri-state e dependências não mapeadas continuam bloqueados.
+
+### Operadores binários multi-bit 8x2 (v0.10.6)
+
+A Release 0.10.6 adiciona três fixtures combinacionais reais do DLS: `8x2-AND`, `8x2-OR` e `8x2-XOR`. Cada perfil possui dois barramentos de entrada de 8 bits e uma saída de 8 bits. O Veritas preserva a estrutura em ordem **MSB → LSB**, materializando dois **Splitter**, oito portas escalares do operador correspondente e um **Combiner**.
+
+Ao clicar em **Adicionar ao editor**, o perfil passa pela allowlist estrutural, é salvo no IndexedDB e aparece como chip customizado. As entradas duplicadas `IN` tornam-se determinísticamente `IN` e `IN_2`, ambas com 8 bits; a saída `OUT` mantém 8 bits. No canvas, a peça exibe `IN 8 + 8 bits · OUT 8 bits`, e as três alças anunciam suas larguras individualmente.
+
+Os três perfis foram avaliados com entradas `0xAA` e `0xCC`: AND produz `0x88`, OR produz `0xEE` e XOR produz `0x66`. Eles também passam por validação local e exportação HDL. A importação permanece deliberadamente allowlist: chips temporais, memória, tri-state e dependências não mapeadas continuam bloqueados.
 
 ### Performance (v0.4.9)
 

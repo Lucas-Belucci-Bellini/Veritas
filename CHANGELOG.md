@@ -2,6 +2,21 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.10.6] — 2026-08-25
+
+### Adicionado
+
+- Perfis combinacionais reais `8x2-AND`, `8x2-OR` e `8x2-XOR` do catálogo DLS, cada um com dois barramentos de 8 bits e uma saída de 8 bits.
+- Cobertura estrutural com dois Splitters, oito portas escalares do operador correspondente e um Combiner, mantendo a convenção MSB → LSB.
+- Integração dos três perfis ao fluxo catálogo → IndexedDB → canvas e normalização determinística das portas duplicadas `IN`/`IN_2` nos chips locais.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 513 testes aprovados; a suíte focada dos operadores vetoriais confirmou AND, OR e XOR com entradas `0xAA` e `0xCC`.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- Smoke local confirmou o card `8x2-AND`, sua persistência na biblioteca e a peça no canvas com `IN 8 + 8 bits · OUT 8 bits`, sem alertas inesperados.
+- O beta readiness continua bloqueado por credenciais/evidências externas Supabase; `validate:plugin` continua bloqueado pela ausência do executável `claude` no sandbox. Perfis sequenciais e memória permanecem fora do escopo.
+
 ## [0.10.5] — 2026-08-25
 
 ### Adicionado
