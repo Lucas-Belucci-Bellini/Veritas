@@ -7,6 +7,7 @@ import {
   type EditorComponentType,
 } from './editorModel'
 import { normalizeCircuitDocument } from './documentContract'
+import { MAX_CUSTOM_CHIP_DEPTH } from './customChipInstance'
 
 export const CUSTOM_CHIP_FORMAT = 'veritas-custom-chip' as const
 export const CUSTOM_CHIP_VERSION = 1 as const
@@ -33,13 +34,30 @@ export interface CustomChipDefinition {
 
 const STATEFUL_TYPES: readonly EditorComponentType[] = ['clock', 'dff', 'tff', 'delay']
 
+export interface CustomChipBuildOptions {
+  /** Definições disponíveis para resolver instâncias aninhadas dentro do chip. */
+  customChips?: readonly CustomChipLibraryEntry[]
+  /**
+   * ID do próprio chip quando ele está sendo atualizado.
+   *
+   * Só faz sentido em atualização: um chip novo ainda não tem ID, então nada
+   * pode apontar de volta para ele. Na atualização, apontar é possível — e é
+   * exatamente aí que nasce um ciclo.
+   */
+  selfId?: number
+}
+
 /**
  * Cria uma definição serializável sem mutar o documento original.
- * A execução hierárquica e a instanciação no canvas ficam para CHIP-002.
+ *
+ * O documento pode conter instâncias `custom-chip`, contanto que as definições
+ * correspondentes venham em `options.customChips`. A hierarquia é por
+ * referência: o chip guarda o `customChipId` do filho, não uma cópia dele.
  */
 export function buildCustomChipDefinition(
   document: CircuitDocument,
   name = document.name,
+  options: CustomChipBuildOptions = {},
 ): CustomChipDefinition {
   const normalizedDocument = normalizeCircuitDocument(document)
   const normalizedName = name.trim() || normalizedDocument.name
@@ -48,11 +66,15 @@ export function buildCustomChipDefinition(
     throw new Error(`O nome do chip customizado pode ter no máximo ${MAX_CIRCUIT_NAME_LENGTH} caracteres.`)
   }
 
-  if (normalizedDocument.nodes.some((node) => node.type === 'custom-chip')) {
-    throw new Error('Chips customizados desta versão não podem conter outras instâncias de chip.')
-  }
-  const issues = validateCircuit(normalizedDocument, { allowBuses: true })
+  const customChips = options.customChips ?? []
+  const issues = validateCircuit(normalizedDocument, { allowBuses: true, customChips })
   if (issues.length > 0) throw new CircuitValidationError(issues)
+
+  // Um chip pode conter outros chips: é o que permite subir de meio somador
+  // para somador completo, e daí para uma ALU. O motor (avaliação e
+  // elaboração) já recursava; o que faltava era deixar construir.
+  if (options.selfId !== undefined) assertNoCustomChipCycle(normalizedDocument, customChips, options.selfId)
+  assertCustomChipDepthWithinLimit(normalizedDocument, customChips)
   if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) {
     throw new Error('Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF ou delay.')
   }
@@ -69,6 +91,82 @@ export function buildCustomChipDefinition(
     document: normalizedDocument,
     inputs,
     outputs,
+  }
+}
+
+/**
+ * Recusa uma atualização que faria o chip conter a si mesmo, direta ou
+ * indiretamente. Sem isso, a avaliação só perceberia o problema ao estourar o
+ * limite de profundidade, com uma mensagem que não explica a causa.
+ */
+function assertNoCustomChipCycle(
+  document: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[],
+  selfId: number,
+): void {
+  const byId = new Map(customChips.map((entry) => [entry.id, entry]))
+  const visited = new Set<number>()
+
+  const reaches = (doc: CircuitDocument): boolean => {
+    for (const node of doc.nodes) {
+      if (node.type !== 'custom-chip') continue
+      const childId = node.options?.customChipId
+      if (childId === undefined) continue
+      if (childId === selfId) return true
+      if (visited.has(childId)) continue
+      visited.add(childId)
+      const child = byId.get(childId)
+      if (child && reaches(child.definition.document)) return true
+    }
+    return false
+  }
+
+  if (reaches(document)) {
+    throw new Error(
+      'Este chip passaria a conter a si mesmo, direta ou indiretamente. ' +
+      'Uma hierarquia circular não pode ser avaliada.',
+    )
+  }
+}
+
+/**
+ * Recusa na criação uma hierarquia que estouraria o limite na avaliação.
+ *
+ * Falhar aqui é melhor que falhar depois: o autor descobre ao salvar, e não na
+ * primeira vez que tentar simular o chip.
+ */
+function assertCustomChipDepthWithinLimit(
+  document: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[],
+): void {
+  const byId = new Map(customChips.map((entry) => [entry.id, entry]))
+  const cache = new Map<number, number>()
+
+  const depthOf = (doc: CircuitDocument, seen: ReadonlySet<number>): number => {
+    let deepest = 0
+    for (const node of doc.nodes) {
+      if (node.type !== 'custom-chip') continue
+      const childId = node.options?.customChipId
+      if (childId === undefined || seen.has(childId)) continue
+      const cached = cache.get(childId)
+      if (cached !== undefined) {
+        deepest = Math.max(deepest, cached)
+        continue
+      }
+      const child = byId.get(childId)
+      const childDepth = child ? 1 + depthOf(child.definition.document, new Set([...seen, childId])) : 1
+      cache.set(childId, childDepth)
+      deepest = Math.max(deepest, childDepth)
+    }
+    return deepest
+  }
+
+  // O chip em construção é mais um nível acima da hierarquia que ele contém.
+  const depth = depthOf(document, new Set()) + 1
+  if (depth > MAX_CUSTOM_CHIP_DEPTH) {
+    throw new Error(
+      `A hierarquia deste chip teria ${depth} níveis; o limite seguro é ${MAX_CUSTOM_CHIP_DEPTH}.`,
+    )
   }
 }
 

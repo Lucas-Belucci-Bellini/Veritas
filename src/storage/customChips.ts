@@ -1,4 +1,9 @@
-import { buildCustomChipDefinition, type CircuitDocument, type CustomChipDefinition } from '../circuit'
+import {
+  buildCustomChipDefinition,
+  type CircuitDocument,
+  type CustomChipDefinition,
+  type CustomChipLibraryEntry,
+} from '../circuit'
 import {
   db,
   type CustomChipProject,
@@ -18,8 +23,22 @@ export async function getCustomChipProject(id: number): Promise<CustomChipProjec
   return db.customChipProjects.get(id)
 }
 
+/**
+ * Biblioteca local no formato que a validação hierárquica espera.
+ *
+ * Um chip pode conter outros chips, então construir uma definição exige ter as
+ * definições dos filhos à mão. Carregar aqui mantém a API do storage estável:
+ * quem salva um chip não precisa montar a biblioteca.
+ */
+async function loadLibrary(): Promise<CustomChipLibraryEntry[]> {
+  const projects = await db.customChipProjects.toArray()
+  return projects.map((project) => ({ id: project.id, definition: project.definition }))
+}
+
 export async function createCustomChipProject(input: NewCustomChipInput): Promise<number> {
-  const definition = buildCustomChipDefinition(input.document, input.name)
+  const definition = buildCustomChipDefinition(input.document, input.name, {
+    customChips: await loadLibrary(),
+  })
   const now = Date.now()
   return db.customChipProjects.add({
     name: definition.name,
@@ -38,6 +57,7 @@ export async function updateCustomChipProject(
   const definition = buildCustomChipDefinition(
     patch.document ?? current.definition.document,
     patch.name ?? current.name,
+    { customChips: await loadLibrary(), selfId: id },
   )
   await db.customChipProjects.update(id, {
     name: definition.name,
