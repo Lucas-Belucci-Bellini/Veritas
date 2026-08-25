@@ -29,7 +29,7 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
   const [notice, setNotice] = useState('')
 
   async function importChip(chip: ChipEntry): Promise<void> {
-    const document = catalogChipToCircuitDocument(chip) ?? catalogMultiBitChipToCircuitDocument(chip)
+    const document = catalogMultiBitChipToCircuitDocument(chip) ?? catalogChipToCircuitDocument(chip)
     if (!document) {
       setNotice(`"${chip.name}" ainda não possui um modelo materializável para o canvas.`)
       return
@@ -197,8 +197,8 @@ function ChipCard({
   const parts = Object.entries(chip.parts)
   const scalarDocument = catalogChipToCircuitDocument(chip)
   const multiBitDocument = catalogMultiBitChipToCircuitDocument(chip)
-  const materializedDocument = scalarDocument ?? multiBitDocument
-  const isMultiBitModel = !scalarDocument && Boolean(multiBitDocument)
+  const materializedDocument = multiBitDocument ?? scalarDocument
+  const isMultiBitModel = Boolean(multiBitDocument)
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-brand-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-brand-700">

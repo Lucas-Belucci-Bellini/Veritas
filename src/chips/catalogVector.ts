@@ -34,6 +34,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (isEightBitNot(chip)) return buildEightBitNotDocument(chip)
   if (isEightBitNegate(chip)) return buildEightBitNegateDocument(chip)
   if (isSixteenInputBusRouter(chip)) return buildSixteenInputBusRouterDocument(chip)
+  if (isFourToEightZeroExtend(chip)) return buildFourToEightZeroExtendDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
@@ -179,6 +180,19 @@ function isSixteenInputBusRouter(chip: ChipEntry): boolean {
     && chip.parts['1-8BIT'] === 2
     && chip.parts['8-4BIT'] === 1
     && chip.parts['8x2-AND'] === 1
+}
+
+function isFourToEightZeroExtend(chip: ChipEntry): boolean {
+  return chip.name === 'ZEXT-4-8'
+    && chip.in === 4
+    && chip.out === 8
+    && chip.widths === undefined
+    && chip.parts['0'] === 1
+    && Object.keys(chip.parts).length === 1
+    && chip.partCount === 1
+    && chip.wireCount === 8
+    && chip.pins?.in?.join('|') === 'A0|A1|A2|A3'
+    && chip.pins?.out?.join('|') === 'O0|O1|O2|O3|O4|O5|O6|O7'
 }
 
 function isEightBitMask(chip: ChipEntry): boolean {
@@ -1008,6 +1022,69 @@ function buildSixteenInputBusRouterDocument(chip: ChipEntry): CircuitDocument {
       target: { node: `output-${String(outputIndex + 1).padStart(2, '0')}`, port: 0 },
     })
   }
+
+  return { ...document, nodes, connections }
+}
+
+function buildFourToEightZeroExtendDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 4 ? chip.pins.in : ['A0', 'A1', 'A2', 'A3']
+  const outputLabels = chip.pins?.out?.length === 8
+    ? chip.pins.out
+    : ['O0', 'O1', 'O2', 'O3', 'O4', 'O5', 'O6', 'O7']
+  const nodes: CircuitNode[] = []
+  const connections: CircuitDocument['connections'] = []
+
+  for (let inputIndex = 0; inputIndex < 4; inputIndex += 1) {
+    nodes.push({
+      id: `input-${String(inputIndex + 1).padStart(2, '0')}`,
+      type: 'input',
+      position: { x: 0, y: 100 + inputIndex * 120 },
+      label: inputLabels[inputIndex] || `A${inputIndex}`,
+    })
+  }
+  const constantId = 'constant-00'
+  nodes.push({
+    id: constantId,
+    type: 'constant',
+    position: { x: 0, y: 640 },
+    label: '0',
+    options: { value: false },
+  })
+
+  const combinerId = 'combiner-zext'
+  nodes.push({
+    id: combinerId,
+    type: 'combiner',
+    position: { x: 360, y: 360 },
+    label: 'Zero extend 4→8',
+    options: { width: 8, widths: unitWidths(8) },
+  })
+  for (let inputIndex = 0; inputIndex < 4; inputIndex += 1) {
+    connections.push({
+      source: { node: `input-${String(inputIndex + 1).padStart(2, '0')}` },
+      target: { node: combinerId, port: inputIndex },
+    })
+  }
+  for (let combinerPort = 4; combinerPort < 8; combinerPort += 1) {
+    connections.push({
+      source: { node: constantId },
+      target: { node: combinerId, port: combinerPort },
+    })
+  }
+
+  const outputId = 'output-01'
+  nodes.push({
+    id: outputId,
+    type: 'output',
+    position: { x: 720, y: 360 },
+    label: outputLabels[0] || 'O0',
+    options: { width: 8 },
+  })
+  connections.push({
+    source: { node: combinerId },
+    target: { node: outputId, port: 0 },
+  })
 
   return { ...document, nodes, connections }
 }
