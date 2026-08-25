@@ -20970,6 +20970,26 @@ function bitwiseNot(vector) {
 	assertVector(vector);
 	return bitVector(vector.width, vector.bits.map((bit) => !bit));
 }
+/** Divide um barramento MSB → LSB nos widths informados, também MSB → LSB. */
+function splitBus(vector, widths) {
+	assertVector(vector);
+	if (widths.length === 0 || widths.some((width) => !isValidWidth(width))) throw new BitVectorError("O splitter precisa de larguras positivas e inteiras.");
+	const total = widths.reduce((sum, width) => sum + width, 0);
+	if (total !== vector.width) throw new BitVectorError(`O splitter espera ${total} bits, mas recebeu ${vector.width}.`);
+	let offset = 0;
+	return widths.map((width) => {
+		const part = vector.bits.slice(offset, offset + width);
+		offset += width;
+		return bitVector(width, part);
+	});
+}
+/** Concatena partes MSB → LSB em um barramento único. */
+function combineBus(parts) {
+	if (parts.length === 0) throw new BitVectorError("O combiner precisa de pelo menos uma parte.");
+	parts.forEach(assertVector);
+	const bits = parts.flatMap((part) => [...part.bits]);
+	return bitVector(bits.length, bits);
+}
 function parseBusLiteral(literal, width) {
 	const cleaned = literal.trim().replace(/_/g, "");
 	if (!cleaned) throw new BitVectorError("Literal de barramento vazio.");
@@ -21032,7 +21052,8 @@ function group(value, size) {
 //#endregion
 //#region src/simulation/components.ts
 /** Quantas saídas cada tipo de componente tem. */
-function outputCount(type) {
+function outputCount(type, options) {
+	if (type === "splitter") return options?.widths?.length ?? 0;
 	return type === "dff" || type === "tff" ? 2 : 1;
 }
 var FOLDS = {
@@ -21285,6 +21306,8 @@ var EDITOR_COMPONENT_TYPES = [
 	"delay",
 	"transmitter",
 	"receiver",
+	"splitter",
+	"combiner",
 	"custom-chip"
 ];
 var CircuitValidationError = class extends Error {
@@ -21300,13 +21323,15 @@ function editorInputCount(type) {
 	switch (type) {
 		case "input":
 		case "constant":
-		case "clock": return 0;
+		case "clock":
+		case "receiver":
+		case "combiner":
+		case "custom-chip": return 0;
+		case "splitter": return 1;
 		case "not":
 		case "output":
 		case "delay":
 		case "transmitter": return 1;
-		case "receiver":
-		case "custom-chip": return 0;
 		case "and":
 		case "nand":
 		case "or":
@@ -21352,10 +21377,37 @@ function validateCircuit(document, options = {}) {
 			message: `A instância de chip "${node.id}" não encontrou a definição local solicitada.`
 		});
 		const width = circuitNodeWidth(node);
+		if (node.type === "splitter" || node.type === "combiner") {
+			const widths = node.options?.widths ?? [];
+			if (widths.length === 0 || widths.some((part) => !isValidCircuitWidth(part))) issues.push({
+				code: "invalid-width",
+				nodeId: node.id,
+				message: `O ${node.type === "splitter" ? "splitter" : "combiner"} "${node.id}" precisa declarar larguras de portas válidas.`
+			});
+			else {
+				const total = widths.reduce((sum, part) => sum + part, 0);
+				const expected = node.type === "splitter" ? width : total;
+				if (node.type === "combiner" && width !== total) issues.push({
+					code: "width-mismatch",
+					nodeId: node.id,
+					message: `O combiner "${node.id}" soma ${total} bits nas entradas, mas a saída declara ${width} bits.`
+				});
+				if (node.type === "splitter" && total !== expected) issues.push({
+					code: "width-mismatch",
+					nodeId: node.id,
+					message: `O splitter "${node.id}" precisa repartir ${width} bits, mas as saídas somam ${total}.`
+				});
+			}
+		}
 		if (!isValidCircuitWidth(width)) issues.push({
 			code: "invalid-width",
 			nodeId: node.id,
 			message: `A largura do componente "${node.id}" precisa ser um inteiro entre 1 e 64.`
+		});
+		else if ((node.type === "splitter" || node.type === "combiner") && !options.allowBuses) issues.push({
+			code: "unsupported-width",
+			nodeId: node.id,
+			message: `O componente "${node.id}" só pode ser usado no fluxo vetorial de barramentos.`
 		});
 		else if (width !== 1 && (!options.allowBuses || isStatefulEditorType(node.type))) issues.push({
 			code: "unsupported-width",
@@ -21469,18 +21521,22 @@ function validateCircuit(document, options = {}) {
 function nodeInputCount(node, customChips) {
 	if (node.type === "input" && node.options?.customChipBoundary === "internal") return 1;
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0;
+	if (node.type === "splitter") return 1;
+	if (node.type === "combiner") return node.options?.widths?.length ?? 0;
 	return editorInputCount(node.type);
 }
 function nodeOutputCount(node, customChips) {
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0;
-	return outputCount(node.type);
+	return outputCount(node.type, node.options);
 }
 function nodeInputWidth(node, port, customChips) {
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs[port]?.width ?? 1;
+	if (node.type === "combiner") return node.options?.widths?.[port] ?? 1;
 	return circuitNodeWidth(node);
 }
 function nodeOutputWidth(node, port, customChips) {
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs[port]?.width ?? 1;
+	if (node.type === "splitter") return node.options?.widths?.[port] ?? 1;
 	return circuitNodeWidth(node);
 }
 function circuitNodeWidth(node) {
@@ -21626,6 +21682,7 @@ function evaluateVectorNetlist(netlist, inputs, options, depth = 0) {
 	for (const [id, value] of Object.entries(values)) publicValues[id] = Array.isArray(value) ? value[0] : value;
 	return {
 		values: publicValues,
+		ports: values,
 		outputs,
 		order
 	};
@@ -21670,6 +21727,8 @@ function evaluateVectorComponent(component, componentInputs, inputs, options) {
 		case "xor": return foldVectors(componentInputs, width, bitwiseXor);
 		case "xnor": return bitwiseNot(foldVectors(componentInputs, width, bitwiseXor));
 		case "not": return bitwiseNot(componentInputs[0] ?? bitVector(width, 0));
+		case "splitter": return splitBus(componentInputs[0] ?? bitVector(width, 0), component.options?.widths ?? []);
+		case "combiner": return combineBus(componentInputs);
 		default: throw new Error(`O componente "${component.id}" não é suportado no avaliador vetorial.`);
 	}
 }
@@ -22006,10 +22065,11 @@ function exportVerilog(document, options = {}) {
 	const model = buildExportModel(normalized);
 	const moduleName = sanitizeIdentifier(normalized.name, "veritas_circuit");
 	const ports = [...model.inputs.map((node) => `${verilogDirection(node, "input", model)}`), ...model.outputs.map((node) => `${verilogDirection(node, "output", model)}`)];
-	const declarations = model.internalNodes.map((node) => `  wire${verilogWidth(node)} ${model.names.get(node.id)};`);
+	const declarations = model.internalNodes.flatMap((node) => node.type === "splitter" ? (node.options?.widths ?? []).map((width, index) => `  wire${verilogRange(width)} ${splitterOutputName(node, index, model)};`) : [`  wire${verilogWidth(node)} ${model.names.get(node.id)};`]);
 	const assignments = model.nodes.flatMap((node) => {
 		if (node.type === "output" && node.options?.customChipBoundary !== "internal") return [];
 		if (node.type === "input" && node.options?.customChipBoundary !== "internal") return [];
+		if (node.type === "splitter") return verilogSplitterAssignments(node, model);
 		return [`  assign ${model.names.get(node.id)} = ${verilogExpression(node, model)};`];
 	});
 	const outputAssignments = model.outputs.map((node) => `  assign ${model.names.get(node.id)} = ${sourceExpression(node, model)};`);
@@ -22032,10 +22092,11 @@ function exportVhdl(document, options = {}) {
 	const model = buildExportModel(normalized);
 	const entityName = sanitizeIdentifier(normalized.name, "veritas_circuit");
 	const ports = [...model.inputs.map((node) => `    ${model.names.get(node.id)} : in ${vhdlType(node)}`), ...model.outputs.map((node) => `    ${model.names.get(node.id)} : out ${vhdlType(node)}`)];
-	const declarations = model.internalNodes.map((node) => `  signal ${model.names.get(node.id)} : ${vhdlType(node)};`);
+	const declarations = model.internalNodes.flatMap((node) => node.type === "splitter" ? (node.options?.widths ?? []).map((width, index) => `  signal ${splitterOutputName(node, index, model)} : ${vhdlRangeType(width)};`) : [`  signal ${model.names.get(node.id)} : ${vhdlType(node)};`]);
 	const assignments = model.nodes.flatMap((node) => {
 		if (node.type === "output" && node.options?.customChipBoundary !== "internal") return [];
 		if (node.type === "input" && node.options?.customChipBoundary !== "internal") return [];
+		if (node.type === "splitter") return vhdlSplitterAssignments(node, model);
 		return [`  ${model.names.get(node.id)} <= ${vhdlExpression(node, model)};`];
 	});
 	const outputAssignments = model.outputs.map((node) => `  ${model.names.get(node.id)} <= ${sourceExpression(node, model)};`);
@@ -22105,13 +22166,14 @@ function buildExportModel(document) {
 function sourceExpression(node, model) {
 	const source = model.inputsByNode.get(node.id)?.get(0);
 	if (!source) throw new Error(`Saída ${node.id} sem origem.`);
-	return model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal");
+	return sourceSignalName(source, model);
 }
 function verilogExpression(node, model) {
 	if (node.type === "input" || node.type === "output") return sourceExpression(node, model);
 	if (node.type === "constant") return verilogLiteral(nodeWidth(node), node.options?.value ?? false);
-	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"))[0] ?? verilogLiteral(nodeWidth(node), false);
-	const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"));
+	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => sourceSignalName(source, model))[0] ?? verilogLiteral(nodeWidth(node), false);
+	const operands = operandsFor(node, model).map((source) => sourceSignalName(source, model));
+	if (node.type === "combiner") return `{${operands.join(", ")}}`;
 	if (node.type === "not") return `~${operands[0]}`;
 	const operator = node.type === "and" || node.type === "nand" ? " & " : node.type === "or" || node.type === "nor" ? " | " : " ^ ";
 	const expression = operands.join(operator);
@@ -22120,8 +22182,9 @@ function verilogExpression(node, model) {
 function vhdlExpression(node, model) {
 	if (node.type === "input" || node.type === "output") return sourceExpression(node, model);
 	if (node.type === "constant") return vhdlLiteral(nodeWidth(node), node.options?.value ?? false);
-	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"))[0] ?? vhdlLiteral(nodeWidth(node), false);
-	const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"));
+	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => sourceSignalName(source, model))[0] ?? vhdlLiteral(nodeWidth(node), false);
+	const operands = operandsFor(node, model).map((source) => sourceSignalName(source, model));
+	if (node.type === "combiner") return operands.join(" & ");
 	if (node.type === "not") return `not ${operands[0]}`;
 	const operator = node.type === "and" || node.type === "nand" ? " and " : node.type === "or" || node.type === "nor" ? " or " : " xor ";
 	const expression = operands.join(operator);
@@ -22131,11 +22194,15 @@ function verilogDirection(node, direction, model) {
 	return `${direction}${verilogWidth(node)} ${model.names.get(node.id)}`;
 }
 function verilogWidth(node) {
-	const width = nodeWidth(node);
+	return verilogRange(nodeWidth(node));
+}
+function verilogRange(width) {
 	return width === 1 ? "" : ` [${width - 1}:0]`;
 }
 function vhdlType(node) {
-	const width = nodeWidth(node);
+	return vhdlRangeType(nodeWidth(node));
+}
+function vhdlRangeType(width) {
 	return width === 1 ? "std_logic" : `std_logic_vector(${width - 1} downto 0)`;
 }
 function verilogLiteral(width, value) {
@@ -22149,8 +22216,44 @@ function nodeWidth(node) {
 }
 function operandsFor(node, model) {
 	const inputMap = model.inputsByNode.get(node.id);
-	const count = node.type === "receiver" ? 1 : editorInputCount(node.type);
+	const count = node.type === "receiver" || node.type === "splitter" ? 1 : node.type === "combiner" ? node.options?.widths?.length ?? 0 : editorInputCount(node.type);
 	return Array.from({ length: count }, (_, port) => inputMap?.get(port)).filter((source) => Boolean(source));
+}
+function sourceSignalName(source, model) {
+	const base = model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal");
+	if (model.nodes.find((node) => node.id === source.node)?.type === "splitter") return `${base}_out${(source.port ?? 0) + 1}`;
+	return source.port === void 0 || source.port === 0 ? base : `${base}_out${source.port + 1}`;
+}
+function splitterOutputName(node, index, model) {
+	return `${model.names.get(node.id) ?? sanitizeIdentifier(node.id, "splitter")}_out${index + 1}`;
+}
+function verilogSplitterAssignments(node, model) {
+	const source = model.inputsByNode.get(node.id)?.get(0);
+	if (!source) throw new Error(`Splitter ${node.id} sem origem.`);
+	const widths = node.options?.widths ?? [];
+	const sourceName = sourceSignalName(source, model);
+	let high = nodeWidth(node) - 1;
+	return widths.map((width, index) => {
+		const low = high - width + 1;
+		const range = nodeWidth(node) === 1 ? "" : `[${high}:${low}]`;
+		const assignment = `  assign ${splitterOutputName(node, index, model)} = ${sourceName}${range};`;
+		high = low - 1;
+		return assignment;
+	});
+}
+function vhdlSplitterAssignments(node, model) {
+	const source = model.inputsByNode.get(node.id)?.get(0);
+	if (!source) throw new Error(`Splitter ${node.id} sem origem.`);
+	const widths = node.options?.widths ?? [];
+	const sourceName = sourceSignalName(source, model);
+	let high = nodeWidth(node) - 1;
+	return widths.map((width, index) => {
+		const low = high - width + 1;
+		const range = nodeWidth(node) === 1 ? "" : `(${high} downto ${low})`;
+		const assignment = `  ${splitterOutputName(node, index, model)} <= ${sourceName}${range};`;
+		high = low - 1;
+		return assignment;
+	});
 }
 var NameAllocator = class {
 	used = /* @__PURE__ */ new Set();
@@ -22480,7 +22583,7 @@ var Simulator = class {
 			const target = this.nodes.get(input.node);
 			if (!target) throw new Error(`O componente "${spec.id}" está ligado em "${input.node}", que não existe.`);
 			const port = input.port ?? 0;
-			if (port >= outputCount(target.spec.type)) throw new Error(`"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`);
+			if (port >= outputCount(target.spec.type, target.spec.options)) throw new Error(`"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`);
 		}
 	}
 	/** Quantos tiques já rodaram desde o início ou o último reset. */
@@ -22637,6 +22740,8 @@ var Simulator = class {
 				node.next[1] = !stored;
 				return;
 			}
+			case "splitter":
+			case "combiner": throw new Error(`O componente "${node.spec.id}" exige o runtime vetorial de barramentos.`);
 			case "delay": {
 				const incoming = values[0] ?? false;
 				const extra = Math.max(1, options?.ticks ?? 1) - 1;
@@ -22673,7 +22778,7 @@ function isBooleanArray(values) {
 	return values.every((value) => typeof value === "boolean");
 }
 function createState(spec) {
-	const size = outputCount(spec.type);
+	const size = outputCount(spec.type, spec.options);
 	const initial = spec.options?.initial ?? false;
 	const value = spec.type === "constant" ? spec.options?.value ?? false : initial;
 	const outputs = new Array(size).fill(false);
