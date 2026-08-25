@@ -2,6 +2,32 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.14] — 2026-08-25
+
+### Adicionado
+
+- Verificador de equivalência comportamental entre dois `CircuitDocument` combinacionais (`compareCircuitEquivalence`), com pareamento de portas por rótulo, ordem canônica e contraexemplo determinístico da primeira combinação divergente.
+- Painel “Equivalência entre circuitos” sobre os circuitos salvos localmente, mostrando veredito, entradas do contraexemplo e o valor produzido por cada lado.
+- Ferramenta MCP `circuit_equivalence`, com Markdown determinístico, bibliotecas `custom_chips_a`/`custom_chips_b` separadas e checks `MCP-EQ-001`/`MCP-EQ-002` no acceptance stdio.
+- `docs/VERIFICATION.md` com o contrato do relatório, a política de exaustividade e os limites medidos.
+
+- Comparação temporal entre dois circuitos (`compareCircuitTimelines`): roda a mesma sequência de entradas nos dois e aponta o primeiro tique divergente, cobrindo a classe sequencial (clock, DFF, TFF, delay) que a equivalência exaustiva recusa.
+- Painel “Comparação temporal” com editor de roteiro sobre os circuitos salvos, e ferramenta MCP `circuit_differential` com checks `MCP-DIFF-001`/`MCP-DIFF-002` no acceptance stdio.
+- Seletor de circuito extraído para `CircuitPicker`, compartilhado pelos dois painéis de verificação.
+
+### Corrigido
+
+- `scripts/mcpAcceptanceContract.d.mts` declarava apenas `MCP-001…MCP-006` enquanto o runner já usava dez cenários; a declaração voltou a espelhar o contrato real.
+
+### Validação e limites
+
+- Suíte com 447 testes, typecheck, lint, build do frontend, builds MCP stdio/HTTP, lib e plugin aprovados; `npm run beta:mcp` com 14 PASS, `npm run beta:mcp:http` com 18 PASS, `npm run beta:wasm:isolation` com 5 PASS e `npm run beta:accessibility` com 5 PASS, todos sem FAIL.
+- Os dois painéis foram verificados no navegador (Chromium) nos dois desfechos cada — equivalente/divergente com contraexemplo, e idêntico/divergente com o primeiro tique — sem erro de console.
+- A comparação temporal nunca afirma equivalência: o melhor veredito é “idêntico neste roteiro”, e tanto o MCP quanto o painel dizem em texto que concordar num roteiro não prova que não exista outro que separe os circuitos.
+- A comparação é exaustiva por definição: acima de 12 bits de entrada por padrão (teto de 16) ela é **recusada** em vez de truncada, porque uma comparação parcial não prova equivalência. Circuitos com `clock`, `dff`, `tff` ou `delay` não são aceitos.
+- Limites escolhidos por medição local: 12 bits ≈ 85 ms e 16 bits ≈ 776 ms na mesma máquina; são justificativa da escolha, não promessa de desempenho.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.13] — 2026-08-22
 
 ### Adicionado

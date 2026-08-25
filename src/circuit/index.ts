@@ -7,6 +7,7 @@ export {
   createCircuitDocument,
   editorInputCount,
   isEditorComponentType,
+  isStatefulEditorType,
   toNetlist,
   validateCircuit,
 } from './editorModel'
@@ -29,6 +30,33 @@ export { exportCircuit, exportVerilog, exportVhdl } from './export'
 export type { CircuitExportFormat, CircuitExportOptions } from './export'
 export { elaborateCustomChipDocument, MAX_CUSTOM_CHIP_ELABORATION_DEPTH } from './customChipElaboration'
 export type { CustomChipElaborationOptions } from './customChipElaboration'
+export {
+  compareCircuitEquivalence,
+  DEFAULT_EQUIVALENCE_INPUT_BITS,
+  MAX_EQUIVALENCE_INPUT_BITS,
+} from './equivalence'
+export type {
+  CircuitEquivalenceCounterexample,
+  CircuitEquivalenceDivergence,
+  CircuitEquivalenceInputValue,
+  CircuitEquivalenceIssue,
+  CircuitEquivalenceIssueCode,
+  CircuitEquivalenceOptions,
+  CircuitEquivalencePort,
+  CircuitEquivalenceReport,
+  CircuitEquivalenceStatus,
+} from './equivalence'
+export { compareCircuitTimelines, MAX_DIFFERENTIAL_TICKS } from './differential'
+export type {
+  CircuitDifferentialDivergence,
+  CircuitDifferentialIssue,
+  CircuitDifferentialIssueCode,
+  CircuitDifferentialOptions,
+  CircuitDifferentialReport,
+  CircuitDifferentialSignal,
+  CircuitDifferentialStatus,
+  CircuitDifferentialStep,
+} from './differential'
 export { optimizeCircuitDocument } from './optimize'
 export type { CircuitOptimization } from './optimize'
 export { buildCircuitIssueGuidance, summarizeCircuitIssues } from './validationFeedback'

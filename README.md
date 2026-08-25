@@ -187,6 +187,49 @@ interface e o caminho combinacional existente continua independente. O `CircuitE
 
 Documentos sequenciais desenhados no canvas agora são conectados ao `Simulator` por um painel temporal local. A interface oferece Step, Run, Reset, entradas manuais, Watch e timeline dos últimos 32 estados, enquanto o canvas ilumina os nós e fios do snapshot atual. O usuário pode alterar o período de cada clock entre 1 e 64 tiques; a mudança reinicia o runtime e limpa a timeline para não misturar cadências. O checkpoint do runtime é salvo por documento no `localStorage` quando disponível e restaurado ao reabrir; corrupção, quota ou ausência do armazenamento degradam para memória sem interromper a execução. Em uma room autorizada, editors e owners podem transmitir os períodos de clock pelo evento temporal privado e, separadamente, o snapshot de execução com inputs, estado do Simulator e timeline. Viewers não publicam. Configurações com versão-base divergente são rejeitadas e estados remotos válidos aguardam confirmação no botão `Aplicar estado remoto`; nada substitui o runtime local silenciosamente. Ofertas de estado com mais de 30 segundos expiram, timestamps inválidos são descartados e o painel mostra a idade, o autor e os participantes Presence online. Antes de aplicar, o painel revalida a `baseVersion` contra a versão estrutural atual: se o documento mudou enquanto a oferta estava aberta, o botão é bloqueado e a oferta obsoleta é descartada, evitando restaurar um runtime incompatível. Quando a aplicação termina, aparece uma confirmação visual de sucesso; falhas de restauração exibem erro sem interromper o runtime local. Contadores locais indicam recebidos, aplicados, conflitos, expirações/rejeições, falhas de publicação e falhas de aplicação; uma lista recolhível mantém somente os últimos 12 eventos genéricos. Eles não enviam documento, inputs ou timeline para telemetria e são reiniciados ao trocar documento ou room. A tabela verdade, a IA e a exportação HDL continuam bloqueadas em circuitos sequenciais até que seus contratos temporais sejam definidos.
 
+### Verificação de equivalência
+
+O painel **Equivalência entre circuitos** compara dois circuitos salvos em todas
+as combinações de entrada e responde se eles fazem a mesma coisa. As portas são
+pareadas pelo rótulo, então um XOR desenhado direto e o mesmo XOR montado em
+soma de produtos contam como equivalentes, apesar de não terem nenhuma porta em
+comum.
+
+Quando eles discordam, o resultado útil não é o veredito: é o **contraexemplo** —
+a combinação exata de entradas em que divergem e o valor que cada lado produziu.
+
+```
+Entradas do contraexemplo     Saídas divergentes
+A = 1                         S:  A → 0   B → 1
+B = 1
+```
+
+A comparação é exaustiva ou não acontece: acima do limite de bits de entrada ela
+é recusada em vez de truncada, porque uma comparação parcial não prova
+equivalência. Circuitos com clock, flip-flops ou atraso ficam de fora — o
+comportamento deles depende do histórico. O contrato completo está em
+[`docs/VERIFICATION.md`](./docs/VERIFICATION.md); pelo MCP, a mesma verificação
+é a ferramenta `circuit_equivalence`.
+
+### Comparação temporal
+
+Equivalência exaustiva só existe para circuitos combinacionais. Para clock,
+flip-flops e atrasos — onde a saída depende do que veio antes — o painel
+**Comparação temporal** roda a mesma sequência de entradas nos dois circuitos e
+aponta o **primeiro tique** em que discordam.
+
+```
+Roteiro          →  Primeira divergência · tique 1
+D=1, CLK=0 (2t)     CLK=1  D=0        Q:  A → 0   B → 1
+CLK=1      (2t)
+```
+
+A diferença de força entre as duas ferramentas está no vocabulário: a
+equivalência diz *equivalentes*, a temporal diz *idênticos neste roteiro*.
+Concordar num roteiro não prova que não existe outro que separe os dois
+circuitos, e o painel diz isso junto do resultado positivo. Pelo MCP, é a
+ferramenta `circuit_differential`.
+
 ### Plugin do Claude Code
 
 Este repositório também é um **marketplace de plugin do Claude Code**. Dá para
@@ -214,8 +257,8 @@ npm run validate:plugin
 
 `mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
 para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh,
-simulação de circuitos sequenciais, casos didáticos, debug de `AlgorithmDocument`
-e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
+simulação de circuitos sequenciais, equivalência e comparação temporal entre
+circuitos, casos didáticos, debug de `AlgorithmDocument` e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
 expressão ou estado, ele pergunta e recebe a conta/execução feita.
 
 ```bash

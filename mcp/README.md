@@ -23,6 +23,8 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `simulate_circuit` | Roda um circuito com clock, flip-flops, atrasos, canais wireless e instâncias `custom-chip`; devolve o diagrama de tempo |
 | `circuit_truth_table` | Gera a tabela verdade escalar de um `CircuitDocument`, incluindo instâncias `custom-chip` com definições explícitas |
 | `circuit_vector_truth_table` | Gera tabela verdade determinística para barramentos de até 12 bits de entrada |
+| `circuit_equivalence` | Compara dois `CircuitDocument` combinacionais em todas as combinações de entrada e devolve o contraexemplo quando divergem |
+| `circuit_differential` | Roda a mesma sequência de entradas em dois `CircuitDocument` e aponta o primeiro tique em que discordam (aceita clock, flip-flops e atrasos) |
 | `export_circuit_hdl` | Exporta um `CircuitDocument` validado para Verilog ou VHDL, incluindo chips customizados elaborados |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
@@ -191,6 +193,97 @@ A ferramenta `circuit_vector_truth_table` recebe o mesmo `CircuitDocument` seria
 ```
 
 A resposta começa com `| a[3:0] | b[3:0] | out[3:0] |` e contém linhas binárias como `| 0000 | 0000 | 0000 |`, além de bits totais, cardinalidade, truncamento e classificação. Erros de documento, largura total acima do limite e circuito incompatível são retornados como erro controlado, sem fazer acesso à nuvem.
+
+### `circuit_equivalence`
+
+Compara dois `CircuitDocument` **combinacionais** por comportamento. As portas
+são pareadas pelo rótulo (ou pelo ID, quando não houver rótulo), então
+implementações estruturalmente diferentes da mesma função são reconhecidas como
+equivalentes. `custom_chips_a` e `custom_chips_b` são bibliotecas separadas,
+porque os dois documentos podem depender de definições distintas.
+
+A comparação é exaustiva: quando `2^(soma das larguras das entradas)` excede
+`max_input_bits` (padrão 12, teto 16), a ferramenta responde **não comparável**
+com zero linhas avaliadas, em vez de devolver uma prova parcial. Circuitos com
+`clock`, `dff`, `tff` ou `delay` também são recusados, porque a saída deles
+depende do histórico.
+
+```json
+{
+  "name": "circuit_equivalence",
+  "arguments": {
+    "document_a": { "format": "veritas-circuit", "version": 1, "...": "..." },
+    "document_b": { "format": "veritas-circuit", "version": 1, "...": "..." },
+    "max_input_bits": 12
+  }
+}
+```
+
+A resposta divergente traz a linha do contraexemplo, os valores de entrada e o
+valor produzido por cada lado:
+
+```
+Resultado: não equivalente
+Linhas comparadas: 4 de 4 (comparação exaustiva)
+
+Contraexemplo (linha 3):
+
+| Entrada | Valor |
+| --- | --- |
+| A | 1 |
+| B | 1 |
+
+| Saída | A | B |
+| --- | --- | --- |
+| S | 0 | 1 |
+```
+
+O contrato completo está em [`../docs/VERIFICATION.md`](../docs/VERIFICATION.md).
+
+### `circuit_differential`
+
+A contraparte temporal. Enquanto `circuit_equivalence` percorre **todo** o
+espaço de entrada e por isso pode afirmar equivalência, esta roda apenas o
+`script` que você escreveu — e por isso o melhor resultado possível é
+*"idêntico neste roteiro"*, nunca *"equivalente"*. É a ferramenta certa para
+`clock`, `dff`, `tff` e `delay`, que `circuit_equivalence` recusa.
+
+```json
+{
+  "name": "circuit_differential",
+  "arguments": {
+    "document_a": { "format": "veritas-circuit", "version": 1, "...": "..." },
+    "document_b": { "format": "veritas-circuit", "version": 1, "...": "..." },
+    "script": [
+      { "set": { "D": true, "CLK": false }, "ticks": 2 },
+      { "set": { "CLK": true }, "ticks": 2 }
+    ]
+  }
+}
+```
+
+`set` usa os rótulos das entradas; uma entrada omitida mantém o valor anterior.
+Um roteiro que soma mais de `max_ticks` tiques (teto 1000) é recusado sem
+simular nada. A resposta divergente traz o tique, o passo, as entradas em vigor
+e o valor de cada lado:
+
+```
+Resultado: divergente
+Tiques simulados: 4
+Tiques divergentes: 4
+Saídas divergentes: Q
+
+Primeira divergência no tique 1 (passo 0):
+
+| Entrada | Valor |
+| --- | --- |
+| CLK | 0 |
+| D | 1 |
+
+| Saída | A | B |
+| --- | --- | --- |
+| Q | 0 | 1 |
+```
 
 ## Erros
 

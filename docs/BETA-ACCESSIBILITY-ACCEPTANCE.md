@@ -1,7 +1,7 @@
 # Aceitação Beta — Acessibilidade e mobile/PWA
 
 **Produto:** Veritas  
-**Versão candidata:** `v0.9.0-rc.13`
+**Versão candidata:** `v0.9.0-rc.14`
 **Objetivo:** garantir que o fluxo principal do Veritas seja navegável por teclado, tenha landmarks e anúncios acessíveis, preserve feedback offline e mantenha uma área de edição utilizável em telas pequenas.
 
 ## 1. Contrato A11Y
@@ -48,7 +48,7 @@ O workflow `.github/workflows/quality.yml` executa o mesmo comando em cada push 
 O agregador consome o relatório pelo ambiente `BETA_ACCESSIBILITY_REPORT`:
 
 ```bash
-BETA_EXPECTED_VERSION=0.9.0-rc.13 \
+BETA_EXPECTED_VERSION=0.9.0-rc.14 \
 BETA_ACCESSIBILITY_REPORT=artifacts/accessibility-acceptance.md \
 BETA_EVIDENCE_OUTPUT=artifacts/beta-evidence-manifest.json \
 npm run beta:evidence
