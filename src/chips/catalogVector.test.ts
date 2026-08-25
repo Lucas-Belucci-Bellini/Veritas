@@ -966,7 +966,7 @@ describe('16 para 8 e 4 bits importado do catálogo DLS', () => {
 
   it('preserva a ordem real dos dez outputs e as duplicações de barramento', async () => {
     const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
-    const values = '11110011' + '10101111'
+    const values = '11110011' + '01011010'
     const inputs = Object.fromEntries([...values].map((bit, index) => [
       `input-${String(index + 1).padStart(2, '0')}`,
       Number(bit),
@@ -975,14 +975,14 @@ describe('16 para 8 e 4 bits importado do catálogo DLS', () => {
 
     expect(toBinary(result.outputs['output-01']!)).toBe('11110011')
     expect(toBinary(result.outputs['output-02']!)).toBe('11110011')
-    expect(toBinary(result.outputs['output-03']!)).toBe('1010')
+    expect(toBinary(result.outputs['output-03']!)).toBe('0101')
     expect(toBinary(result.outputs['output-04']!)).toBe('11110011')
-    expect(toBinary(result.outputs['output-05']!)).toBe('1010')
-    expect(toBinary(result.outputs['output-06']!)).toBe('0011')
-    expect(toBinary(result.outputs['output-07']!)).toBe('0011')
-    expect(toBinary(result.outputs['output-08']!)).toBe('10101111')
-    expect(toBinary(result.outputs['output-09']!)).toBe('10101111')
-    expect(toBinary(result.outputs['output-10']!)).toBe('10101111')
+    expect(toBinary(result.outputs['output-05']!)).toBe('0101')
+    expect(toBinary(result.outputs['output-06']!)).toBe('0010')
+    expect(toBinary(result.outputs['output-07']!)).toBe('0010')
+    expect(toBinary(result.outputs['output-08']!)).toBe('01011010')
+    expect(toBinary(result.outputs['output-09']!)).toBe('01011010')
+    expect(toBinary(result.outputs['output-10']!)).toBe('01011010')
   })
 
   it('preserva as dezesseis entradas escalares e as larguras públicas mistas', async () => {
