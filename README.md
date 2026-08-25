@@ -50,6 +50,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.11.2 | Inversor real `NOT-8 Bits` do DLS, com entrada e saída vetoriais de 8 bits |
 | v0.11.3 | `NEGATE-8` real do DLS, com entrada 8 bits, controle 1 bit e saída 8 bits |
 | v0.11.4 | Roteador real `16 para 8 e 4 bits`, com 16 entradas escalares, dez saídas e AND dividido em dois nibbles |
+| v0.11.5 | Expansor real `ZEXT-4-8`, com quatro entradas escalares, saída de 8 bits e zeros explícitos |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -118,7 +119,7 @@ O `4-ADD` preserva três entradas de `4 + 4 + 1` bits, duas saídas de `4 + 1` b
 
 O restante do catálogo continua disponível para consulta. Chips sequenciais, memória, tri-state, conversores e perfis com dependências ou portas fora da allowlist permanecem bloqueados até que exista um contrato vetorial/temporal específico. Assim, a importação não altera o caminho local-first: construir, simular, salvar e exportar continuam funcionando sem conta ou conexão.
 
-A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional e o roteador `16 para 8 e 4 bits`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
+A allowlist multi-bit foi ampliada em releases posteriores com contratos explícitos para EQUAL-4, somadores, máscaras, operadores binários, mux, inversor, negação condicional, o roteador `16 para 8 e 4 bits` e o expansor `ZEXT-4-8`. Esses modelos não são inferidos pelo número de componentes: cada assinatura precisa coincidir antes de virar `CircuitDocument`.
 
 ### Comparador multi-bit EQUAL-4 (v0.10.3)
 
@@ -213,6 +214,14 @@ A Release 0.11.4 confirma o fixture real `16 para 8 e 4 bits` do DLS. Ele possui
 O Veritas aceita somente a assinatura `in=16`, `out=10`, larguras públicas `[1, 4, 8]` e essas contagens de partes. A materialização local é explícita: dois Combiners e dois Splitters de 8 bits alimentam oito AND escalares; o resultado passa por um Combiner e por um Splitter `[4,4]`. Os outputs preservam a ordem real `A, A, AND[0], A, AND[0], AND[1], AND[1], B, B, B`, com larguras `[8, 8, 4, 8, 4, 4, 4, 8, 8, 8]` e convenção MSB → LSB.
 
 Ao clicar em **Adicionar ao editor**, o perfil é validado, salvo no IndexedDB e aparece na paleta de chips customizados. No canvas, a instância mostra 16 entradas e dez saídas, com 26 handles acessíveis. Um chip recém-inserido permanece isolado até receber fios; por isso o editor informa as entradas desconectadas como problemas acionáveis, sem considerar a materialização inválida. A importação continua sendo allowlist verificável e não executa o JSON DLS.
+
+### Expansor vetorial `ZEXT-4-8` (v0.11.5)
+
+A Release 0.11.5 confirma o fixture real `ZEXT-4-8` do DLS. Ele publica quatro entradas escalares `A0`, `A1`, `A2` e `A3`, oito saídas escalares derivadas no catálogo e uma saída estrutural `O0` de 8 bits. A assinatura real contém somente a dependência `1× 0`.
+
+O Veritas materializa o contrato como quatro inputs de 1 bit, uma única constante `0` compartilhada pelos quatro fios de preenchimento, um **Combiner** de oito partes e uma saída de 8 bits. Assim, a saída é `A0 A1 A2 A3 0000` em ordem **MSB → LSB**, sem executar o JSON DLS nem transformar as oito expressões derivadas em oito portas públicas independentes.
+
+Como o fixture também possui expressões escalares derivadas para consulta, a biblioteca calcula os perfis vetorial e escalar, mas prioriza o documento vetorial quando a assinatura allowlisted coincide. Isso preserva `IN 1 + 1 + 1 + 1 bits · OUT 8 bits` no IndexedDB, na paleta e no canvas. A entrada isolada permanece desconectada até o usuário criar os fios, e a validação apresenta esse estado como problema acionável.
 
 ### Performance (v0.4.9)
 
