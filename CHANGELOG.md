@@ -2,6 +2,29 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.9.0-rc.17] — 2026-08-25
+
+### Adicionado
+
+- **Chips funcionam na simulação temporal.** `createDocumentRuntime` achata instâncias `custom-chip` antes de montar o netlist, reusando a elaboração que já serve à exportação HDL. Um registrador ou contador montado com chips agora roda por tiques.
+- `customChips` propagado para o painel sequencial, o testbench e a comparação temporal (`customChipsA`/`customChipsB`, alinhado à equivalência).
+
+### Corrigido
+
+- O `Simulator` ignorava a ligação de um `input` marcado como fronteira interna de chip — sua regra era "só muda por setInput". O avaliador combinacional já seguia essa convenção; o simulador não. O efeito era **silencioso e errado**, não um erro: o chip rodava com a entrada em zero, e um inversor alimentado com 1 devolvia 1.
+
+### Removido
+
+- A guarda `sequential-custom-chip` do testbench, que existia só porque o runtime não expandia chips. O teste que documentava a limitação foi substituído por um que prova o oposto.
+
+### Validação e limites
+
+- Suíte com 483 testes, três novos no runtime: propagação de valor através do chip nos dois sentidos, preservação dos IDs de topo após o achatamento e recusa quando a definição não veio.
+- O defeito do simulador só apareceu porque o teste verificava o valor propagado, e não apenas que a simulação não quebrava.
+- `beta:mcp` 16 PASS, `beta:mcp:http` 18 PASS, `beta:accessibility` 5 PASS. No navegador, um registrador com chip simulou oito tiques sem erro de console.
+- Chips continuam combinacionais; achatar preserva o comportamento porque não há estado dentro deles.
+- O beta público continua bloqueado até a evidência real de RLS-001…RLS-022, RT-001…RT-005, mobile, onboarding externo e demais gates exigidos.
+
 ## [0.9.0-rc.16] — 2026-08-25
 
 ### Alterado

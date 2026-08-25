@@ -57,7 +57,6 @@ export type TestbenchIssueCode =
   | 'duplicate-port-name'
   | 'cases-exceeded'
   | 'ticks-exceeded'
-  | 'sequential-custom-chip'
 
 export interface TestbenchIssue {
   code: TestbenchIssueCode
@@ -132,28 +131,11 @@ export function runTestbench(
   const referenceIssues = validateReferences(testbench, identity.inputIds, identity.outputIds)
   if (referenceIssues.length > 0) return invalid(referenceIssues)
 
-  // O runtime temporal não expande instâncias custom-chip; sem esta guarda o
-  // usuário receberia um "componente sem definição" genérico do netlist, que
-  // não explica que o problema é a combinação de modo sequencial com chip.
-  if (
-    normalized.nodes.some((node) => node.type === 'custom-chip') &&
-    testbench.cases.some((testCase) => testCase.steps)
-  ) {
-    return invalid([
-      {
-        code: 'sequential-custom-chip',
-        message:
-          'Casos sequenciais ainda não expandem instâncias custom-chip: o runtime temporal não recebe ' +
-          'a biblioteca de chips. Use casos combinacionais para este circuito, ou elabore o chip antes de testar.',
-      },
-    ])
-  }
-
   const results: TestbenchCaseResult[] = []
   for (const [index, testCase] of testbench.cases.entries()) {
     results.push(
       testCase.steps
-        ? runSequentialCase(normalized, testCase, index, identity)
+        ? runSequentialCase(normalized, testCase, index, identity, options)
         : runCombinationalCase(normalized, testCase, index, identity, options),
     )
   }
@@ -205,8 +187,9 @@ function runSequentialCase(
   testCase: TestbenchCase,
   index: number,
   identity: PortIdentity,
+  options: TestbenchOptions,
 ): TestbenchCaseResult {
-  const runtime = buildRuntime(document)
+  const runtime = buildRuntime(document, options)
   const mismatches: TestbenchMismatch[] = []
 
   ;(testCase.steps ?? []).forEach((step, stepIndex) => {
@@ -245,9 +228,9 @@ function evaluate(
   }
 }
 
-function buildRuntime(document: CircuitDocument) {
+function buildRuntime(document: CircuitDocument, options: TestbenchOptions) {
   try {
-    return createDocumentRuntime(document)
+    return createDocumentRuntime(document, { customChips: options.customChips })
   } catch (error) {
     throw new Error(`Circuito inválido: ${describe(error)}`)
   }

@@ -7,6 +7,7 @@ import {
   TESTBENCH_VERSION,
   type TestbenchDocument,
 } from './testbench'
+import { buildCustomChipDefinition, type CustomChipLibraryEntry } from './customChip'
 import {
   CIRCUIT_DOCUMENT_FORMAT,
   CIRCUIT_DOCUMENT_VERSION,
@@ -247,26 +248,56 @@ describe('runTestbench', () => {
     expect(report.issues[0]?.code).toBe('duplicate-port-name')
   })
 
-  it('explica que casos sequenciais ainda não expandem custom-chip', () => {
-    const withChip = doc(
-      'circuito com chip',
+  it('roda casos sequenciais sobre um circuito montado com chips', () => {
+    // Registrador cujo dado passa por um chip combinacional: só funciona se o
+    // runtime temporal souber expandir a instância.
+    const inverter = buildCustomChipDefinition(
+      doc(
+        'inversor',
+        [node('i', 'input', 'IN'), node('n', 'not'), node('o', 'output', 'OUT')],
+        [link('i', 'n'), link('n', 'o')],
+      ),
+      'Inversor',
+    )
+    const library: CustomChipLibraryEntry[] = [{ id: 1, definition: inverter }]
+
+    const register = doc(
+      'registrador com chip',
       [
-        node('i', 'input', 'IN'),
+        node('d', 'input', 'D'),
         node('c', 'input', 'CLK'),
-        node('chip', 'custom-chip', undefined, { customChipId: 1 }),
-        node('o', 'output', 'OUT'),
+        node('chip', 'custom-chip', 'INV', { customChipId: 1 }),
+        node('ff', 'dff'),
+        node('q', 'output', 'Q'),
       ],
-      [link('i', 'chip', 0), link('chip', 'o')],
+      [link('d', 'chip', 0), link('chip', 'ff', 0), link('c', 'ff', 1), link('ff', 'q')],
     )
 
-    const report = runTestbench(withChip, bench([
-      { steps: [{ set: { IN: true }, ticks: 1, expect: { OUT: true } }] },
-    ], 'chip'))
+    // D=1 passa pelo inversor e vira 0; na borda de subida, Q carrega 0.
+    const report = runTestbench(
+      register,
+      bench([
+        {
+          name: 'carrega o inverso de D',
+          steps: [
+            { set: { D: true, CLK: false }, ticks: 3, expect: { Q: false } },
+            { set: { CLK: true }, ticks: 3, expect: { Q: false } },
+          ],
+        },
+        {
+          name: 'com D=0 carrega 1',
+          steps: [
+            { set: { D: false, CLK: false }, ticks: 3 },
+            { set: { CLK: true }, ticks: 3, expect: { Q: true } },
+          ],
+        },
+      ], 'registrador com chip'),
+      { customChips: library },
+    )
 
-    expect(report.status).toBe('invalid')
-    expect(report.issues[0]?.code).toBe('sequential-custom-chip')
-    // A mensagem precisa dizer o que fazer, não só o que falhou.
-    expect(report.issues[0]?.message).toContain('combinacionais')
+    expect(report.issues).toEqual([])
+    expect(report.status).toBe('passed')
+    expect(report.cases.every((item) => item.mode === 'sequential')).toBe(true)
   })
 
   it('trata passo sem ticks como um único tique', () => {

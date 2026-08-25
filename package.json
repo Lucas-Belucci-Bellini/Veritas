@@ -1,7 +1,7 @@
 {
   "name": "veritas",
   "private": true,
-  "version": "0.9.0-rc.16",
+  "version": "0.9.0-rc.17",
   "type": "module",
   "description": "Calculadora de tabelas verdade e simulador de circuitos logicos, 100% no navegador.",
   "scripts": {

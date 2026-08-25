@@ -249,8 +249,10 @@ passasse do teto, você descobre na hora, não na primeira simulação. Uma
 atualização que faria um chip conter a si mesmo, direta ou indiretamente, é
 recusada.
 
-Chips continuam combinacionais: clock, flip-flops e atraso ainda não entram em
-um chip.
+Chips continuam combinacionais — clock, flip-flops e atraso não entram *dentro*
+de um chip. Mas um chip pode ser usado *em* um circuito sequencial: desde a
+rc.17 a simulação por tiques expande as instâncias, então um registrador ou
+contador montado com chips roda no tempo.
 
 ### Testes do circuito
 

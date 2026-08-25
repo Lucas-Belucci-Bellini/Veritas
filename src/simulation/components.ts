@@ -86,7 +86,6 @@ export function inputNames(type: ComponentType): string[] | null {
     case 'output':
     case 'transmitter':
       return ['IN']
-    case 'input':
     case 'constant':
     case 'clock':
     case 'receiver':
