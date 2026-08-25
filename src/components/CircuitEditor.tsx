@@ -72,6 +72,8 @@ interface EditorNodeData extends Record<string, unknown> {
   outputs: number
   inputLabels?: string[]
   outputLabels?: string[]
+  inputWidths?: number[]
+  outputWidths?: number[]
   width: number
   op?: GateOp
   value?: boolean
@@ -1415,12 +1417,21 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
     return (
       <div className="relative flex min-h-16 w-36 flex-col items-center justify-center rounded-lg border-2 border-violet-300 bg-violet-50 px-3 py-2 text-center shadow-sm dark:border-violet-700 dark:bg-violet-950/30" title={data.label}>
         {Array.from({ length: inputCount }, (_, index) => (
-          <Handle key={`input-${index}`} type="target" position={Position.Left} id={`in-${index}`} style={{ top: `${((index + 1) / (inputCount + 1)) * 100}%` }} className={dot} />
+          <Handle key={`input-${index}`} type="target" position={Position.Left} id={`in-${index}`} aria-label={`${data.label} entrada ${index + 1} · ${formatBits(data.inputWidths?.[index] ?? 1)}`}
+ style={{ top: `${((index + 1) / (inputCount + 1)) * 100}%` }} className={dot} />
         ))}
         <span className="max-w-full truncate font-mono text-xs font-black text-violet-800 dark:text-violet-200">{data.label}</span>
-        <span className="text-[10px] text-violet-700 dark:text-violet-300">{inputCount} entrada{inputCount === 1 ? '' : 's'} · {outputCount} saída{outputCount === 1 ? '' : 's'}</span>
+        <span className="text-[10px] text-violet-700 dark:text-violet-300">
+          {inputCount} entrada{inputCount === 1 ? '' : 's'} · {outputCount} saída{outputCount === 1 ? '' : 's'}
+        </span>
+        {(data.inputWidths?.some((width) => width > 1) || data.outputWidths?.some((width) => width > 1)) && (
+          <span className="max-w-full truncate text-[10px] text-violet-700 dark:text-violet-300" title={`IN ${data.inputWidths?.join(' + ') ?? '1'} · OUT ${data.outputWidths?.join(' + ') ?? '1'} bits`}>
+            IN {data.inputWidths?.join(' + ') ?? '1'} · OUT {data.outputWidths?.join(' + ') ?? '1'} bits
+          </span>
+        )}
         {Array.from({ length: outputCount }, (_, index) => (
-          <Handle key={`output-${index}`} type="source" position={Position.Right} id={`out-${index}`} style={{ top: `${((index + 1) / (outputCount + 1)) * 100}%` }} className={dot} />
+          <Handle key={`output-${index}`} type="source" position={Position.Right} id={`out-${index}`} aria-label={`${data.label} saída ${index + 1} · ${formatBits(data.outputWidths?.[index] ?? 1)}`}
+ style={{ top: `${((index + 1) / (outputCount + 1)) * 100}%` }} className={dot} />
         ))}
       </div>
     )
@@ -1619,12 +1630,18 @@ function createCustomChipNode(entry: CustomChipLibraryEntry, index: number, id: 
       outputs: entry.definition.outputs.length,
       inputLabels: entry.definition.inputs.map((port) => port.name),
       outputLabels: entry.definition.outputs.map((port) => port.name),
-      width: 1,
+      inputWidths: entry.definition.inputs.map((port) => port.width),
+      outputWidths: entry.definition.outputs.map((port) => port.width),
+      width: Math.max(1, ...entry.definition.inputs.map((port) => port.width), ...entry.definition.outputs.map((port) => port.width)),
       customChipId: entry.id,
       value: false,
       initial: false,
     },
   }
+}
+
+function formatBits(width: number): string {
+  return `${width} bit${width === 1 ? '' : 's'}`
 }
 
 function defaultBusParts(width: number): number[] {
@@ -1711,6 +1728,8 @@ function fromDocument(document: CircuitDocument, customChips: readonly CustomChi
               : node.data.outputs,
           inputLabels: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.map((port) => port.name) : node.data.inputLabels,
           outputLabels: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.map((port) => port.name) : node.data.outputLabels,
+          inputWidths: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.map((port) => port.width) : node.data.inputWidths,
+          outputWidths: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.map((port) => port.width) : node.data.outputWidths,
         },
       }
     }),
