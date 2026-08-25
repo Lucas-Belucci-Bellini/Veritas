@@ -82,7 +82,7 @@ export class Simulator {
           )
         }
         const port = input.port ?? 0
-        if (port >= outputCount(target.spec.type)) {
+        if (port >= outputCount(target.spec.type, target.spec.options)) {
           throw new Error(
             `"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`,
           )
@@ -283,6 +283,10 @@ export class Simulator {
         return
       }
 
+      case 'splitter':
+      case 'combiner':
+        throw new Error(`O componente "${node.spec.id}" exige o runtime vetorial de barramentos.`)
+
       case 'delay': {
         const incoming = values[0] ?? false
         // Todo componente já custa um tique para propagar, então a fila só
@@ -328,7 +332,7 @@ function isBooleanArray(values: readonly unknown[]): values is boolean[] {
 }
 
 function createState(spec: ComponentSpec): NodeState {
-  const size = outputCount(spec.type)
+  const size = outputCount(spec.type, spec.options)
   const initial = spec.options?.initial ?? false
   const value = spec.type === 'constant' ? (spec.options?.value ?? false) : initial
 

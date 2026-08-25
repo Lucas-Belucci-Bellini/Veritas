@@ -32,6 +32,8 @@ export type EditorComponentType = Extract<
   | 'delay'
   | 'transmitter'
   | 'receiver'
+  | 'splitter'
+  | 'combiner'
   | 'custom-chip'
 >
 
@@ -52,6 +54,8 @@ export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
   'delay',
   'transmitter',
   'receiver',
+  'splitter',
+  'combiner',
   'custom-chip',
 ]
 
@@ -135,15 +139,17 @@ export function editorInputCount(type: EditorComponentType): number {
     case 'input':
     case 'constant':
     case 'clock':
+    case 'receiver':
+    case 'combiner':
+    case 'custom-chip':
       return 0
+    case 'splitter':
+      return 1
     case 'not':
     case 'output':
     case 'delay':
     case 'transmitter':
       return 1
-    case 'receiver':
-    case 'custom-chip':
-      return 0
     case 'and':
     case 'nand':
     case 'or':
@@ -205,11 +211,44 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
       })
     }
     const width = circuitNodeWidth(node)
+    if (node.type === 'splitter' || node.type === 'combiner') {
+      const widths = node.options?.widths ?? []
+      if (widths.length === 0 || widths.some((part) => !isValidCircuitWidth(part))) {
+        issues.push({
+          code: 'invalid-width',
+          nodeId: node.id,
+          message: `O ${node.type === 'splitter' ? 'splitter' : 'combiner'} "${node.id}" precisa declarar larguras de portas válidas.`,
+        })
+      } else {
+        const total = widths.reduce((sum, part) => sum + part, 0)
+        const expected = node.type === 'splitter' ? width : total
+        if (node.type === 'combiner' && width !== total) {
+          issues.push({
+            code: 'width-mismatch',
+            nodeId: node.id,
+            message: `O combiner "${node.id}" soma ${total} bits nas entradas, mas a saída declara ${width} bits.`,
+          })
+        }
+        if (node.type === 'splitter' && total !== expected) {
+          issues.push({
+            code: 'width-mismatch',
+            nodeId: node.id,
+            message: `O splitter "${node.id}" precisa repartir ${width} bits, mas as saídas somam ${total}.`,
+          })
+        }
+      }
+    }
     if (!isValidCircuitWidth(width)) {
       issues.push({
         code: 'invalid-width',
         nodeId: node.id,
         message: `A largura do componente "${node.id}" precisa ser um inteiro entre 1 e ${MAX_BUS_WIDTH}.`,
+      })
+    } else if ((node.type === 'splitter' || node.type === 'combiner') && !options.allowBuses) {
+      issues.push({
+        code: 'unsupported-width',
+        nodeId: node.id,
+        message: `O componente "${node.id}" só pode ser usado no fluxo vetorial de barramentos.`,
       })
     } else if (width !== 1 && (!options.allowBuses || isStatefulEditorType(node.type))) {
       issues.push({
@@ -367,21 +406,25 @@ export function validateCircuit(document: CircuitDocument, options: CircuitValid
 function nodeInputCount(node: CircuitNode, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
   if (node.type === 'input' && node.options?.customChipBoundary === 'internal') return 1
   if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0
+  if (node.type === 'splitter') return 1
+  if (node.type === 'combiner') return node.options?.widths?.length ?? 0
   return editorInputCount(node.type)
 }
 
 function nodeOutputCount(node: CircuitNode, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
   if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0
-  return outputCount(node.type)
+  return outputCount(node.type, node.options)
 }
 
 function nodeInputWidth(node: CircuitNode, port: number, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
   if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs[port]?.width ?? 1
+  if (node.type === 'combiner') return node.options?.widths?.[port] ?? 1
   return circuitNodeWidth(node)
 }
 
 function nodeOutputWidth(node: CircuitNode, port: number, customChips: ReadonlyMap<number, CustomChipLibraryEntry>): number {
   if (node.type === 'custom-chip') return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs[port]?.width ?? 1
+  if (node.type === 'splitter') return node.options?.widths?.[port] ?? 1
   return circuitNodeWidth(node)
 }
 

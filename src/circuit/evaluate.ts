@@ -4,7 +4,7 @@ import {
   type Netlist,
   type PortRef,
 } from '../simulation/components'
-import { bitVector, type BitVector, bitwiseAnd, bitwiseNot, bitwiseOr, bitwiseXor, parseBusLiteral } from '../bus'
+import { bitVector, combineBus, type BitVector, bitwiseAnd, bitwiseNot, bitwiseOr, bitwiseXor, parseBusLiteral, splitBus } from '../bus'
 import {
   toNetlist,
   type CircuitDocument,
@@ -36,7 +36,10 @@ export type VectorInput = BitVector | bigint | number | string
 type CircuitVectorValue = BitVector | BitVector[]
 
 export interface CircuitVectorEvaluation {
+  /** Primeiro valor de cada componente, preservando o contrato público anterior. */
   values: Record<string, BitVector>
+  /** Todos os valores de saída; Splitter usa um vetor por porta. */
+  ports?: Record<string, BitVector | BitVector[]>
   outputs: Record<string, BitVector>
   order: string[]
 }
@@ -133,7 +136,7 @@ export function evaluateVectorNetlist(
   }
   const publicValues: Record<string, BitVector> = {}
   for (const [id, value] of Object.entries(values)) publicValues[id] = Array.isArray(value) ? value[0] : value
-  return { values: publicValues, outputs, order }
+  return { values: publicValues, ports: values, outputs, order }
 }
 
 function evaluateCustomComponent(
@@ -167,7 +170,7 @@ function evaluateVectorComponent(
   componentInputs: BitVector[],
   inputs: Record<string, VectorInput>,
   options: CircuitVectorEvaluationOptions,
-): BitVector {
+): CircuitVectorValue {
   const width = component.options?.width ?? componentInputs[0]?.width ?? 1
   switch (component.type as EditorComponentType) {
     case 'input':
@@ -192,6 +195,10 @@ function evaluateVectorComponent(
       return bitwiseNot(foldVectors(componentInputs, width, bitwiseXor))
     case 'not':
       return bitwiseNot(componentInputs[0] ?? bitVector(width, 0))
+    case 'splitter':
+      return splitBus(componentInputs[0] ?? bitVector(width, 0), component.options?.widths ?? [])
+    case 'combiner':
+      return combineBus(componentInputs)
     default:
       throw new Error(`O componente "${component.id}" não é suportado no avaliador vetorial.`)
   }

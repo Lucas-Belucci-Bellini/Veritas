@@ -22,10 +22,13 @@ export function exportVerilog(document: CircuitDocument, options: CircuitExportO
     ...model.inputs.map((node) => `${verilogDirection(node, 'input', model)}`),
     ...model.outputs.map((node) => `${verilogDirection(node, 'output', model)}`),
   ]
-  const declarations = model.internalNodes.map((node) => `  wire${verilogWidth(node)} ${model.names.get(node.id)};`)
+  const declarations = model.internalNodes.flatMap((node) => node.type === 'splitter'
+    ? (node.options?.widths ?? []).map((width, index) => `  wire${verilogRange(width)} ${splitterOutputName(node, index, model)};`)
+    : [`  wire${verilogWidth(node)} ${model.names.get(node.id)};`])
   const assignments = model.nodes.flatMap((node) => {
     if (node.type === 'output' && node.options?.customChipBoundary !== 'internal') return []
     if (node.type === 'input' && node.options?.customChipBoundary !== 'internal') return []
+    if (node.type === 'splitter') return verilogSplitterAssignments(node, model)
     return [`  assign ${model.names.get(node.id)} = ${verilogExpression(node, model)};`]
   })
   const outputAssignments = model.outputs.map((node) => `  assign ${model.names.get(node.id)} = ${sourceExpression(node, model)};`)
@@ -53,10 +56,13 @@ export function exportVhdl(document: CircuitDocument, options: CircuitExportOpti
     ...model.inputs.map((node) => `    ${model.names.get(node.id)} : in ${vhdlType(node)}`),
     ...model.outputs.map((node) => `    ${model.names.get(node.id)} : out ${vhdlType(node)}`),
   ]
-  const declarations = model.internalNodes.map((node) => `  signal ${model.names.get(node.id)} : ${vhdlType(node)};`)
+  const declarations = model.internalNodes.flatMap((node) => node.type === 'splitter'
+    ? (node.options?.widths ?? []).map((width, index) => `  signal ${splitterOutputName(node, index, model)} : ${vhdlRangeType(width)};`)
+    : [`  signal ${model.names.get(node.id)} : ${vhdlType(node)};`])
   const assignments = model.nodes.flatMap((node) => {
     if (node.type === 'output' && node.options?.customChipBoundary !== 'internal') return []
     if (node.type === 'input' && node.options?.customChipBoundary !== 'internal') return []
+    if (node.type === 'splitter') return vhdlSplitterAssignments(node, model)
     return [`  ${model.names.get(node.id)} <= ${vhdlExpression(node, model)};`]
   })
   const outputAssignments = model.outputs.map((node) => `  ${model.names.get(node.id)} <= ${sourceExpression(node, model)};`)
@@ -134,14 +140,15 @@ function buildExportModel(document: CircuitDocument): ExportModel {
 function sourceExpression(node: CircuitNode, model: ExportModel): string {
   const source = model.inputsByNode.get(node.id)?.get(0)
   if (!source) throw new Error(`Saída ${node.id} sem origem.`)
-  return model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal')
+  return sourceSignalName(source, model)
 }
 
 function verilogExpression(node: CircuitNode, model: ExportModel): string {
   if (node.type === 'input' || node.type === 'output') return sourceExpression(node, model)
   if (node.type === 'constant') return verilogLiteral(nodeWidth(node), node.options?.value ?? false)
-  if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))[0] ?? verilogLiteral(nodeWidth(node), false)
-  const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
+  if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => sourceSignalName(source, model))[0] ?? verilogLiteral(nodeWidth(node), false)
+  const operands = operandsFor(node, model).map((source) => sourceSignalName(source, model))
+  if (node.type === 'combiner') return `{${operands.join(', ')}}`
   if (node.type === 'not') return `~${operands[0]}`
   const operator = node.type === 'and' || node.type === 'nand' ? ' & ' : node.type === 'or' || node.type === 'nor' ? ' | ' : ' ^ '
   const expression = operands.join(operator)
@@ -151,8 +158,9 @@ function verilogExpression(node: CircuitNode, model: ExportModel): string {
 function vhdlExpression(node: CircuitNode, model: ExportModel): string {
   if (node.type === 'input' || node.type === 'output') return sourceExpression(node, model)
   if (node.type === 'constant') return vhdlLiteral(nodeWidth(node), node.options?.value ?? false)
-  if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))[0] ?? vhdlLiteral(nodeWidth(node), false)
-  const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal'))
+  if (node.type === 'transmitter' || node.type === 'receiver') return operandsFor(node, model).map((source) => sourceSignalName(source, model))[0] ?? vhdlLiteral(nodeWidth(node), false)
+  const operands = operandsFor(node, model).map((source) => sourceSignalName(source, model))
+  if (node.type === 'combiner') return operands.join(' & ')
   if (node.type === 'not') return `not ${operands[0]}`
   const operator = node.type === 'and' || node.type === 'nand' ? ' and ' : node.type === 'or' || node.type === 'nor' ? ' or ' : ' xor '
   const expression = operands.join(operator)
@@ -162,14 +170,16 @@ function vhdlExpression(node: CircuitNode, model: ExportModel): string {
 function verilogDirection(node: CircuitNode, direction: 'input' | 'output', model: ExportModel): string {
   return `${direction}${verilogWidth(node)} ${model.names.get(node.id)}`
 }
-
 function verilogWidth(node: CircuitNode): string {
-  const width = nodeWidth(node)
+  return verilogRange(nodeWidth(node))
+}
+function verilogRange(width: number): string {
   return width === 1 ? '' : ` [${width - 1}:0]`
 }
-
 function vhdlType(node: CircuitNode): string {
-  const width = nodeWidth(node)
+  return vhdlRangeType(nodeWidth(node))
+}
+function vhdlRangeType(width: number): string {
   return width === 1 ? 'std_logic' : `std_logic_vector(${width - 1} downto 0)`
 }
 
@@ -187,10 +197,50 @@ function nodeWidth(node: CircuitNode): number {
 
 function operandsFor(node: CircuitNode, model: ExportModel) {
   const inputMap = model.inputsByNode.get(node.id)
-  const count = node.type === 'receiver' ? 1 : editorInputCount(node.type)
+  const count = node.type === 'receiver' || node.type === 'splitter'
+    ? 1
+    : node.type === 'combiner'
+      ? node.options?.widths?.length ?? 0
+      : editorInputCount(node.type)
   return Array.from({ length: count }, (_, port) => inputMap?.get(port)).filter((source): source is { node: string; port?: number } => Boolean(source))
 }
-
+function sourceSignalName(source: { node: string; port?: number }, model: ExportModel): string {
+  const base = model.names.get(source.node) ?? sanitizeIdentifier(source.node, 'signal')
+  const sourceNode = model.nodes.find((node) => node.id === source.node)
+  if (sourceNode?.type === 'splitter') return `${base}_out${(source.port ?? 0) + 1}`
+  return source.port === undefined || source.port === 0 ? base : `${base}_out${source.port + 1}`
+}
+function splitterOutputName(node: CircuitNode, index: number, model: ExportModel): string {
+  return `${model.names.get(node.id) ?? sanitizeIdentifier(node.id, 'splitter')}_out${index + 1}`
+}
+function verilogSplitterAssignments(node: CircuitNode, model: ExportModel): string[] {
+  const source = model.inputsByNode.get(node.id)?.get(0)
+  if (!source) throw new Error(`Splitter ${node.id} sem origem.`)
+  const widths = node.options?.widths ?? []
+  const sourceName = sourceSignalName(source, model)
+  let high = nodeWidth(node) - 1
+  return widths.map((width, index) => {
+    const low = high - width + 1
+    const range = nodeWidth(node) === 1 ? '' : `[${high}:${low}]`
+    const assignment = `  assign ${splitterOutputName(node, index, model)} = ${sourceName}${range};`
+    high = low - 1
+    return assignment
+  })
+}
+function vhdlSplitterAssignments(node: CircuitNode, model: ExportModel): string[] {
+  const source = model.inputsByNode.get(node.id)?.get(0)
+  if (!source) throw new Error(`Splitter ${node.id} sem origem.`)
+  const widths = node.options?.widths ?? []
+  const sourceName = sourceSignalName(source, model)
+  let high = nodeWidth(node) - 1
+  return widths.map((width, index) => {
+    const low = high - width + 1
+    const range = nodeWidth(node) === 1 ? '' : `(${high} downto ${low})`
+    const assignment = `  ${splitterOutputName(node, index, model)} <= ${sourceName}${range};`
+    high = low - 1
+    return assignment
+  })
+}
 class NameAllocator {
   private readonly used = new Set<string>()
 

@@ -36,6 +36,7 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.8.0-rc.1 | Barramentos multi-bit, tabela verdade vetorial, seleção de linhas e exportação HDL dimensionada |
 | v0.8.0 (prévia anterior) | ALGO-001 executor determinístico local-first e ALGO-002 Watch/BranchTrace |
 | v0.9.0-rc.1 | Workspace sequencial visual, checkpoints temporais, colaboração de runtime e proteção contra ofertas obsoletas |
+| v0.10.1 (em construção) | Splitter/Combiner visuais, partições editáveis, avaliação vetorial multi-saída e persistência reversível |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -89,6 +90,13 @@ padrão, para evitar explosão combinatória e travamento da interface. A análi
 continua disponível para circuitos escalares e aparece desabilitada para circuitos
 vetoriais até que o contexto de IA multi-bit seja finalizado. O modo local-first e o
 IndexedDB preservam a largura mesmo sem Supabase configurado.
+
+Na release **v0.10.1 em construção**, o editor também oferece **Splitter** e
+**Combiner**. O Splitter recebe um barramento e o divide em partes na ordem MSB → LSB;
+o Combiner recebe essas partes e reconstrói um barramento. Selecione a peça e edite
+as partes no painel lateral, por exemplo `3 + 5`. O Splitter exige que a soma feche
+exatamente sua entrada; o Combiner atualiza a largura da saída. As portas são
+serializadas no arquivo `.veritas` e restauradas ao reabrir o projeto.
 
 ### Performance (v0.4.9)
 

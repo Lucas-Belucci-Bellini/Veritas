@@ -762,3 +762,14 @@ O elaborador hierárquico transforma instâncias em namespaces determinísticos 
 O catálogo DLS ganhou um adaptador que converte chips escalares com expressões completas em `CircuitDocument`. O botão “Adicionar ao editor” salva uma cópia na biblioteca local e o editor recebe a mudança por evento local, sem autenticação ou rede. O catálogo completo continua disponível para consulta; chips multi-bit, sequenciais ou com alguma expressão ausente permanecem explicitamente não executáveis nesta fatia, evitando uma falsa promessa de comportamento.
 
 Critérios verificados nesta fatia: composição, avaliação, expansão, ciclo, profundidade, runtime temporal e testbench sequencial cobertos por regressões; typecheck e lint limpos. A validação completa de release ainda será executada antes de abrir a próxima etapa da V1.
+
+
+## Release 0.10.1 — barramentos visuais particionáveis — 2026-08-25
+
+A fundação multi-bit existente agora atravessa a construção visual com dois componentes explícitos: `splitter` e `combiner`. O Splitter recebe um barramento, aplica partições declaradas em `options.widths` na ordem MSB → LSB e expõe uma saída por parte. O Combiner recebe essas partes, valida a soma das larguras e expõe um barramento recombinado. Ambos reutilizam `splitBus` e `combineBus`, sem duplicar a álgebra de `BitVector`.
+
+A validação do documento verifica larguras inteiras entre 1 e 64 bits, soma exata das partições, cardinalidade das portas e compatibilidade de cada conexão. O fluxo escalar permanece protegido: Splitter e Combiner só são aceitos pela avaliação vetorial. O runtime temporal continua explicitamente escalar nesta release, preservando a fronteira documentada para uma futura extensão sequencial multi-bit.
+
+No editor, os componentes aparecem na paleta, criam handles dinâmicos, podem ter suas partições editadas no painel lateral e preservam `width`/`widths` ao salvar e reabrir projetos `.veritas`. A avaliação vetorial mantém `values` compatível com consumidores existentes e expõe `ports` para que o canvas e integrações possam observar todas as saídas de um Splitter.
+
+Critérios verificados nesta fatia: round-trip 8 bits com partição `3 + 5`, preservação MSB → LSB, rejeição de partições que não fecham a largura, typecheck, lint e regressões focadas. A validação completa de release e o smoke visual serão executados antes da consolidação do próximo marco.

@@ -57,11 +57,11 @@ const GUIDANCE: Record<CircuitIssue['code'], Pick<CircuitIssueGuidance, 'title' 
   },
   'unsupported-width': {
     title: 'Largura ainda não suportada neste fluxo',
-    action: 'Use 1 bit neste componente ou permaneça no fluxo vetorial compatível.',
+    action: 'Use Splitter/Combiner e o fluxo vetorial para barramentos; Clock, DFF, TFF e Delay continuam escalares nesta release.',
   },
   'width-mismatch': {
     title: 'Larguras incompatíveis',
-    action: 'Ajuste os componentes conectados para usar a mesma largura de sinal.',
+    action: 'Ajuste a largura da conexão ou faça a partição/concatenação com Splitter e Combiner; as portas conectadas precisam coincidir.',
   },
   'invalid-document-name': {
     title: 'Nome de circuito inválido',
