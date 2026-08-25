@@ -1484,3 +1484,125 @@ describe('BITREV-4 importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+describe('BITREV-8 importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'BITREV-8')
+    expect(chip).toMatchObject({
+      name: 'BITREV-8',
+      category: 'Outros',
+      in: 8,
+      out: 8,
+      parts: {},
+      partCount: 0,
+      wireCount: 8,
+      variables: ['A', 'B', 'C', 'D', 'E', 'G', 'H', 'I'],
+    })
+    expect(chip?.widths).toBeUndefined()
+    expect(chip?.pins).toBeUndefined()
+    expect(chip?.derivedOutputs?.map((output) => [output.name, output.expression])).toEqual([
+      ['O0', 'I'],
+      ['O1', 'H'],
+      ['O2', 'G'],
+      ['O3', 'E'],
+      ['O4', 'D'],
+      ['O5', 'C'],
+      ['O6', 'B'],
+      ['O7', 'A'],
+    ])
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa oito inputs, oito outputs e oito conexões diretas', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'output')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(0)
+    expect(document?.nodes.filter((node) => node.type === 'input').map((node) => node.label)).toEqual([
+      'A', 'B', 'C', 'D', 'E', 'G', 'H', 'I',
+    ])
+    expect(document?.connections.map(({ source, target }) => [source.node, target.node])).toEqual([
+      ['input-08', 'output-01'],
+      ['input-07', 'output-02'],
+      ['input-06', 'output-03'],
+      ['input-05', 'output-04'],
+      ['input-04', 'output-05'],
+      ['input-03', 'output-06'],
+      ['input-02', 'output-07'],
+      ['input-01', 'output-08'],
+    ])
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [['1', '0', '0', '1', '0', '0', '1', '1'], ['1', '1', '0', '0', '1', '0', '0', '1']],
+    [['0', '1', '1', '0', '1', '0', '0', '1'], ['1', '0', '0', '1', '0', '1', '1', '0']],
+    [['1', '1', '1', '1', '1', '1', '1', '1'], ['1', '1', '1', '1', '1', '1', '1', '1']],
+    [['0', '0', '0', '0', '0', '0', '0', '0'], ['0', '0', '0', '0', '0', '0', '0', '0']],
+  ] as const)('inverte a ordem dos oito bits %s, produzindo %s', async (bits, expected) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const inputs = Object.fromEntries(bits.map((bit, index) => [
+      `input-${String(index + 1).padStart(2, '0')}`,
+      Number(bit),
+    ]))
+    const result = evaluateCircuitVectors(document, inputs)
+
+    expect(Array.from({ length: 8 }, (_, index) => `output-${String(index + 1).padStart(2, '0')}`)
+      .map((id) => toBinary(result.outputs[id]!))).toEqual(expected)
+  })
+
+  it('preserva as oito portas escalares e as oito saídas escalares no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, 'BITREV-8 importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['A', 1],
+      ['B', 1],
+      ['C', 1],
+      ['D', 1],
+      ['E', 1],
+      ['G', 1],
+      ['H', 1],
+      ['I', 1],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([
+      ['O0', 1],
+      ['O1', 1],
+      ['O2', 1],
+      ['O3', 1],
+      ['O4', 1],
+      ['O5', 1],
+      ['O6', 1],
+      ['O7', 1],
+    ])
+  })
+
+  it('exporta as oito portas escalares para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('module BITREV_8')
+    expect(verilog).toContain('input A')
+    expect(verilog).toContain('output O7')
+    expect(vhdl).toContain('entity BITREV_8 is')
+    expect(vhdl).toContain('A : in std_logic')
+    expect(vhdl).toContain('O7 : out std_logic')
+  })
+
+  it('recusa o fixture quando a assinatura real é alterada', async () => {
+    const chip = await loadRealChip()
+
+    expect(catalogVectorChipToCircuitDocument({ ...chip, wireCount: 7 })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({ ...chip, parts: { AND: 1 } })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({ ...chip, variables: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      derivedOutputs: chip.derivedOutputs?.map((output, index) => index === 0 ? { ...output, expression: 'A' } : output),
+    })).toBeNull()
+  })
+})

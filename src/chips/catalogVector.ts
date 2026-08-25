@@ -39,6 +39,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (isFourToSixteenSignExtend(chip)) return buildFourToSixteenSignExtendDocument(chip)
   if (isFourToEightSignExtend(chip)) return buildFourToEightSignExtendDocument(chip)
   if (isFourBitBitReverse(chip)) return buildFourBitBitReverseDocument(chip)
+  if (isEightBitBitReverse(chip)) return buildEightBitBitReverseDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
@@ -253,6 +254,22 @@ function isFourBitBitReverse(chip: ChipEntry): boolean {
     && chip.pins?.out?.join('|') === 'O0|O1|O2|O3'
     && derivedNames === 'O0|O1|O2|O3'
     && expressions === 'D|C|B|A'
+}
+
+function isEightBitBitReverse(chip: ChipEntry): boolean {
+  const expressions = chip.derivedOutputs?.map((output) => output.expression).join('|')
+  const derivedNames = chip.derivedOutputs?.map((output) => output.name).join('|')
+  return chip.name === 'BITREV-8'
+    && chip.in === 8
+    && chip.out === 8
+    && chip.widths === undefined
+    && Object.keys(chip.parts).length === 0
+    && chip.partCount === 0
+    && chip.wireCount === 8
+    && chip.variables?.join('|') === 'A|B|C|D|E|G|H|I'
+    && chip.pins === undefined
+    && derivedNames === 'O0|O1|O2|O3|O4|O5|O6|O7'
+    && expressions === 'I|H|G|E|D|C|B|A'
 }
 
 function isEightBitMask(chip: ChipEntry): boolean {
@@ -1350,6 +1367,42 @@ function buildFourBitBitReverseDocument(chip: ChipEntry): CircuitDocument {
     })
     connections.push({
       source: { node: `input-${String(4 - outputIndex).padStart(2, '0')}` },
+      target: { node: `output-${String(outputIndex + 1).padStart(2, '0')}`, port: 0 },
+    })
+  }
+
+  return { ...document, nodes, connections }
+}
+
+function buildEightBitBitReverseDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.variables?.length === 8
+    ? chip.variables
+    : ['A', 'B', 'C', 'D', 'E', 'G', 'H', 'I']
+  const outputLabels = chip.derivedOutputs?.length === 8
+    ? chip.derivedOutputs.map((output, index) => output.name || `O${index}`)
+    : Array.from({ length: 8 }, (_, index) => `O${index}`)
+  const nodes: CircuitNode[] = []
+  const connections: CircuitDocument['connections'] = []
+
+  for (let inputIndex = 0; inputIndex < 8; inputIndex += 1) {
+    nodes.push({
+      id: `input-${String(inputIndex + 1).padStart(2, '0')}`,
+      type: 'input',
+      position: { x: 0, y: 40 + inputIndex * 80 },
+      label: inputLabels[inputIndex] || `IN ${inputIndex + 1}`,
+    })
+  }
+
+  for (let outputIndex = 0; outputIndex < 8; outputIndex += 1) {
+    nodes.push({
+      id: `output-${String(outputIndex + 1).padStart(2, '0')}`,
+      type: 'output',
+      position: { x: 420, y: 40 + outputIndex * 80 },
+      label: outputLabels[outputIndex] || `O${outputIndex}`,
+    })
+    connections.push({
+      source: { node: `input-${String(8 - outputIndex).padStart(2, '0')}` },
       target: { node: `output-${String(outputIndex + 1).padStart(2, '0')}`, port: 0 },
     })
   }
