@@ -669,3 +669,53 @@ describe('(8 Bits) 8-bit Adder importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+
+describe('bancos base de barramento de 8 bits importados do catálogo DLS', () => {
+  it.each([
+    ['AND-8 Bits', 'and', { '1-8BIT': 1, '8-1BIT': 2, AND: 8 }, '10001000'],
+    ['NAND-8Bits', 'nand', { '1-8BIT': 1, '8-1BIT': 2, AND: 8, NOT: 8 }, '01110111'],
+    ['OR-8 Bits', 'or', { 'NAND-8Bits': 1, 'NOT-8 Bits': 2 }, '11101110'],
+    ['XOR - 8 BIT', 'xor', { 'NAND-8Bits': 3, 'NOT-8 Bits': 2 }, '01100110'],
+  ] as const)('materializa e avalia o fixture real %s', async (name, nodeType, parts, expected) => {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === name)
+
+    expect(chip).toMatchObject({
+      name,
+      in: 2,
+      out: 1,
+      widths: [8],
+      pins: { in: ['IN', 'IN'], out: ['OUT'] },
+      parts,
+    })
+    expect(chip).toBeDefined()
+
+    const document = catalogVectorChipToCircuitDocument(chip!)
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(2)
+    expect(document?.nodes.filter((node) => node.type === nodeType)).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+
+    const result = evaluateCircuitVectors(document!, { 'input-1': 0xaa, 'input-2': 0xcc })
+    expect(toBinary(result.outputs['output-1']!)).toBe(expected)
+
+    const definition = buildCustomChipDefinition(document!, `${name} importado`)
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN', 8],
+      ['IN_2', 8],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
+  })
+
+  it('recusa o fixture NAND real quando a máscara NOT está incompleta', async () => {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'NAND-8Bits')!
+
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, NOT: 7 },
+    })).toBeNull()
+  })
+})

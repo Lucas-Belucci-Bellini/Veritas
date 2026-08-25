@@ -45,6 +45,23 @@ export function isCatalogMultiBitChipImportable(chip: ChipEntry): boolean {
 function vectorGateModel(chip: ChipEntry): VectorGateModel | null {
   if (chip.out !== 1 || !hasOnlyBusWidth(chip, BUS_WIDTH)) return null
 
+  // OR/XOR reais do DLS encapsulam NAND-8Bits/NOT-8 Bits. A materialização
+  // local usa a forma booleana equivalente, sem executar a hierarquia JSON.
+  if (chip.name === 'OR-8 Bits') {
+    return chip.in === 2
+      && chip.parts['NAND-8Bits'] === 1
+      && chip.parts['NOT-8 Bits'] === 2
+      ? { gate: 'or', inputCount: 2, primitive: 'NAND-8Bits' }
+      : null
+  }
+  if (chip.name === 'XOR - 8 BIT') {
+    return chip.in === 2
+      && chip.parts['NAND-8Bits'] === 3
+      && chip.parts['NOT-8 Bits'] === 2
+      ? { gate: 'xor', inputCount: 2, primitive: 'NAND-8Bits' }
+      : null
+  }
+
   if (chip.name === 'AND-3 8 bits') {
     return chip.in === 3
       && chip.parts.AND === BUS_WIDTH * 2
@@ -62,16 +79,6 @@ function vectorGateModel(chip: ChipEntry): VectorGateModel | null {
   if (chip.name === 'NAND-8Bits') {
     return chip.parts.AND === BUS_WIDTH && chip.parts.NOT === BUS_WIDTH
       ? { gate: 'nand', inputCount: 2, primitive: 'AND' }
-      : null
-  }
-  if (chip.name === 'OR-8 Bits') {
-    return chip.parts['NOT-8 Bits'] === 2 && chip.parts['NAND-8Bits'] === 1
-      ? { gate: 'or', inputCount: 2, primitive: 'NAND-8Bits' }
-      : null
-  }
-  if (chip.name === 'XOR - 8 BIT') {
-    return chip.parts['NAND-8Bits'] === 3 && chip.parts['NOT-8 Bits'] === 2
-      ? { gate: 'xor', inputCount: 2, primitive: 'NAND-8Bits' }
       : null
   }
   if (chip.name === '8x2-OR') {
