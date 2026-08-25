@@ -27,6 +27,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   const gate = vectorGateModel(chip)
   if (gate) return buildVectorGateDocument(chip, gate)
   if (isFourBitAdder(chip)) return buildFourBitAdderDocument(chip)
+  if (isEightBitAdder(chip)) return buildEightBitAdderDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
   return null
 }
@@ -85,6 +86,16 @@ function hasOnlyBusWidth(chip: ChipEntry, width: number): boolean {
 
 function hasScalarAndBusWidth(chip: ChipEntry, width: number): boolean {
   return chip.widths?.includes(width) === true && chip.widths.every((candidate) => candidate === 1 || candidate === width)
+}
+
+function isEightBitAdder(chip: ChipEntry): boolean {
+  return chip.name === '8-ADD'
+    && chip.in === 3
+    && chip.out === 2
+    && hasScalarAndBusWidth(chip, BUS_WIDTH)
+    && chip.parts['1-ADD'] === BUS_WIDTH
+    && chip.parts['8-1BIT'] === 2
+    && chip.parts['1-8BIT'] === 1
 }
 
 function isFourBitEqual(chip: ChipEntry): boolean {
@@ -271,6 +282,118 @@ function buildFourBitAdderDocument(chip: ChipEntry): CircuitDocument {
     },
   )
   for (let bit = 0; bit < ADDER_WIDTH; bit += 1) {
+    connections.push({ source: { node: `sum-xor-2-${bit}` }, target: { node: combinerId, port: bit } })
+  }
+  connections.push(
+    { source: { node: combinerId }, target: { node: outputSumId, port: 0 } },
+    { source: { node: incomingCarry }, target: { node: outputCarryId, port: 0 } },
+  )
+
+  return { ...document, nodes, connections }
+}
+
+function buildEightBitAdderDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 3 ? chip.pins.in : ['CARRY', 'IN', 'IN']
+  const outputLabels = chip.pins?.out?.length === 2 ? chip.pins.out : ['OUT', 'CARRY']
+  // A ordem pública do fixture DLS é CARRY, IN, IN.
+  const nodes: CircuitNode[] = [
+    {
+      id: 'input-0-carry',
+      type: 'input',
+      position: { x: 0, y: 700 },
+      label: inputLabels[0] || 'CARRY',
+    },
+    {
+      id: 'input-1-a',
+      type: 'input',
+      position: { x: 0, y: 80 },
+      label: inputLabels[1] || 'IN',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: 'input-2-b',
+      type: 'input',
+      position: { x: 0, y: 320 },
+      label: inputLabels[2] || 'IN',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: 'splitter-a',
+      type: 'splitter',
+      position: { x: 190, y: 80 },
+      label: 'Split A',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: 'splitter-b',
+      type: 'splitter',
+      position: { x: 190, y: 320 },
+      label: 'Split B',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+  ]
+  // Conexões do 8-ADD: os dois barramentos ocupam as entradas 1 e 2.
+  const connections: CircuitDocument['connections'] = [
+    { source: { node: 'input-1-a' }, target: { node: 'splitter-a', port: 0 } },
+    { source: { node: 'input-2-b' }, target: { node: 'splitter-b', port: 0 } },
+  ]
+
+  let incomingCarry = 'input-0-carry'
+  for (let bit = BUS_WIDTH - 1; bit >= 0; bit -= 1) {
+    const xorOne = `sum-xor-1-${bit}`
+    const xorTwo = `sum-xor-2-${bit}`
+    const andAb = `carry-and-ab-${bit}`
+    const andCarry = `carry-and-propagate-${bit}`
+    const carryOut = `carry-or-${bit}`
+    nodes.push(
+      { id: xorOne, type: 'xor', position: { x: 430, y: 30 + (BUS_WIDTH - 1 - bit) * 100 }, label: `Sum XOR A${bit}` },
+      { id: xorTwo, type: 'xor', position: { x: 600, y: 30 + (BUS_WIDTH - 1 - bit) * 100 }, label: `Sum XOR B${bit}` },
+      { id: andAb, type: 'and', position: { x: 430, y: 80 + (BUS_WIDTH - 1 - bit) * 100 }, label: `Carry A${bit}B${bit}` },
+      { id: andCarry, type: 'and', position: { x: 600, y: 80 + (BUS_WIDTH - 1 - bit) * 100 }, label: `Carry P${bit}` },
+      { id: carryOut, type: 'or', position: { x: 770, y: 80 + (BUS_WIDTH - 1 - bit) * 100 }, label: `Carry out ${bit}` },
+    )
+    connections.push(
+      { source: { node: 'splitter-a', port: bit }, target: { node: xorOne, port: 0 } },
+      { source: { node: 'splitter-b', port: bit }, target: { node: xorOne, port: 1 } },
+      { source: { node: xorOne }, target: { node: xorTwo, port: 0 } },
+      { source: { node: incomingCarry }, target: { node: xorTwo, port: 1 } },
+      { source: { node: 'splitter-a', port: bit }, target: { node: andAb, port: 0 } },
+      { source: { node: 'splitter-b', port: bit }, target: { node: andAb, port: 1 } },
+      { source: { node: xorOne }, target: { node: andCarry, port: 0 } },
+      { source: { node: incomingCarry }, target: { node: andCarry, port: 1 } },
+      { source: { node: andAb }, target: { node: carryOut, port: 0 } },
+      { source: { node: andCarry }, target: { node: carryOut, port: 1 } },
+    )
+    incomingCarry = carryOut
+  }
+
+  const combinerId = 'combiner-sum'
+  const outputSumId = 'output-0-sum'
+  const outputCarryId = 'output-1-carry'
+  nodes.push(
+    {
+      id: combinerId,
+      type: 'combiner',
+      position: { x: 980, y: 390 },
+      label: 'Combiner OUT',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: outputSumId,
+      type: 'output',
+      position: { x: 1190, y: 390 },
+      label: outputLabels[0] || 'OUT',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: outputCarryId,
+      type: 'output',
+      position: { x: 980, y: 780 },
+      label: outputLabels[1] || 'CARRY',
+    },
+  )
+  for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
     connections.push({ source: { node: `sum-xor-2-${bit}` }, target: { node: combinerId, port: bit } })
   }
   connections.push(

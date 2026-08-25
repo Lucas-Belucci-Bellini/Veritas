@@ -246,3 +246,75 @@ describe('EQUAL-4 importado do catálogo DLS', () => {
     expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
   })
 })
+
+
+function eightBitAdderChip(): ChipEntry {
+  return {
+    name: '8-ADD',
+    category: 'Somadores',
+    in: 3,
+    out: 2,
+    pins: { in: ['CARRY', 'IN', 'IN'], out: ['OUT', 'CARRY'] },
+    widths: [1, 8],
+    parts: { '1-ADD': 8, '8-1BIT': 2, '1-8BIT': 1 },
+    partCount: 11,
+    wireCount: 36,
+  }
+}
+
+describe('8-ADD importado do catálogo DLS', () => {
+  it('materializa um ripple-carry de oito bits com duas saídas', () => {
+    const document = catalogVectorChipToCircuitDocument(eightBitAdderChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input').map((node) => node.label)).toEqual(['CARRY', 'IN', 'IN'])
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(2)
+    expect(document?.nodes.filter((node) => node.type === 'xor')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'or')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [0x00, 0x00, 0, '00000000', '0'],
+    [0xff, 0x00, 0, '11111111', '0'],
+    [0xff, 0x01, 0, '00000000', '1'],
+    [0x7f, 0x80, 0, '11111111', '0'],
+    [0xff, 0xff, 1, '11111111', '1'],
+  ])('avalia %s + %s + carry %s como %s e carry %s', (a, b, carryIn, expectedSum, expectedCarry) => {
+    const document = catalogVectorChipToCircuitDocument(eightBitAdderChip())!
+    const result = evaluateCircuitVectors(document, {
+      'input-1-a': a,
+      'input-2-b': b,
+      'input-0-carry': carryIn,
+    })
+    expect(toBinary(result.outputs['output-0-sum']!)).toBe(expectedSum)
+    expect(toBinary(result.outputs['output-1-carry']!)).toBe(expectedCarry)
+  })
+
+  it('preserva a ordem pública do DLS e normaliza o segundo IN ao virar chip local', () => {
+    const document = catalogVectorChipToCircuitDocument(eightBitAdderChip())!
+    const definition = buildCustomChipDefinition(document, '8-ADD importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['CARRY', 1],
+      ['IN', 8],
+      ['IN_2', 8],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([
+      ['OUT', 8],
+      ['CARRY', 1],
+    ])
+  })
+
+  it('reconhece a entrada 8-ADD do catálogo gerado a partir do DLS', async () => {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === '8-ADD')
+
+    expect(chip).toBeDefined()
+    const document = catalogVectorChipToCircuitDocument(chip!)
+    expect(document).not.toBeNull()
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+})
