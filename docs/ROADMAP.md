@@ -771,3 +771,21 @@ A verificação decisiva foi no navegador, pelo caminho real do produto: com um 
 O segundo gap do mesmo loop: `createDocumentRuntime` chama `toNetlist(runtimeDocument)` sem a biblioteca, então instâncias `custom-chip` não atravessam a simulação por tiques. Foi esse buraco que obrigou o testbench a criar a guarda `sequential-custom-chip`. Enquanto ele existir, um contador ou registrador montado com chips não roda no tempo — e sem isso não se chega a uma CPU.
 
 Depois vem CHIP-007: os 1121 chips importados do Digital Logic Sim hoje só viram expressão booleana na calculadora (`ChipLibrary` só expõe `onUseExpression`). Transformá-los em peças instanciáveis no canvas põe a maior biblioteca do projeto dentro da ferramenta de construção.
+
+## Implementação CHIP-006 — chips na simulação temporal — 2026-08-25
+
+O segundo gap do loop do Digital Logic Sim: instâncias `custom-chip` não atravessavam a simulação por tiques. `createDocumentRuntime` chamava `toNetlist` sem a biblioteca, e o `Simulator` sequer tinha um caso para avaliar chips — o tipo existia em `components.ts`, mas nada o executava. Foi esse buraco que obrigou o testbench a criar a guarda `sequential-custom-chip`; enquanto ele existisse, um contador ou registrador montado com chips não rodaria no tempo, e sem isso não se chega a uma CPU.
+
+A escolha foi **achatar antes de simular** em vez de ensinar o `Simulator` a recursar. Chips são combinacionais por contrato, então elaborar preserva o comportamento — e reusa `elaborateCustomChipDocument`, que já serve à exportação HDL, com detecção de ciclo e limite de profundidade já testados. A elaboração preserva os IDs do nível de topo, então `setInput`, o watch e a linha do tempo continuam falando dos mesmos nós que o autor vê no canvas.
+
+A mudança expôs um defeito que estava escondido. A elaboração deixa os `input` internos de um chip como tipo `input`, marcados com `customChipBoundary: 'internal'` — uma convenção que o avaliador combinacional já conhecia (`nodeInputCount` conta uma entrada nesse caso), mas que o `Simulator` ignorava: seu `case 'input'` dizia "só muda por setInput" e descartava a ligação. O resultado era silencioso e errado, não um erro: o chip inteiro rodava com a entrada em zero. Um inversor alimentado com 1 devolvia 1.
+
+O defeito só apareceu porque o teste verificava o **valor** propagado, e não apenas que a simulação não quebrava. A correção ensina o `Simulator` a mesma convenção: um `input` de fronteira interna se comporta como passagem.
+
+A biblioteca foi propagada por todos os consumidores do runtime: o painel sequencial recebe `customChips` do editor, o testbench passa as suas definições (e a guarda `sequential-custom-chip` foi removida, já sem motivo), e a comparação temporal ganhou `customChips`/`customChipsA`/`customChipsB`, alinhando-se à equivalência.
+
+Critérios realizados: 483 testes, três deles novos no runtime — propagação de valor através do chip nos dois sentidos, preservação dos IDs de topo após o achatamento e recusa quando a definição não veio. O teste do testbench que documentava a limitação foi substituído por um que prova o oposto: um registrador cujo dado passa por um chip, conferido em dois casos sequenciais. Typecheck, lint, builds e `beta:mcp` 16 PASS, `beta:mcp:http` 18 PASS, `beta:accessibility` 5 PASS. No navegador, um registrador com chip simulou oito tiques sem erro de console — antes o runtime nem seria criado.
+
+## Próxima fatia — CHIP-007 biblioteca instanciável
+
+Resta o terceiro gap: os 1121 chips importados do Digital Logic Sim só viram expressão booleana na calculadora, porque `ChipLibrary` expõe apenas `onUseExpression`. Transformá-los em peças instanciáveis no canvas põe a maior biblioteca do projeto dentro da ferramenta de construção — e, com CHIP-005 e CHIP-006 fechados, elas já podem ser aninhadas e simuladas no tempo.

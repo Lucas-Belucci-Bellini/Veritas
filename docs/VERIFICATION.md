@@ -291,11 +291,8 @@ temporal diz "idêntico neste roteiro".
 Referências a portas inexistentes (`unknown-input`, `unknown-output`) e rótulos
 duplicados são recusados **antes** de qualquer execução.
 
-Casos sequenciais ainda não expandem instâncias `custom-chip`: o runtime
-temporal não recebe a biblioteca de chips. Em vez de deixar isso virar um
-"componente sem definição" genérico do netlist, existe uma guarda explícita
-(`sequential-custom-chip`) que diz o que fazer. Casos combinacionais aceitam
-chips normalmente.
+Casos sequenciais aceitam instâncias `custom-chip` desde CHIP-006: o runtime
+temporal recebe a biblioteca e achata os chips antes de simular.
 
 ### Superfícies
 

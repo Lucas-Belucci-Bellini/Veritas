@@ -2,7 +2,7 @@
 
 **Data da captura:** 2026-08-21  
 **Projeto:** `hcwzsxdcvmswebunznak`  
-**Versão de referência:** `v0.9.0-rc.16`
+**Versão de referência:** `v0.9.0-rc.17`
 
 ## Escopo
 
