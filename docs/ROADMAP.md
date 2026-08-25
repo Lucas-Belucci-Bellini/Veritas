@@ -789,3 +789,27 @@ Critérios realizados: 483 testes, três deles novos no runtime — propagação
 ## Próxima fatia — CHIP-007 biblioteca instanciável
 
 Resta o terceiro gap: os 1121 chips importados do Digital Logic Sim só viram expressão booleana na calculadora, porque `ChipLibrary` expõe apenas `onUseExpression`. Transformá-los em peças instanciáveis no canvas põe a maior biblioteca do projeto dentro da ferramenta de construção — e, com CHIP-005 e CHIP-006 fechados, elas já podem ser aninhadas e simuladas no tempo.
+
+## Implementação CHIP-007 — chips do Digital Logic Sim com estrutura — 2026-08-25
+
+O terceiro gap do loop, e o que fecha a fila CHIP-005 → CHIP-006 → CHIP-007.
+
+O importador que existia (`scripts/import-dls-chips.mjs`) já lia a netlist real de cada chip do DLS — pinos de entrada, pinos de saída, sub-chips e fios — e a resolvia recursivamente. Só que ele simulava o chip em todas as combinações e persistia apenas a expressão booleana mínima de cada saída. O comportamento sobrevivia, a construção não. E o teto de `MAX_SIMULATED_INPUTS = 10` deixava de fora todo chip com mais de dez entradas, porque a simulação exaustiva não cabia.
+
+Ou seja: os dados estruturais estavam disponíveis o tempo todo; o que se perdia era na escrita. Reconstruir os chips a partir da expressão teria sido o caminho pior — mais trabalho, menos chips, e a hierarquia perdida de qualquer jeito.
+
+`src/circuit/dlsImport.ts` transcreve a netlist para `CircuitDocument`. Cada sub-chip vira uma instância `custom-chip` do chip correspondente, o que só é possível porque CHIP-005 destravou o aninhamento. O NAND é a única folha nativa: o projeto constrói o próprio AND, OR, NOT e XOR a partir dele, e substituí-los por portas nativas do Veritas daria o mesmo resultado apagando justamente o que o autor construiu.
+
+A medida que decidiu o desenho foi a profundidade. Importando tudo estruturalmente, a hierarquia mais funda da biblioteca chega a 7 níveis contra o teto de 8 — cabe, com uma folga. Mapear os quatro portões básicos para nativos baixaria para 5, mas ao custo da fidelidade, e a folga não exigia esse preço.
+
+Nada é descartado em silêncio. O que não couber sai com o motivo, e quem dependia de um chip recusado é recusado junto, nomeando a dependência. Quem julga a validade é o próprio Veritas: cada chip passa por `buildCustomChipDefinition` antes de ir para o banco, então os limites de 256 componentes, 512 conexões, ciclo combinacional e pino com dois alimentadores aparecem com a mensagem do produto, não com uma regra paralela do importador.
+
+Sobre a biblioteca real do UMBRA LIMA ALFA: 775 dos 1121 chips entram com estrutura completa. Ficam de fora 35 com pino multi-bit (o Veritas ainda não liga barramento dentro de chip), 29 sem pinos de entrada, 6 que usam componentes do DLS que não existem aqui, 6 acima dos limites de documento, 2 com ciclo combinacional, 2 com defeito no próprio arquivo — e 267 que dependem de algum dos anteriores. O barramento dentro de chip é o próximo gargalo se a meta for aumentar esse número.
+
+A verificação que vale é o cruzamento. O `catalog.json` foi gerado pelo outro caminho — simular e destilar. `tests/dlsLibraryParity.test.ts` transcreve a netlist e roda pelo simulador do Veritas. São duas implementações independentes: 212 chips conferidos, zero divergências. Um erro teria que estar nas duas, do mesmo jeito, no mesmo chip.
+
+### O defeito que apareceu no caminho
+
+`buildCustomChipDefinition` ordenava as portas de um chip por ID; a elaboração as ordenava pela ordem do documento. Onde as duas discordavam, o sinal ligado na porta *k* de uma instância chegava em outro pino — sem erro, sem aviso, só o valor errado. Discordar era fácil: os IDs do editor são `input-1`, `input-2`, …, numerados pelo total de nós, e `"input-11"` vem *antes* de `"input-2"` na ordenação textual. Bastava acrescentar um pino depois do nono componente.
+
+Está corrigido em `orderCustomChipPins`, fonte única dessa ordem para a validação, a interface e a elaboração. O teste de hierarquia só detectou o defeito depois de quebrar a simetria entre os níveis: com a mesma permutação nos dois, a troca se cancelava e o teste passava por cima do problema.

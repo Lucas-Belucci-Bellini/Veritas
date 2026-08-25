@@ -2,7 +2,7 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
-## [Não publicado]
+## [0.9.0-rc.18] — 2026-08-25
 
 ### Adicionado
 
