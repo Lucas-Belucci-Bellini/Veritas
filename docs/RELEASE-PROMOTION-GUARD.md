@@ -8,7 +8,7 @@ O Veritas usa o script `npm run release:guard` como uma barreira determinística
 | --- | --- | --- |
 | Alpha | `v0.9.0-alpha.1` | Nenhum requisito beta. Os gates gerais do workflow continuam obrigatórios. |
 | Beta | `v0.9.0-beta.1` | `RELEASE_PREFLIGHT_STRICT=1`, `RELEASE_EVIDENCE_STATUS=PASS` e `RELEASE_BETA_APPROVED=true`. |
-| Release candidate | `v0.9.0-rc.14` | Nenhum requisito beta. O workflow executa testes, typecheck, lint, builds, readiness WASM-001, matriz golden/hardening WASM-003, benchmark comparativo e smoke; a ponte permanece opt-in e fora do produto. |
+| Release candidate | `v0.9.0-rc.15` | Nenhum requisito beta. O workflow executa testes, typecheck, lint, builds, readiness WASM-001, matriz golden/hardening WASM-003, benchmark comparativo e smoke; a ponte permanece opt-in e fora do produto. |
 | Estável | `v1.0.0` | Nenhum requisito beta no guard; os critérios de estabilidade e rollback continuam sendo responsabilidade do processo de release. |
 
 Versões sem sufixo são estáveis. Sufixos desconhecidos, formatos incompletos e versões que não seguem `MAJOR.MINOR.PATCH` são rejeitados como canal inválido.
@@ -30,7 +30,7 @@ O manifesto aceito deve ser produzido pelo fluxo de evidências beta e conter os
 Para uma RC, o comando pode ser executado sem variáveis beta:
 
 ```bash
-RELEASE_VERSION=v0.9.0-rc.14 npm run release:guard
+RELEASE_VERSION=v0.9.0-rc.15 npm run release:guard
 ```
 
 O resultado esperado é `Release guard PASS`. Para confirmar o fail-closed de beta:
