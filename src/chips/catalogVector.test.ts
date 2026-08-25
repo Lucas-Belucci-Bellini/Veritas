@@ -719,3 +719,79 @@ describe('bancos base de barramento de 8 bits importados do catálogo DLS', () =
     })).toBeNull()
   })
 })
+
+
+describe('1-8MUX importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === '1-8MUX')
+    expect(chip).toMatchObject({
+      name: '1-8MUX',
+      in: 3,
+      out: 1,
+      widths: [1, 8],
+      pins: { in: ['IN', 'IN', 'IN'], out: ['OUT'] },
+      parts: { '8-1AND': 2, '8x2-OR': 1, NOT: 1 },
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa dois Splitters, NOT de seleção, dezesseis AND, oito OR e um Combiner', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(2)
+    expect(document?.nodes.filter((node) => node.type === 'not')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'or')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [0, 0xaa, 0xcc, '11001100'],
+    [1, 0xaa, 0xcc, '10101010'],
+    [0, 0x00, 0xff, '11111111'],
+    [1, 0x00, 0xff, '00000000'],
+  ])('seleciona A/B com select %s: A=%s, B=%s → %s', async (select, a, b, expected) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const result = evaluateCircuitVectors(document, {
+      'input-0-select': select,
+      'input-1-a': a,
+      'input-2-b': b,
+    })
+
+    expect(toBinary(result.outputs['output-1']!)).toBe(expected)
+  })
+
+  it('preserva as três entradas heterogêneas e normaliza IN no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, '1-8MUX importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN', 1],
+      ['IN_2', 8],
+      ['IN_3', 8],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
+  })
+
+  it('exporta o multiplexador vetorial para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('recusa o fixture quando falta uma das máscaras 8-1AND', async () => {
+    const chip = await loadRealChip()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, '8-1AND': 1 },
+    })).toBeNull()
+  })
+})
