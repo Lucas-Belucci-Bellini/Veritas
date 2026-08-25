@@ -23,11 +23,15 @@ import {
   buildCircuitVectorTruthTable,
   buildCustomChipDefinition,
   compareCircuitEquivalence,
+  compareCircuitTimelines,
+  MAX_DIFFERENTIAL_TICKS,
   MAX_EQUIVALENCE_INPUT_BITS,
   elaborateCustomChipDocument,
   exportCircuit,
   isCircuitDocumentShape,
   type CircuitDocument,
+  type CircuitDifferentialReport,
+  type CircuitDifferentialStep,
   type CircuitEquivalenceReport,
   type CustomChipLibraryEntry,
 } from '../../src/circuit/index'
@@ -605,6 +609,79 @@ function formatEquivalenceReport(report: CircuitEquivalenceReport): string {
   }
   return lines.join('\n')
 }
+
+export interface CircuitDifferentialToolQuery {
+  documentA: unknown
+  documentB: unknown
+  script: readonly CircuitDifferentialStep[]
+  maxTicks?: number
+}
+
+export function circuitDifferential(query: CircuitDifferentialToolQuery): ToolResult {
+  try {
+    if (!isCircuitDocumentShape(query.documentA)) {
+      return { isError: true, text: 'O documento A não possui o formato veritas-circuit esperado.' }
+    }
+    if (!isCircuitDocumentShape(query.documentB)) {
+      return { isError: true, text: 'O documento B não possui o formato veritas-circuit esperado.' }
+    }
+    const report = compareCircuitTimelines(query.documentA, query.documentB, query.script, {
+      maxTicks: query.maxTicks,
+    })
+    return { text: formatDifferentialReport(report) }
+  } catch (error) {
+    return { isError: true, text: error instanceof Error ? error.message : 'Falha ao comparar as linhas do tempo.' }
+  }
+}
+
+function formatDifferentialReport(report: CircuitDifferentialReport): string {
+  if (report.status === 'incomparable') {
+    return [
+      'Resultado: não comparável',
+      '',
+      ...report.issues.map((issue) => `- [${issue.code}] ${issue.message}`),
+      '',
+      'Nenhum tique foi simulado.',
+    ].join('\n')
+  }
+
+  const lines = [
+    report.status === 'identical'
+      ? 'Resultado: idêntico neste roteiro'
+      : 'Resultado: divergente',
+    '',
+    `Entradas: ${report.inputs.join(', ') || '(nenhuma)'}`,
+    `Saídas: ${report.outputs.join(', ')}`,
+    `Tiques simulados: ${report.comparedTicks}`,
+  ]
+
+  if (report.status === 'identical') {
+    lines.push(
+      '',
+      'Os dois circuitos concordaram em todos os tiques do roteiro. Isso não é prova de',
+      'equivalência: outro roteiro ainda pode separá-los.',
+    )
+    return lines.join('\n')
+  }
+
+  const first = report.firstDivergence
+  lines.push(`Tiques divergentes: ${report.divergentTicks}`)
+  lines.push(`Saídas divergentes: ${report.divergentOutputs.join(', ')}`)
+  if (first) {
+    lines.push('', `Primeira divergência no tique ${first.tick} (passo ${first.step}):`)
+    if (first.inputs.length > 0) {
+      lines.push('', '| Entrada | Valor |', '| --- | --- |')
+      for (const input of first.inputs) lines.push(`| ${input.name} | ${input.value ? 1 : 0} |`)
+    }
+    lines.push('', '| Saída | A | B |', '| --- | --- | --- |')
+    for (const signal of first.signals) {
+      lines.push(`| ${signal.signal} | ${signal.a ? 1 : 0} | ${signal.b ? 1 : 0} |`)
+    }
+  }
+  return lines.join('\n')
+}
+
+export const MCP_MAX_DIFFERENTIAL_TICKS = MAX_DIFFERENTIAL_TICKS
 
 export const MCP_MAX_EQUIVALENCE_INPUT_BITS = MAX_EQUIVALENCE_INPUT_BITS
 

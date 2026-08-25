@@ -709,3 +709,21 @@ Critérios realizados: 15 testes de domínio, 4 testes da ferramenta MCP, checks
 Com o contrato de equivalência fechado, a continuação natural é a comparação **temporal**: aplicar a mesma sequência de entradas a dois circuitos sequenciais e apontar o primeiro tique em que divergem, reusando o runtime já existente em `src/simulation/`. Isso cobre a classe que VERIFY-001 recusa explicitamente e não exige inventar um motor novo.
 
 Depois dela, o testbench declarativo passa a ser possível sem DSL executável: um conjunto de vetores de entrada e saídas esperadas, avaliado pelo mesmo caminho da equivalência, com o mesmo formato de contraexemplo. As asserções (`assert ALWAYS`, `assert NEVER`) e a verificação de propriedades dependem dessa base e continuam fora do escopo até ela existir.
+
+## Implementação VERIFY-002 — comparação temporal e primeiro tique divergente — 2026-08-25
+
+VERIFY-001 fechou a equivalência exaustiva e recusou explicitamente a classe sequencial. Esta fatia entrega a resposta para essa classe: `compareCircuitTimelines` roda a mesma sequência de entradas em dois circuitos e aponta o **primeiro tique** em que discordam, reusando o runtime já existente em `src/simulation/` em vez de inventar um motor novo.
+
+A decisão de projeto mais importante é de vocabulário, não de algoritmo. A equivalência percorre todo o espaço de entrada e por isso pode dizer `equivalent`; a comparação temporal percorre apenas o roteiro que o autor escreveu, então o melhor veredito possível é `identical` — "concordaram **neste roteiro**". O campo se chama `identical` justamente para que nenhum consumidor leia mais força do que existe, e tanto o relatório do MCP quanto o painel afirmam em texto, junto do resultado positivo, que aquilo não é prova de equivalência. Um teste cobre esse aviso, e o gate `MCP-DIFF-001` também.
+
+As regras de identidade são as mesmas de VERIFY-001: portas pareadas por rótulo, com rótulo duplicado, interface divergente e entrada desconhecida no roteiro recusados **antes** de simular, com `comparedTicks: 0`. O limite é de 1000 tiques somados, e um roteiro maior é recusado sem simular nada, pelo mesmo motivo que a equivalência recusa em vez de truncar. A simulação é escalar porque é o que o runtime oferece hoje; barramentos ficam para quando o runtime os suportar, e isso está escrito no contrato em vez de implícito.
+
+O painel “Comparação temporal” traz um editor de roteiro sobre os circuitos salvos: cada passo define quais entradas mudam, com que valor, e por quantos tiques rodar. O seletor de circuito foi extraído para `CircuitPicker` e é compartilhado com o painel de equivalência, para que os dois não divirjam.
+
+Critérios realizados: 14 testes de domínio (incluindo uma divergência que só aparece depois de vários ciclos, com atrasos de 1 contra 3 tiques, e a repetição determinística da comparação), 4 testes da ferramenta MCP, checks `MCP-DIFF-001` e `MCP-DIFF-002` no acceptance stdio (14 PASS, 0 FAIL, 0 SKIP), suíte completa com 447 testes, typecheck, lint, builds de frontend/MCP stdio/MCP HTTP/lib/plugin, `beta:mcp:http` com 18 PASS, `beta:wasm:isolation` com 5 PASS, `beta:accessibility` com 5 PASS, e verificação do painel no Chromium nos dois desfechos sem erro de console. A etapa não altera persistência, Supabase, Realtime nem o runtime produtivo, e não desbloqueia o beta.
+
+## Próxima fatia — VERIFY-003 testbench declarativo
+
+Com os dois contratos de comparação fechados, o testbench passa a ser possível sem inventar uma DSL executável: um conjunto de vetores de entrada e saídas esperadas, avaliado pelo mesmo caminho da equivalência (combinacional) ou da comparação temporal (sequencial), com o mesmo formato de contraexemplo. O documento de teste é dado, não código — o que mantém a fronteira de segurança do §70 do plano mestre intacta.
+
+Só depois disso vêm as asserções (`assert ALWAYS`, `assert NEVER`) e a verificação de propriedades, que precisam de um avaliador de expressões sobre sinais — e esse avaliador deve reusar o parser da engine, não um `eval`.

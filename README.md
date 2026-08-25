@@ -211,6 +211,25 @@ comportamento deles depende do histórico. O contrato completo está em
 [`docs/VERIFICATION.md`](./docs/VERIFICATION.md); pelo MCP, a mesma verificação
 é a ferramenta `circuit_equivalence`.
 
+### Comparação temporal
+
+Equivalência exaustiva só existe para circuitos combinacionais. Para clock,
+flip-flops e atrasos — onde a saída depende do que veio antes — o painel
+**Comparação temporal** roda a mesma sequência de entradas nos dois circuitos e
+aponta o **primeiro tique** em que discordam.
+
+```
+Roteiro          →  Primeira divergência · tique 1
+D=1, CLK=0 (2t)     CLK=1  D=0        Q:  A → 0   B → 1
+CLK=1      (2t)
+```
+
+A diferença de força entre as duas ferramentas está no vocabulário: a
+equivalência diz *equivalentes*, a temporal diz *idênticos neste roteiro*.
+Concordar num roteiro não prova que não existe outro que separe os dois
+circuitos, e o painel diz isso junto do resultado positivo. Pelo MCP, é a
+ferramenta `circuit_differential`.
+
 ### Plugin do Claude Code
 
 Este repositório também é um **marketplace de plugin do Claude Code**. Dá para
@@ -238,8 +257,8 @@ npm run validate:plugin
 
 `mcp/` é um servidor [MCP](https://modelcontextprotocol.io) que entrega o motor
 para assistentes de IA — tabela verdade, avaliação, simplificação, Karnaugh,
-simulação de circuitos sequenciais, equivalência entre circuitos, casos
-didáticos, debug de `AlgorithmDocument` e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
+simulação de circuitos sequenciais, equivalência e comparação temporal entre
+circuitos, casos didáticos, debug de `AlgorithmDocument` e consulta à biblioteca de chips. Em vez de o modelo chutar o resultado de uma
 expressão ou estado, ele pergunta e recebe a conta/execução feita.
 
 ```bash

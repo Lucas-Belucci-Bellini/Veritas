@@ -2,6 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import {
+  circuitDifferential,
   circuitEquivalence,
   circuitTruthTable,
   circuitVectorTruthTable,
@@ -301,6 +302,49 @@ server.registerTool(
       maxInputBits: max_input_bits,
       customChipsA: custom_chips_a,
       customChipsB: custom_chips_b,
+    })),
+)
+
+server.registerTool(
+  'circuit_differential',
+  {
+    title: 'Comparação temporal entre circuitos',
+    description:
+      'Roda a mesma sequência de entradas em dois CircuitDocument e aponta o primeiro tique em que ' +
+      'eles discordam. É a contraparte temporal de circuit_equivalence: cobre justamente a classe ' +
+      'que aquela recusa — clock, flip-flops (dff/tff) e atrasos, cuja saída depende do histórico. ' +
+      'Concordar em um roteiro NÃO é prova de equivalência: só a comparação exaustiva de ' +
+      'circuit_equivalence prova isso, e apenas para circuitos combinacionais.',
+    inputSchema: {
+      document_a: z.unknown().describe('CircuitDocument de referência, no formato veritas-circuit'),
+      document_b: z.unknown().describe('CircuitDocument comparado, no formato veritas-circuit'),
+      script: z
+        .array(
+          z.object({
+            set: z
+              .record(z.string(), z.boolean())
+              .optional()
+              .describe('Valores a aplicar nas entradas, por rótulo, antes de rodar'),
+            ticks: z.number().int().min(1).default(1).describe('Quantos tiques rodar neste passo'),
+          }),
+        )
+        .min(1)
+        .describe('Roteiro aplicado igualmente aos dois circuitos, em ordem'),
+      max_ticks: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .default(1000)
+        .describe('Teto de tiques do roteiro; acima disso a comparação é recusada sem simular'),
+    },
+  },
+  async ({ document_a, document_b, script, max_ticks }) =>
+    guard(() => circuitDifferential({
+      documentA: document_a,
+      documentB: document_b,
+      script,
+      maxTicks: max_ticks,
     })),
 )
 

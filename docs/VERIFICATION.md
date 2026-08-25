@@ -1,6 +1,8 @@
-# VERIFY-001 — equivalência comportamental entre circuitos
+# Verificação comportamental entre circuitos
 
-## Objetivo e fronteira
+## VERIFY-001 — equivalência exaustiva (combinacional)
+
+### Objetivo e fronteira
 
 O `compareCircuitEquivalence` responde a uma pergunta de engenharia, não a uma
 pergunta estética: *"eu reescrevi este circuito — ele continua fazendo a mesma
@@ -13,7 +15,7 @@ usa SAT/BDD, não estima área, atraso físico ou consumo, e não altera o
 `CircuitDocument`, a persistência local, o Supabase ou o Realtime. A verificação
 é local-first e roda inteiramente no navegador ou no processo MCP.
 
-## Identidade das portas
+### Identidade das portas
 
 A comparação pareia entradas e saídas pelo **rótulo visual** (`label`), com
 fallback para o ID quando não houver rótulo. Essa escolha é o que torna a
@@ -29,7 +31,7 @@ Consequências diretas, todas cobertas por teste:
 - portas de mesmo nome com larguras diferentes são recusadas
   (`width-mismatch`), porque comparar `A[3:0]` com `A` não teria significado.
 
-## Ordem canônica e determinismo
+### Ordem canônica e determinismo
 
 As portas são ordenadas **alfabeticamente por nome**, não pela ordem de
 declaração no documento. A enumeração de linhas deriva dessa ordem, o que dá
@@ -38,7 +40,7 @@ encontram sempre a **mesma linha** de contraexemplo, apenas com os valores de A
 e B trocados. Nenhuma parte da comparação depende de relógio, ordem incidental
 de objetos ou aleatoriedade.
 
-## Exaustividade: a prova é total ou não é prova
+### Exaustividade: a prova é total ou não é prova
 
 A comparação percorre `2^(soma das larguras das entradas)` linhas. Quando esse
 espaço excede o limite da execução, a ferramenta **recusa** com
@@ -65,7 +67,7 @@ justificativa da escolha, não uma promessa de desempenho.
 Para manter esse custo, o netlist de cada circuito é construído **uma vez** e
 reusado em todas as linhas; apenas a avaliação entra no laço.
 
-## Circuitos sequenciais
+### Circuitos sequenciais
 
 `clock`, `dff`, `tff` e `delay` são recusados com `sequential-unsupported`. A
 saída desses componentes depende do histórico, e uma tabela de combinações de
@@ -77,7 +79,10 @@ Instâncias `custom-chip` **são** aceitas: a construção de um chip customizad
 rejeita componentes com estado, então o chip elaborado é combinacional por
 construção.
 
-## Contrato do relatório
+Circuitos com estado não ficam sem resposta: eles são o domínio de
+[VERIFY-002](#verify-002--comparação-temporal-sequencial), abaixo.
+
+### Contrato do relatório
 
 ```ts
 interface CircuitEquivalenceReport {
@@ -106,7 +111,7 @@ produziu — o suficiente para reproduzir a divergência no editor.
 Documentos inválidos não produzem relatório: `compareCircuitEquivalence` lança
 `Circuito A inválido: …` ou `Circuito B inválido: …`, identificando o lado.
 
-## Superfícies
+### Superfícies
 
 | Camada | Entrada |
 | --- | --- |
@@ -119,7 +124,7 @@ A ferramenta MCP recebe os dois documentos no payload e aceita bibliotecas
 `custom_chips_a`/`custom_chips_b` separadas, sem tocar em IndexedDB, Supabase ou
 credenciais.
 
-## Cobertura
+### Cobertura
 
 - `src/circuit/equivalence.test.ts` — 15 casos: XOR direto contra XOR em soma de
   produtos, contraexemplo determinístico, simetria da troca de lados, comparação
@@ -133,8 +138,95 @@ credenciais.
 - `scripts/mcp-acceptance.mjs` — `MCP-EQ-001` e `MCP-EQ-002` exercitam a
   ferramenta pelo transporte stdio real.
 
-## O que esta etapa deliberadamente não entrega
+## VERIFY-002 — comparação temporal (sequencial)
 
-Simulação diferencial passo a passo, testbenches declarativos, asserções,
-verificação de propriedades, equivalência sequencial e auto-correção por IA
-continuam fora do escopo. Todas dependem deste contrato e vêm depois dele.
+`compareCircuitTimelines` é a contraparte temporal: roda a **mesma sequência de
+entradas** nos dois circuitos e aponta o primeiro tique em que discordam. Cobre
+exatamente a classe que VERIFY-001 recusa — `clock`, `dff`, `tff` e `delay`.
+
+### A força da conclusão faz parte da conclusão
+
+A diferença entre as duas ferramentas está no vocabulário do relatório, e é
+deliberada:
+
+| | VERIFY-001 | VERIFY-002 |
+| --- | --- | --- |
+| percorre | todo o espaço de entrada | só o roteiro escrito |
+| melhor veredito | `equivalent` | `identical` |
+| significa | "concordam sempre" | "concordaram **neste roteiro**" |
+| classe | combinacional | sequencial (e combinacional) |
+
+Um roteiro que termina sem divergência **não prova** que não existe uma. O campo
+se chama `identical`, e não `equivalent`, para que nenhum consumidor — pessoa,
+IA ou código — leia mais força do que existe. O relatório do MCP e o painel
+dizem isso em texto, junto do resultado positivo.
+
+### Roteiro
+
+```ts
+interface CircuitDifferentialStep {
+  set?: Record<string, boolean>  // valores por nome de porta; ausente = mantém
+  ticks?: number                 // padrão 1
+}
+```
+
+Entradas e saídas são pareadas pelo rótulo, com as mesmas regras de identidade
+de VERIFY-001: rótulo duplicado, interface divergente e nome desconhecido no
+roteiro são recusados **antes** de simular, com `comparedTicks: 0`.
+
+A simulação é escalar (um bit por porta), porque é o que o runtime de
+`src/simulation/` oferece; barramentos ficam para quando o runtime os suportar.
+O limite é `MAX_DIFFERENTIAL_TICKS = 1000` tiques somados; um roteiro maior é
+recusado sem simular nada, em vez de truncado.
+
+### Contrato do relatório
+
+```ts
+interface CircuitDifferentialReport {
+  status: 'identical' | 'divergent' | 'incomparable'
+  identical: boolean
+  inputs: string[]
+  outputs: string[]
+  totalTicks: number
+  comparedTicks: number
+  divergentTicks: number
+  divergentOutputs: string[]
+  firstDivergence: {
+    tick: number
+    step: number
+    inputs: { name: string; value: boolean }[]
+    signals: { signal: string; a: boolean; b: boolean }[]
+  } | null
+  issues: { code: CircuitDifferentialIssueCode; message: string }[]
+}
+```
+
+### Superfícies
+
+| Camada | Entrada |
+| --- | --- |
+| Domínio | `compareCircuitTimelines` em `src/circuit/differential.ts` |
+| Interface | painel “Comparação temporal” (`src/components/TimelineComparisonPanel.tsx`), com editor de roteiro |
+| MCP | ferramenta `circuit_differential` |
+
+### Cobertura
+
+- `src/circuit/differential.test.ts` — 14 casos: sequenciais idênticos, primeiro
+  tique divergente, divergência que só aparece depois de vários ciclos
+  (atrasos de 1 contra 3 tiques), determinismo da repetição, contagem de tiques
+  divergentes, valor inicial de entrada que o roteiro nunca toca, divergência
+  de interface, entrada desconhecida no roteiro,
+  roteiro vazio, limite de tiques, teto absoluto, passo sem `ticks`, documento
+  inválido e rótulo duplicado.
+- `mcp/src/tools.test.ts` — golden idêntico (incluindo o aviso de que não é
+  prova), golden do primeiro tique divergente, recusa por limite e documento
+  fora do formato.
+- `scripts/mcp-acceptance.mjs` — `MCP-DIFF-001` e `MCP-DIFF-002` pelo transporte
+  stdio real.
+
+## O que estas etapas deliberadamente não entregam
+
+Testbenches declarativos, asserções (`assert ALWAYS`/`NEVER`), verificação de
+propriedades, equivalência **sequencial provada** (não amostrada) e
+auto-correção por IA continuam fora do escopo. Todas dependem destes dois
+contratos e vêm depois deles.

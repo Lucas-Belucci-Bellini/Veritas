@@ -24,6 +24,7 @@ site, sem interface gráfica, falando por stdio na máquina do usuário.
 | `circuit_truth_table` | Gera a tabela verdade escalar de um `CircuitDocument`, incluindo instâncias `custom-chip` com definições explícitas |
 | `circuit_vector_truth_table` | Gera tabela verdade determinística para barramentos de até 12 bits de entrada |
 | `circuit_equivalence` | Compara dois `CircuitDocument` combinacionais em todas as combinações de entrada e devolve o contraexemplo quando divergem |
+| `circuit_differential` | Roda a mesma sequência de entradas em dois `CircuitDocument` e aponta o primeiro tique em que discordam (aceita clock, flip-flops e atrasos) |
 | `export_circuit_hdl` | Exporta um `CircuitDocument` validado para Verilog ou VHDL, incluindo chips customizados elaborados |
 | `list_chips` | Busca nos 1121 chips importados do Digital Logic Sim |
 | `get_chip` | Pinos, componentes internos e a expressão de cada saída de um chip |
@@ -238,6 +239,51 @@ Contraexemplo (linha 3):
 ```
 
 O contrato completo está em [`../docs/VERIFICATION.md`](../docs/VERIFICATION.md).
+
+### `circuit_differential`
+
+A contraparte temporal. Enquanto `circuit_equivalence` percorre **todo** o
+espaço de entrada e por isso pode afirmar equivalência, esta roda apenas o
+`script` que você escreveu — e por isso o melhor resultado possível é
+*"idêntico neste roteiro"*, nunca *"equivalente"*. É a ferramenta certa para
+`clock`, `dff`, `tff` e `delay`, que `circuit_equivalence` recusa.
+
+```json
+{
+  "name": "circuit_differential",
+  "arguments": {
+    "document_a": { "format": "veritas-circuit", "version": 1, "...": "..." },
+    "document_b": { "format": "veritas-circuit", "version": 1, "...": "..." },
+    "script": [
+      { "set": { "D": true, "CLK": false }, "ticks": 2 },
+      { "set": { "CLK": true }, "ticks": 2 }
+    ]
+  }
+}
+```
+
+`set` usa os rótulos das entradas; uma entrada omitida mantém o valor anterior.
+Um roteiro que soma mais de `max_ticks` tiques (teto 1000) é recusado sem
+simular nada. A resposta divergente traz o tique, o passo, as entradas em vigor
+e o valor de cada lado:
+
+```
+Resultado: divergente
+Tiques simulados: 4
+Tiques divergentes: 4
+Saídas divergentes: Q
+
+Primeira divergência no tique 1 (passo 0):
+
+| Entrada | Valor |
+| --- | --- |
+| CLK | 0 |
+| D | 1 |
+
+| Saída | A | B |
+| --- | --- | --- |
+| Q | 0 | 1 |
+```
 
 ## Erros
 

@@ -46,6 +46,17 @@ export type {
   CircuitEquivalenceReport,
   CircuitEquivalenceStatus,
 } from './equivalence'
+export { compareCircuitTimelines, MAX_DIFFERENTIAL_TICKS } from './differential'
+export type {
+  CircuitDifferentialDivergence,
+  CircuitDifferentialIssue,
+  CircuitDifferentialIssueCode,
+  CircuitDifferentialOptions,
+  CircuitDifferentialReport,
+  CircuitDifferentialSignal,
+  CircuitDifferentialStatus,
+  CircuitDifferentialStep,
+} from './differential'
 export { optimizeCircuitDocument } from './optimize'
 export type { CircuitOptimization } from './optimize'
 export { buildCircuitIssueGuidance, summarizeCircuitIssues } from './validationFeedback'
