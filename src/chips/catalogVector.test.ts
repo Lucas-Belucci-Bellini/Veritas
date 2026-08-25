@@ -1106,3 +1106,90 @@ describe('ZEXT-4-8 importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+
+describe('SEXT-4-8 importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'SEXT-4-8')
+    expect(chip).toMatchObject({
+      name: 'SEXT-4-8',
+      category: 'Outros',
+      in: 4,
+      out: 8,
+      pins: {
+        in: ['A0', 'A1', 'A2', 'A3'],
+        out: ['O0', 'O1', 'O2', 'O3', 'O4', 'O5', 'O6', 'O7'],
+      },
+      parts: {},
+      partCount: 0,
+      wireCount: 8,
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa quatro inputs, fan-out do sinal, um combiner e uma saída vetorial', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(4)
+    expect(document?.nodes.filter((node) => node.type === 'constant')).toHaveLength(0)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(document?.nodes.filter((node) => node.type === 'output')).toHaveLength(1)
+    expect(document?.connections).toHaveLength(9)
+    expect(document?.nodes.find((node) => node.id === 'combiner-sext')?.options).toEqual({
+      width: 8,
+      widths: [1, 1, 1, 1, 1, 1, 1, 1],
+    })
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [['1', '0', '1', '0'], '10100000'],
+    [['0', '1', '0', '1'], '01011111'],
+    [['1', '1', '1', '1'], '11111111'],
+    [['0', '0', '0', '0'], '00000000'],
+  ] as const)('replica o bit de sinal na extensão %s → %s', async (bits, expected) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const inputs = Object.fromEntries(bits.map((bit, index) => [
+      `input-${String(index + 1).padStart(2, '0')}`,
+      Number(bit),
+    ]))
+    const result = evaluateCircuitVectors(document, inputs)
+
+    expect(toBinary(result.outputs['output-01']!)).toBe(expected)
+  })
+
+  it('preserva as portas escalares e a saída de 8 bits no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, 'SEXT-4-8 importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['A0', 1],
+      ['A1', 1],
+      ['A2', 1],
+      ['A3', 1],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([
+      ['O0', 8],
+    ])
+  })
+
+  it('exporta a saída vetorial para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('recusa o expansor quando a assinatura real é alterada', async () => {
+    const chip = await loadRealChip()
+
+    expect(catalogVectorChipToCircuitDocument({ ...chip, wireCount: 7 })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({ ...chip, parts: { '0': 1 } })).toBeNull()
+    expect(catalogVectorChipToCircuitDocument({ ...chip, name: 'SEXT-4-16' })).toBeNull()
+  })
+})
