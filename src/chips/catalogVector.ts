@@ -27,6 +27,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   const gate = vectorGateModel(chip)
   if (gate) return buildVectorGateDocument(chip, gate)
   if (isFourBitAdder(chip)) return buildFourBitAdderDocument(chip)
+  if (isEightBitFullAdder(chip)) return buildEightBitFullAdderDocument(chip)
   if (isEightBitAdder(chip)) return buildEightBitAdderDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
@@ -107,6 +108,16 @@ function isEightBitAdder(chip: ChipEntry): boolean {
     && chip.parts['1-ADD'] === BUS_WIDTH
     && chip.parts['8-1BIT'] === 2
     && chip.parts['1-8BIT'] === 1
+}
+
+function isEightBitFullAdder(chip: ChipEntry): boolean {
+  return chip.name === 'Full Adder - 8 Bits'
+    && chip.in === 3
+    && chip.out === 2
+    && hasOnlyBusWidth(chip, BUS_WIDTH)
+    && chip.parts['AND-8 Bits'] === 2
+    && chip.parts['XOR - 8 BIT'] === 2
+    && chip.parts['OR-8 Bits'] === 1
 }
 
 function isEightBitMask(chip: ChipEntry): boolean {
@@ -430,6 +441,136 @@ function buildEightBitAdderDocument(chip: ChipEntry): CircuitDocument {
   connections.push(
     { source: { node: combinerId }, target: { node: outputSumId, port: 0 } },
     { source: { node: incomingCarry }, target: { node: outputCarryId, port: 0 } },
+  )
+
+  return { ...document, nodes, connections }
+}
+
+function buildEightBitFullAdderDocument(chip: ChipEntry): CircuitDocument {
+  const document = createCircuitDocument(chip.name)
+  const inputLabels = chip.pins?.in?.length === 3 ? chip.pins.in : ['Carry IN', 'IN A', 'IN B']
+  const outputLabels = chip.pins?.out?.length === 2 ? chip.pins.out : ['BIT-8 Bits', 'Carry Out-8Bits']
+  const nodes: CircuitNode[] = [
+    {
+      id: 'input-0-carry',
+      type: 'input',
+      position: { x: 0, y: 700 },
+      label: inputLabels[0] || 'Carry IN',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: 'input-1-a',
+      type: 'input',
+      position: { x: 0, y: 80 },
+      label: inputLabels[1] || 'IN A',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: 'input-2-b',
+      type: 'input',
+      position: { x: 0, y: 320 },
+      label: inputLabels[2] || 'IN B',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: 'splitter-carry',
+      type: 'splitter',
+      position: { x: 190, y: 700 },
+      label: 'Split Carry IN',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: 'splitter-a',
+      type: 'splitter',
+      position: { x: 190, y: 80 },
+      label: 'Split IN A',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: 'splitter-b',
+      type: 'splitter',
+      position: { x: 190, y: 320 },
+      label: 'Split IN B',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+  ]
+  const connections: CircuitDocument['connections'] = [
+    { source: { node: 'input-0-carry' }, target: { node: 'splitter-carry', port: 0 } },
+    { source: { node: 'input-1-a' }, target: { node: 'splitter-a', port: 0 } },
+    { source: { node: 'input-2-b' }, target: { node: 'splitter-b', port: 0 } },
+  ]
+
+  for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
+    const xorAb = `sum-xor-ab-${bit}`
+    const xorCarry = `sum-xor-carry-${bit}`
+    const andAb = `carry-and-ab-${bit}`
+    const andCarry = `carry-and-carry-${bit}`
+    const carryOr = `carry-or-${bit}`
+    const y = 30 + bit * 100
+    nodes.push(
+      { id: xorAb, type: 'xor', position: { x: 430, y }, label: `Sum XOR A/B bit ${bit + 1}` },
+      { id: xorCarry, type: 'xor', position: { x: 600, y }, label: `Sum XOR carry bit ${bit + 1}` },
+      { id: andAb, type: 'and', position: { x: 430, y: y + 50 }, label: `Carry A/B bit ${bit + 1}` },
+      { id: andCarry, type: 'and', position: { x: 600, y: y + 50 }, label: `Carry XOR/carry bit ${bit + 1}` },
+      { id: carryOr, type: 'or', position: { x: 770, y: y + 50 }, label: `Carry OR bit ${bit + 1}` },
+    )
+    connections.push(
+      { source: { node: 'splitter-a', port: bit }, target: { node: xorAb, port: 0 } },
+      { source: { node: 'splitter-b', port: bit }, target: { node: xorAb, port: 1 } },
+      { source: { node: xorAb }, target: { node: xorCarry, port: 0 } },
+      { source: { node: 'splitter-carry', port: bit }, target: { node: xorCarry, port: 1 } },
+      { source: { node: 'splitter-a', port: bit }, target: { node: andAb, port: 0 } },
+      { source: { node: 'splitter-b', port: bit }, target: { node: andAb, port: 1 } },
+      { source: { node: xorAb }, target: { node: andCarry, port: 0 } },
+      { source: { node: 'splitter-carry', port: bit }, target: { node: andCarry, port: 1 } },
+      { source: { node: andAb }, target: { node: carryOr, port: 0 } },
+      { source: { node: andCarry }, target: { node: carryOr, port: 1 } },
+    )
+  }
+
+  const sumCombinerId = 'combiner-sum'
+  const carryCombinerId = 'combiner-carry'
+  const sumOutputId = 'output-0-sum'
+  const carryOutputId = 'output-1-carry'
+  nodes.push(
+    {
+      id: sumCombinerId,
+      type: 'combiner',
+      position: { x: 980, y: 280 },
+      label: 'Combiner BIT',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: carryCombinerId,
+      type: 'combiner',
+      position: { x: 980, y: 760 },
+      label: 'Combiner Carry',
+      options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
+    },
+    {
+      id: sumOutputId,
+      type: 'output',
+      position: { x: 1190, y: 280 },
+      label: outputLabels[0] || 'BIT-8 Bits',
+      options: { width: BUS_WIDTH },
+    },
+    {
+      id: carryOutputId,
+      type: 'output',
+      position: { x: 1190, y: 760 },
+      label: outputLabels[1] || 'Carry Out-8Bits',
+      options: { width: BUS_WIDTH },
+    },
+  )
+  for (let bit = 0; bit < BUS_WIDTH; bit += 1) {
+    connections.push(
+      { source: { node: `sum-xor-carry-${bit}` }, target: { node: sumCombinerId, port: bit } },
+      { source: { node: `carry-or-${bit}` }, target: { node: carryCombinerId, port: bit } },
+    )
+  }
+  connections.push(
+    { source: { node: sumCombinerId }, target: { node: sumOutputId, port: 0 } },
+    { source: { node: carryCombinerId }, target: { node: carryOutputId, port: 0 } },
   )
 
   return { ...document, nodes, connections }

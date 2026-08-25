@@ -500,3 +500,87 @@ describe('AND-3 8 bits importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+
+describe('Full Adder - 8 Bits importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === 'Full Adder - 8 Bits')
+    expect(chip).toMatchObject({
+      name: 'Full Adder - 8 Bits',
+      in: 3,
+      out: 2,
+      widths: [8],
+      pins: {
+        in: ['Carry IN', 'IN A', 'IN B'],
+        out: ['BIT-8 Bits', 'Carry Out-8Bits'],
+      },
+      parts: { 'AND-8 Bits': 2, 'XOR - 8 BIT': 2, 'OR-8 Bits': 1 },
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa três Splitters, dois barramentos de saída e oito somadores completos bit a bit', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'xor')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'or')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(2)
+    expect(document?.nodes.filter((node) => node.type === 'output')).toHaveLength(2)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [0x00, 0x00, 0x00, '00000000', '00000000'],
+    [0xaa, 0xcc, 0xf0, '10010110', '11101000'],
+    [0xff, 0xff, 0x00, '00000000', '11111111'],
+    [0xff, 0xff, 0xff, '11111111', '11111111'],
+  ])('avalia carry %s, A %s e B %s como soma %s e carry %s', async (carry, a, b, expectedSum, expectedCarry) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const result = evaluateCircuitVectors(document, {
+      'input-0-carry': carry,
+      'input-1-a': a,
+      'input-2-b': b,
+    })
+
+    expect(toBinary(result.outputs['output-0-sum']!)).toBe(expectedSum)
+    expect(toBinary(result.outputs['output-1-carry']!)).toBe(expectedCarry)
+  })
+
+  it('preserva as três entradas e as duas saídas vetoriais no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, 'Full Adder - 8 Bits importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['Carry IN', 8],
+      ['IN A', 8],
+      ['IN B', 8],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([
+      ['BIT-8 Bits', 8],
+      ['Carry Out-8Bits', 8],
+    ])
+  })
+
+  it('exporta os dois barramentos do full adder para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('recusa a assinatura quando falta um bloco AND do fixture real', async () => {
+    const chip = await loadRealChip()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, 'AND-8 Bits': 1 },
+    })).toBeNull()
+  })
+})
