@@ -584,3 +584,88 @@ describe('Full Adder - 8 Bits importado do catálogo DLS', () => {
     })).toBeNull()
   })
 })
+
+
+describe('(8 Bits) 8-bit Adder importado do catálogo DLS', () => {
+  async function loadRealChip(): Promise<ChipEntry> {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === '(8 Bits) 8-bit Adder')
+    expect(chip).toMatchObject({
+      name: '(8 Bits) 8-bit Adder',
+      in: 3,
+      out: 2,
+      widths: [1, 8],
+      pins: {
+        in: ['IN A 1-8', 'IN B 1-8', 'Carry IN'],
+        out: ['OUT', 'Carry OUT'],
+      },
+      parts: { '1-8BIT': 1, '8-1BIT': 2, '8-bit Adder': 1 },
+    })
+    expect(chip).toBeDefined()
+    return chip!
+  }
+
+  it('materializa dois Splitters, oito estágios ripple-carry e duas saídas heterogêneas', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())
+
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'input')).toHaveLength(3)
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(2)
+    expect(document?.nodes.filter((node) => node.type === 'xor')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'and')).toHaveLength(16)
+    expect(document?.nodes.filter((node) => node.type === 'or')).toHaveLength(8)
+    expect(document?.nodes.filter((node) => node.type === 'combiner')).toHaveLength(1)
+    expect(document?.nodes.find((node) => node.id === 'input-2-carry')?.options).toBeUndefined()
+    expect(document?.nodes.find((node) => node.id === 'output-1-carry')?.options).toBeUndefined()
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+  })
+
+  it.each([
+    [0x00, 0x00, 0, '00000000', '0'],
+    [0xaa, 0xcc, 1, '01110111', '1'],
+    [0xff, 0x00, 1, '00000000', '1'],
+    [0x7f, 0x80, 0, '11111111', '0'],
+  ])('avalia A %s, B %s e carry %s como soma %s e carry %s', async (a, b, carryIn, expectedSum, expectedCarry) => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const result = evaluateCircuitVectors(document, {
+      'input-0-a': a,
+      'input-1-b': b,
+      'input-2-carry': carryIn,
+    })
+
+    expect(toBinary(result.outputs['output-0-sum']!)).toBe(expectedSum)
+    expect(toBinary(result.outputs['output-1-carry']!)).toBe(expectedCarry)
+  })
+
+  it('preserva a ordem pública e as larguras heterogêneas no chip local', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const definition = buildCustomChipDefinition(document, '(8 Bits) 8-bit Adder importado')
+
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN A 1-8', 8],
+      ['IN B 1-8', 8],
+      ['Carry IN', 1],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([
+      ['OUT', 8],
+      ['Carry OUT', 1],
+    ])
+  })
+
+  it('exporta o alias real de 8 bits para Verilog e VHDL', async () => {
+    const document = catalogVectorChipToCircuitDocument(await loadRealChip())!
+    const verilog = exportVerilog(document)
+    const vhdl = exportVhdl(document)
+
+    expect(verilog).toContain('[7:0]')
+    expect(vhdl).toContain('std_logic_vector(7 downto 0)')
+  })
+
+  it('recusa o alias quando a dependência 8-bit Adder não coincide', async () => {
+    const chip = await loadRealChip()
+    expect(catalogVectorChipToCircuitDocument({
+      ...chip,
+      parts: { ...chip.parts, '8-bit Adder': 2 },
+    })).toBeNull()
+  })
+})

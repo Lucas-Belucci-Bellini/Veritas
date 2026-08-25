@@ -28,6 +28,7 @@ export function catalogMultiBitChipToCircuitDocument(chip: ChipEntry): CircuitDo
   if (gate) return buildVectorGateDocument(chip, gate)
   if (isFourBitAdder(chip)) return buildFourBitAdderDocument(chip)
   if (isEightBitFullAdder(chip)) return buildEightBitFullAdderDocument(chip)
+  if (isEightBitRippleAdderAlias(chip)) return buildEightBitAdderDocument(chip)
   if (isEightBitAdder(chip)) return buildEightBitAdderDocument(chip)
   if (isEightBitMask(chip)) return buildEightBitMaskDocument(chip)
   if (isFourBitEqual(chip)) return buildFourBitEqualDocument(chip)
@@ -98,6 +99,16 @@ function hasOnlyBusWidth(chip: ChipEntry, width: number): boolean {
 
 function hasScalarAndBusWidth(chip: ChipEntry, width: number): boolean {
   return chip.widths?.includes(width) === true && chip.widths.every((candidate) => candidate === 1 || candidate === width)
+}
+
+function isEightBitRippleAdderAlias(chip: ChipEntry): boolean {
+  return chip.name === '(8 Bits) 8-bit Adder'
+    && chip.in === 3
+    && chip.out === 2
+    && hasScalarAndBusWidth(chip, BUS_WIDTH)
+    && chip.parts['8-bit Adder'] === 1
+    && chip.parts['8-1BIT'] === 2
+    && chip.parts['1-8BIT'] === 1
 }
 
 function isEightBitAdder(chip: ChipEntry): boolean {
@@ -336,28 +347,38 @@ function buildFourBitAdderDocument(chip: ChipEntry): CircuitDocument {
 
 function buildEightBitAdderDocument(chip: ChipEntry): CircuitDocument {
   const document = createCircuitDocument(chip.name)
-  const inputLabels = chip.pins?.in?.length === 3 ? chip.pins.in : ['CARRY', 'IN', 'IN']
+  const aliasHasCarryLast = chip.name === '(8 Bits) 8-bit Adder'
+  const inputLabels = chip.pins?.in?.length === 3
+    ? chip.pins.in
+    : aliasHasCarryLast
+      ? ['IN A', 'IN B', 'Carry IN']
+      : ['CARRY', 'IN', 'IN']
   const outputLabels = chip.pins?.out?.length === 2 ? chip.pins.out : ['OUT', 'CARRY']
-  // A ordem pública do fixture DLS é CARRY, IN, IN.
+  const carryInputId = aliasHasCarryLast ? 'input-2-carry' : 'input-0-carry'
+  const inputAId = aliasHasCarryLast ? 'input-0-a' : 'input-1-a'
+  const inputBId = aliasHasCarryLast ? 'input-1-b' : 'input-2-b'
+  const carryLabel = aliasHasCarryLast ? inputLabels[2] : inputLabels[0]
+  const inputALabel = aliasHasCarryLast ? inputLabels[0] : inputLabels[1]
+  const inputBLabel = aliasHasCarryLast ? inputLabels[1] : inputLabels[2]
   const nodes: CircuitNode[] = [
     {
-      id: 'input-0-carry',
+      id: carryInputId,
       type: 'input',
       position: { x: 0, y: 700 },
-      label: inputLabels[0] || 'CARRY',
+      label: carryLabel || 'CARRY',
     },
     {
-      id: 'input-1-a',
+      id: inputAId,
       type: 'input',
       position: { x: 0, y: 80 },
-      label: inputLabels[1] || 'IN',
+      label: inputALabel || 'IN',
       options: { width: BUS_WIDTH },
     },
     {
-      id: 'input-2-b',
+      id: inputBId,
       type: 'input',
       position: { x: 0, y: 320 },
-      label: inputLabels[2] || 'IN',
+      label: inputBLabel || 'IN',
       options: { width: BUS_WIDTH },
     },
     {
@@ -375,13 +396,13 @@ function buildEightBitAdderDocument(chip: ChipEntry): CircuitDocument {
       options: { width: BUS_WIDTH, widths: unitWidths(BUS_WIDTH) },
     },
   ]
-  // Conexões do 8-ADD: os dois barramentos ocupam as entradas 1 e 2.
+  // Os dois barramentos ocupam as entradas públicas de dados em ambos os aliases.
   const connections: CircuitDocument['connections'] = [
-    { source: { node: 'input-1-a' }, target: { node: 'splitter-a', port: 0 } },
-    { source: { node: 'input-2-b' }, target: { node: 'splitter-b', port: 0 } },
+    { source: { node: inputAId }, target: { node: 'splitter-a', port: 0 } },
+    { source: { node: inputBId }, target: { node: 'splitter-b', port: 0 } },
   ]
 
-  let incomingCarry = 'input-0-carry'
+  let incomingCarry = carryInputId
   for (let bit = BUS_WIDTH - 1; bit >= 0; bit -= 1) {
     const xorOne = `sum-xor-1-${bit}`
     const xorTwo = `sum-xor-2-${bit}`
