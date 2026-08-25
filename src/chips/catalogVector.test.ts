@@ -388,3 +388,41 @@ describe('8-1AND importado do catálogo DLS', () => {
     expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
   })
 })
+
+
+describe('operadores binários de barramento do catálogo DLS', () => {
+  it.each([
+    ['8x2-AND', '10001000'],
+    ['8x2-OR', '11101110'],
+    ['8x2-XOR', '01100110'],
+  ] as const)('materializa e avalia o fixture real %s', async (name, expected) => {
+    const catalog = await loadCatalog()
+    const chip = catalog.chips.find((candidate) => candidate.name === name)
+
+    expect(chip).toMatchObject({
+      name,
+      in: 2,
+      out: 1,
+      widths: [8],
+      pins: { in: ['IN', 'IN'], out: ['OUT'] },
+    })
+    expect(chip).toBeDefined()
+
+    const document = catalogVectorChipToCircuitDocument(chip!)
+    expect(document).not.toBeNull()
+    expect(document?.nodes.filter((node) => node.type === 'splitter')).toHaveLength(2)
+    const gateType = name === '8x2-AND' ? 'and' : name === '8x2-OR' ? 'or' : 'xor'
+    expect(document?.nodes.filter((node) => node.type === gateType)).toHaveLength(8)
+    expect(validateCircuit(document!, { allowBuses: true })).toEqual([])
+
+    const result = evaluateCircuitVectors(document!, { 'input-1': 0xaa, 'input-2': 0xcc })
+    expect(toBinary(result.outputs['output-1']!)).toBe(expected)
+
+    const definition = buildCustomChipDefinition(document!, `${name} importado`)
+    expect(definition.inputs.map((port) => [port.name, port.width])).toEqual([
+      ['IN', 8],
+      ['IN_2', 8],
+    ])
+    expect(definition.outputs.map((port) => [port.name, port.width])).toEqual([['OUT', 8]])
+  })
+})
