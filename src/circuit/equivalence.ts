@@ -5,8 +5,13 @@ import {
   isStatefulEditorType,
   toNetlist,
   type CircuitDocument,
-  type CircuitNode,
 } from './editorModel'
+import {
+  collectCircuitPorts,
+  compareCircuitText,
+  duplicatePortMessage,
+  type CircuitPort,
+} from './portIdentity'
 import { normalizeCircuitDocument } from './documentContract'
 import type { CustomChipLibraryEntry } from './customChip'
 
@@ -42,10 +47,7 @@ export interface CircuitEquivalenceIssue {
   onlyInB?: string[]
 }
 
-export interface CircuitEquivalencePort {
-  name: string
-  width: number
-}
+export type CircuitEquivalencePort = CircuitPort
 
 export interface CircuitEquivalenceInputValue {
   name: string
@@ -274,7 +276,7 @@ function statefulTypes(document: CircuitDocument): string[] {
   for (const node of document.nodes) {
     if (isStatefulEditorType(node.type)) found.add(node.type)
   }
-  return [...found].sort(compareText)
+  return [...found].sort(compareCircuitText)
 }
 
 interface CollectedPorts {
@@ -286,39 +288,17 @@ interface CollectedPorts {
 }
 
 function collectPorts(document: CircuitDocument, side: 'A' | 'B'): CollectedPorts {
-  const inputs: CircuitEquivalencePort[] = []
-  const outputs: CircuitEquivalencePort[] = []
-  const inputIds = new Map<string, string>()
-  const outputIds = new Map<string, string>()
-  const issues: CircuitEquivalenceIssue[] = []
-
-  for (const node of document.nodes) {
-    if (node.type !== 'input' && node.type !== 'output') continue
-    const name = portName(node)
-    const target = node.type === 'input' ? inputIds : outputIds
-    if (target.has(name)) {
-      issues.push({
-        code: 'duplicate-port-name',
-        message:
-          `O circuito ${side} tem mais de uma ${node.type === 'input' ? 'entrada' : 'saída'} chamada "${name}". ` +
-          'A comparação usa o rótulo como identidade, então os nomes precisam ser únicos.',
-      })
-      continue
-    }
-    target.set(name, node.id)
-    const port = { name, width: node.options?.width ?? 1 }
-    if (node.type === 'input') inputs.push(port)
-    else outputs.push(port)
+  const identity = collectCircuitPorts(document)
+  return {
+    inputs: identity.inputs,
+    outputs: identity.outputs,
+    inputIds: identity.inputIds,
+    outputIds: identity.outputIds,
+    issues: identity.duplicates.map((duplicate) => ({
+      code: 'duplicate-port-name' as const,
+      message: duplicatePortMessage(duplicate, side),
+    })),
   }
-
-  inputs.sort(comparePorts)
-  outputs.sort(comparePorts)
-  return { inputs, outputs, inputIds, outputIds, issues }
-}
-
-function portName(node: CircuitNode): string {
-  const label = node.label?.trim()
-  return label && label.length > 0 ? label : node.id
 }
 
 function compareNameSets(
@@ -329,8 +309,8 @@ function compareNameSets(
 ): CircuitEquivalenceIssue[] {
   const namesA = new Set(a.map((port) => port.name))
   const namesB = new Set(b.map((port) => port.name))
-  const onlyInA = [...namesA].filter((name) => !namesB.has(name)).sort(compareText)
-  const onlyInB = [...namesB].filter((name) => !namesA.has(name)).sort(compareText)
+  const onlyInA = [...namesA].filter((name) => !namesB.has(name)).sort(compareCircuitText)
+  const onlyInB = [...namesB].filter((name) => !namesA.has(name)).sort(compareCircuitText)
   if (onlyInA.length === 0 && onlyInB.length === 0) return []
 
   const parts: string[] = []
@@ -421,11 +401,3 @@ function incomparable(
   }
 }
 
-function comparePorts(a: CircuitEquivalencePort, b: CircuitEquivalencePort): number {
-  return compareText(a.name, b.name)
-}
-
-/** Comparação estável e independente de locale, para manter a ordem determinística. */
-function compareText(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0
-}

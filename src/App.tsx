@@ -50,6 +50,9 @@ const EquivalencePanel = lazy(() =>
 const TimelineComparisonPanel = lazy(() =>
   import('./components/TimelineComparisonPanel').then((module) => ({ default: module.TimelineComparisonPanel })),
 )
+const TestbenchPanel = lazy(() =>
+  import('./components/TestbenchPanel').then((module) => ({ default: module.TestbenchPanel })),
+)
 const ChipLibrary = lazy(() =>
   import('./components/ChipLibrary').then((module) => ({ default: module.ChipLibrary })),
 )
@@ -469,6 +472,12 @@ function AppContent() {
         <WorkspaceBoundary label="a comparação temporal">
           <Suspense fallback={<WorkspaceLoading label="comparação temporal" />}>
             <TimelineComparisonPanel />
+          </Suspense>
+        </WorkspaceBoundary>
+
+        <WorkspaceBoundary label="os testes do circuito">
+          <Suspense fallback={<WorkspaceLoading label="testes do circuito" />}>
+            <TestbenchPanel />
           </Suspense>
         </WorkspaceBoundary>
 

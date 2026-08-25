@@ -5,6 +5,7 @@ import {
   circuitDifferential,
   circuitEquivalence,
   circuitTruthTable,
+  runTestbenchTool,
   circuitVectorTruthTable,
   debugAlgorithm,
   exportCircuitTool,
@@ -346,6 +347,56 @@ server.registerTool(
       script,
       maxTicks: max_ticks,
     })),
+)
+
+server.registerTool(
+  'run_testbench',
+  {
+    title: 'Rodar testbench',
+    description:
+      'Roda um documento de teste declarativo contra um CircuitDocument e devolve quais casos falharam, ' +
+      'com a saída, o valor esperado e o obtido. O teste é DADO, não código: nenhuma expressão é avaliada. ' +
+      'Cada caso é combinacional (inputs + expect) ou sequencial (steps com set/ticks/expect), nunca os dois. ' +
+      'Passar em todos os casos cobre apenas os vetores escritos — para prova sobre todo o espaço de entrada, ' +
+      'use circuit_equivalence.',
+    inputSchema: {
+      document: z.unknown().describe('CircuitDocument serializável do formato veritas-circuit'),
+      testbench: z
+        .object({
+          format: z.literal('veritas-testbench'),
+          version: z.literal(1),
+          name: z.string().min(1),
+          cases: z
+            .array(
+              z.object({
+                name: z.string().optional(),
+                inputs: z.record(z.string(), z.boolean()).optional().describe('Modo combinacional: entradas por rótulo'),
+                expect: z.record(z.string(), z.boolean()).optional().describe('Modo combinacional: saídas esperadas por rótulo'),
+                steps: z
+                  .array(
+                    z.object({
+                      set: z.record(z.string(), z.boolean()).optional(),
+                      ticks: z.number().int().min(1).default(1),
+                      expect: z.record(z.string(), z.boolean()).optional().describe('Conferido depois dos tiques'),
+                    }),
+                  )
+                  .optional()
+                  .describe('Modo sequencial: roteiro com expectativas'),
+              }),
+            )
+            .min(1)
+            .max(512),
+        })
+        .describe('Documento veritas-testbench versão 1'),
+      custom_chips: z
+        .array(z.object({ id: z.number().int().min(1), definition: z.unknown() }))
+        .max(128)
+        .default([])
+        .describe('Definições veritas-custom-chip usadas pelo circuito (somente casos combinacionais)'),
+    },
+  },
+  async ({ document, testbench, custom_chips }) =>
+    guard(() => runTestbenchTool({ document, testbench, customChips: custom_chips })),
 )
 
 server.registerTool(

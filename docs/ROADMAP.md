@@ -727,3 +727,25 @@ Critérios realizados: 14 testes de domínio (incluindo uma divergência que só
 Com os dois contratos de comparação fechados, o testbench passa a ser possível sem inventar uma DSL executável: um conjunto de vetores de entrada e saídas esperadas, avaliado pelo mesmo caminho da equivalência (combinacional) ou da comparação temporal (sequencial), com o mesmo formato de contraexemplo. O documento de teste é dado, não código — o que mantém a fronteira de segurança do §70 do plano mestre intacta.
 
 Só depois disso vêm as asserções (`assert ALWAYS`, `assert NEVER`) e a verificação de propriedades, que precisam de um avaliador de expressões sobre sinais — e esse avaliador deve reusar o parser da engine, não um `eval`.
+
+## Implementação VERIFY-003 — testbench declarativo — 2026-08-25
+
+VERIFY-001 e VERIFY-002 comparam circuito com circuito. Esta fatia fecha o triângulo comparando o circuito com a **intenção declarada do autor**: `runTestbench` recebe um documento `veritas-testbench` e devolve quais casos falharam, com a saída, o valor esperado e o obtido.
+
+A restrição central é que o teste é **dado, não código**. Um caso declara valores; nenhuma expressão do usuário é avaliada, nada é compilado, e abrir um documento de teste não é mais arriscado que abrir um `.veritas`. Isso é deliberado e preserva a fronteira do §70 do plano mestre: assim que um testbench aceita expressões, ele vira uma linguagem, e uma linguagem exige sandbox. As asserções (`assert ALWAYS`/`NEVER`) vão precisar de um avaliador sobre sinais, e ele deve reusar o parser da engine.
+
+Três decisões de contrato que valem registro. Primeira: um caso é combinacional (`inputs` + `expect`) ou sequencial (`steps`), nunca os dois — misturar torna a intenção ambígua e é recusado. Segunda: um caso sem nenhuma saída esperada é recusado em vez de contar como aprovado, porque um caso que não pode falhar não testa nada, só produz sensação de cobertura. Terceira: todos os casos rodam, mesmo depois do primeiro que falha, porque o produto útil é saber quantos e quais quebraram.
+
+O vocabulário do relatório segue a mesma disciplina das fatias anteriores: `passed` cobre **exatamente os casos escritos**, e tanto o MCP quanto o painel dizem isso junto do resultado positivo, apontando `circuit_equivalence` como o caminho para prova sobre todo o espaço de entrada.
+
+Casos sequenciais ainda não expandem `custom-chip`, porque `createDocumentRuntime` não recebe a biblioteca de chips. Em vez de esconder isso, existe uma guarda explícita (`sequential-custom-chip`) que diz o que fazer — sem ela o usuário receberia um "componente sem definição" genérico do netlist, que não explica que o problema é a combinação de modo com chip.
+
+Como efeito colateral necessário, `collectPorts` — que estava duplicado em `equivalence.ts` e `differential.ts` — foi extraído para `src/circuit/portIdentity.ts`. Uma terceira cópia teria criado três definições de "identidade de porta" livres para divergir. A ordem canônica, a regra de rótulo-com-reserva-no-ID e a mensagem de duplicata agora moram num lugar só, e as duas fatias anteriores passaram no refactor sem alterar um único teste.
+
+Critérios realizados: 19 testes de domínio, 4 testes da ferramenta MCP, checks `MCP-TB-001` e `MCP-TB-002` no acceptance stdio (16 PASS, 0 FAIL, 0 SKIP), suíte completa com 470 testes, typecheck, lint, builds de frontend/MCP stdio/MCP HTTP/lib/plugin, `beta:mcp:http` 18 PASS, `beta:accessibility` 5 PASS, `beta:rust` 2 PASS, `beta:wasm:isolation` 5 PASS, e verificação do painel no Chromium com um meio somador de vai-um errado — caso #1 reprovado e caso #2 aprovado, sem erro de console.
+
+## Próxima fatia — VERIFY-004 asserções e casos gerados
+
+Com o testbench declarativo fechado, os dois caminhos naturais são: um editor de roteiro com expectativas na interface (hoje o painel cobre só o modo combinacional, enquanto o domínio e o MCP já fazem os dois), e a geração de casos a partir da tabela verdade, para transformar o comportamento atual em regressão.
+
+As asserções continuam depois disso, e não antes, porque exigem um avaliador de expressões sobre sinais. A regra que já vale: esse avaliador reusa `src/engine/parser.ts`, nunca `eval` nem `Function`.

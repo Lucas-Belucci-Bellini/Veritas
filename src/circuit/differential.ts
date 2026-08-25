@@ -1,6 +1,12 @@
 import { createDocumentRuntime } from '../simulation/documentRuntime'
-import { CircuitValidationError, type CircuitDocument, type CircuitNode } from './editorModel'
+import { CircuitValidationError, type CircuitDocument } from './editorModel'
 import { normalizeCircuitDocument } from './documentContract'
+import {
+  circuitPortName,
+  collectCircuitPorts,
+  compareCircuitText,
+  duplicatePortMessage,
+} from './portIdentity'
 
 /**
  * Teto de tiques de uma comparação temporal.
@@ -119,8 +125,8 @@ export function compareCircuitTimelines(
   ]
   if (interfaceIssues.length > 0) return incomparable(interfaceIssues)
 
-  const inputs = [...portsA.inputs].sort(compareText)
-  const outputs = [...portsA.outputs].sort(compareText)
+  const inputs = [...portsA.inputs].sort(compareCircuitText)
+  const outputs = [...portsA.outputs].sort(compareCircuitText)
 
   if (script.length === 0) {
     return incomparable(
@@ -144,7 +150,7 @@ export function compareCircuitTimelines(
           code: 'unknown-input',
           message:
             `O roteiro aplica valores em entradas que não existem nos circuitos: ` +
-            `${[...unknown].sort(compareText).join(', ')}.`,
+            `${[...unknown].sort(compareCircuitText).join(', ')}.`,
         },
       ],
       { inputs, outputs, totalTicks },
@@ -176,7 +182,7 @@ export function compareCircuitTimelines(
   const applied = new Map<string, boolean>()
   for (const node of normalizedA.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {
-      applied.set(portName(node), node.options.initial)
+      applied.set(circuitPortName(node), node.options.initial)
     }
   }
   const divergentOutputs = new Set<string>()
@@ -261,36 +267,17 @@ interface CollectedPorts {
 }
 
 function collectPorts(document: CircuitDocument, side: 'A' | 'B'): CollectedPorts {
-  const inputs: string[] = []
-  const outputs: string[] = []
-  const inputIds = new Map<string, string>()
-  const outputIds = new Map<string, string>()
-  const issues: CircuitDifferentialIssue[] = []
-
-  for (const node of document.nodes) {
-    if (node.type !== 'input' && node.type !== 'output') continue
-    const name = portName(node)
-    const target = node.type === 'input' ? inputIds : outputIds
-    if (target.has(name)) {
-      issues.push({
-        code: 'duplicate-port-name',
-        message:
-          `O circuito ${side} tem mais de uma ${node.type === 'input' ? 'entrada' : 'saída'} chamada "${name}". ` +
-          'A comparação usa o rótulo como identidade, então os nomes precisam ser únicos.',
-      })
-      continue
-    }
-    target.set(name, node.id)
-    if (node.type === 'input') inputs.push(name)
-    else outputs.push(name)
+  const identity = collectCircuitPorts(document)
+  return {
+    inputs: identity.inputs.map((port) => port.name),
+    outputs: identity.outputs.map((port) => port.name),
+    inputIds: identity.inputIds,
+    outputIds: identity.outputIds,
+    issues: identity.duplicates.map((duplicate) => ({
+      code: 'duplicate-port-name' as const,
+      message: duplicatePortMessage(duplicate, side),
+    })),
   }
-
-  return { inputs, outputs, inputIds, outputIds, issues }
-}
-
-function portName(node: CircuitNode): string {
-  const label = node.label?.trim()
-  return label && label.length > 0 ? label : node.id
 }
 
 function compareNameSets(
@@ -301,8 +288,8 @@ function compareNameSets(
 ): CircuitDifferentialIssue[] {
   const namesA = new Set(a)
   const namesB = new Set(b)
-  const onlyInA = [...namesA].filter((name) => !namesB.has(name)).sort(compareText)
-  const onlyInB = [...namesB].filter((name) => !namesA.has(name)).sort(compareText)
+  const onlyInA = [...namesA].filter((name) => !namesB.has(name)).sort(compareCircuitText)
+  const onlyInB = [...namesB].filter((name) => !namesA.has(name)).sort(compareCircuitText)
   if (onlyInA.length === 0 && onlyInB.length === 0) return []
 
   const parts: string[] = []
@@ -334,9 +321,4 @@ function incomparable(
     firstDivergence: null,
     issues,
   }
-}
-
-/** Comparação estável e independente de locale, para manter a ordem determinística. */
-function compareText(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0
 }

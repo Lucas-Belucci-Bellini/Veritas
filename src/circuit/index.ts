@@ -57,6 +57,27 @@ export type {
   CircuitDifferentialStatus,
   CircuitDifferentialStep,
 } from './differential'
+export {
+  MAX_TESTBENCH_CASES,
+  MAX_TESTBENCH_TICKS,
+  runTestbench,
+  TESTBENCH_FORMAT,
+  TESTBENCH_VERSION,
+} from './testbench'
+export type {
+  TestbenchCase,
+  TestbenchCaseResult,
+  TestbenchDocument,
+  TestbenchIssue,
+  TestbenchIssueCode,
+  TestbenchMismatch,
+  TestbenchOptions,
+  TestbenchReport,
+  TestbenchStatus,
+  TestbenchStep,
+} from './testbench'
+export { circuitPortName, collectCircuitPorts, compareCircuitText, duplicatePortMessage } from './portIdentity'
+export type { CircuitPort, CircuitPortDuplicate, CircuitPortIdentity } from './portIdentity'
 export { optimizeCircuitDocument } from './optimize'
 export type { CircuitOptimization } from './optimize'
 export { buildCircuitIssueGuidance, summarizeCircuitIssues } from './validationFeedback'
