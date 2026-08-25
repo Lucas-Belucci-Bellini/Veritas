@@ -1,5 +1,6 @@
 import { CircuitValidationError, validateCircuit, type CircuitDocument, type CircuitNode } from './editorModel'
 import type { CustomChipLibraryEntry } from './customChip'
+import { orderCustomChipPins } from './customChipPorts'
 import { normalizeCircuitDocument } from './documentContract'
 import { MAX_WIRELESS_CHANNEL_LENGTH } from './documentLimits'
 import { normalizeWirelessChannel } from './wirelessChannels'
@@ -100,9 +101,11 @@ function elaborate(
 
   return {
     document: { ...normalized, nodes, connections },
+    // A fronteira precisa sair na mesma ordem que `definition.inputs`, senão a
+    // porta k da instância liga num pino e a validação conta outro.
     boundary: {
-      inputs: normalized.nodes.filter((node) => node.type === 'input').map((node) => idMap.get(node.id)!),
-      outputs: normalized.nodes.filter((node) => node.type === 'output').map((node) => idMap.get(node.id)!),
+      inputs: orderCustomChipPins(normalized.nodes.filter((node) => node.type === 'input')).map((node) => idMap.get(node.id)!),
+      outputs: orderCustomChipPins(normalized.nodes.filter((node) => node.type === 'output')).map((node) => idMap.get(node.id)!),
     },
   }
 }

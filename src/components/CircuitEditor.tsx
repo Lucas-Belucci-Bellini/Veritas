@@ -57,6 +57,7 @@ import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
 import type { CircuitBroadcast } from '../realtime/circuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
 import { SequentialCircuitPanel } from './SequentialCircuitPanel'
+import { DlsImportPanel } from './DlsImportPanel'
 import type { DocumentRuntimeSnapshot, DocumentRuntimeState } from '../simulation/documentRuntime'
 import { runtimeFreshness } from '../realtime/runtimeFreshness'
 import { EMPTY_RUNTIME_METRICS, recordRuntimeMetric, type RuntimeMetricEvent, type RuntimeMetrics } from '../realtime/runtimeMetrics'
@@ -1074,6 +1075,10 @@ export function CircuitEditor() {
                 ))}
               </ul>
             )}
+            <DlsImportPanel
+              disabled={readOnlyCollaboration || !customChips.ready || Boolean(customChips.unavailable)}
+              onImported={customChips.refresh}
+            />
           </section>
         </aside>
 

@@ -28,6 +28,15 @@ export { buildCircuitContext } from './context'
 export type { CircuitContextOptions, CircuitContextRecord } from './context'
 export { exportCircuit, exportVerilog, exportVhdl } from './export'
 export type { CircuitExportFormat, CircuitExportOptions } from './export'
+export { buildDlsChipDocument, createDlsImportRun, parseDlsChip, planDlsImport } from './dlsImport'
+export type {
+  DlsChip,
+  DlsImportPlan,
+  DlsImportRefusal,
+  DlsImportReport,
+  DlsImportRun,
+  DlsImportStep,
+} from './dlsImport'
 export { elaborateCustomChipDocument, MAX_CUSTOM_CHIP_ELABORATION_DEPTH } from './customChipElaboration'
 export type { CustomChipElaborationOptions } from './customChipElaboration'
 export {

@@ -2,6 +2,28 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [Não publicado]
+
+### Adicionado
+
+- **Importação estrutural de chips do Digital Logic Sim.** `src/circuit/dlsImport.ts` lê a netlist de um chip do DLS — pinos, sub-chips e fios — e a transcreve para um `CircuitDocument`, com cada sub-chip virando uma instância do chip correspondente. A hierarquia que o autor montou continua navegável e editável aqui dentro; o NAND é a única folha nativa, porque o projeto constrói o próprio AND, OR, NOT e XOR a partir dele e trocá-los por portas nativas apagaria justamente o que ele construiu.
+- Painel de importação na Biblioteca local do editor: o operador escolhe os arquivos da pasta `Chips`, a leitura acontece no navegador e nada sai da máquina.
+- `importDlsChipProjects` no storage, com a biblioteca carregada uma vez e crescendo em memória — salvar chip a chip pelo caminho comum releria a tabela inteira a cada um, e com centenas de chips a importação vira O(n²) de leitura.
+- `tests/dlsLibraryParity.test.ts`: confere o importador contra uma biblioteca inteira do DLS. Não roda por padrão — aponte `VERITAS_DLS_CHIPS` para a pasta `Chips` de um projeto.
+
+### Corrigido
+
+- **Os pinos de um chip customizado podiam trocar de lugar em silêncio.** O `buildCustomChipDefinition` ordenava as portas por ID e a elaboração as ordenava pela ordem do documento. Onde as duas discordavam, o sinal ligado na porta *k* chegava em outro pino — sem erro, sem aviso, só o valor errado. E discordar era fácil: os IDs do editor são `input-1`, `input-2`, …, e `"input-11"` vem *antes* de `"input-2"` na ordenação textual, então bastava acrescentar um pino depois do nono componente. `orderCustomChipPins` passa a ser a fonte única dessa ordem, e a validação, a interface e a elaboração agora dizem a mesma coisa. Um chip afetado que já estava salvo passa a se comportar como os rótulos da interface sempre prometeram.
+
+### Validação e limites
+
+- Suíte com 499 testes. Os três de ordem de pinos falham sem a correção e passam com ela — o de hierarquia só depois de quebrar a simetria entre os níveis, porque com a mesma permutação nos dois a troca se cancelava e o teste passava sobre o defeito.
+- Sobre a biblioteca real do UMBRA LIMA ALFA: **775 dos 1121 chips** importados com estrutura completa, contra 388 que o caminho antigo alcançava por expressão booleana.
+- **212 desses chips foram cruzados com as tabelas verdade que o `catalog.json` já trazia, com zero divergências.** São dois caminhos independentes — um simula o chip e destila a expressão, o outro transcreve a netlist e roda pelo simulador do Veritas — então um erro teria que estar nos dois, do mesmo jeito, no mesmo chip.
+- No navegador, pelo caminho real do produto: nove arquivos do DLS escolhidos no painel, oito chips na biblioteca com os pinos certos e um recusado — o `Full Adder`, que tem dois fios no mesmo pino de saída no arquivo de origem, e cuja recusa nomeia o pino exato. Nenhum erro de console.
+- **A importação não promete equivalência com o DLS**: ela transcreve a netlist, não confere comportamento. Para isso existe a comparação de equivalência, que roda depois sobre o chip já importado.
+- Ficam de fora, com o motivo dito um a um: 35 chips com pino multi-bit (o Veritas ainda não liga barramento dentro de chip), 29 sem pinos de entrada, 6 que usam componentes do DLS que não existem aqui, 6 acima dos limites de 256 componentes ou 512 conexões, 2 com ciclo combinacional, 2 com defeito no próprio arquivo — e 267 que dependem de algum dos anteriores.
+
 ## [0.9.0-rc.17] — 2026-08-25
 
 ### Adicionado
