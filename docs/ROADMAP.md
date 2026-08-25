@@ -4,7 +4,7 @@
 
 ## 1. Estado atual
 
-A versão de referência do repositório é a **v0.8.0-rc.1**. O projeto já possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial básica e servidor MCP.
+A versão de referência da implementação local é a **Release 0.10.2**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
 
 | Área | Situação real | Evidência no repositório |
 | --- | --- | --- |
@@ -22,8 +22,8 @@ A versão de referência do repositório é a **v0.8.0-rc.1**. O projeto já pos
 | Colaboração Realtime | Entregue em prévia | Broadcast, Presence, convite por papel e canvas visualizador |
 | Exportação Verilog/VHDL | Entregue em prévia | `src/circuit/export.ts` e testes determinísticos |
 | Monitoramento de IA | Entregue em prévia | `veritas_ai_metrics`, Realtime, cliente e painel |
-| Barramentos multi-bit | Backlog priorizado | Ainda não existe no modelo de dados |
-| Chips customizados hierárquicos | Backlog posterior | Depende do editor e do modelo de subcircuitos |
+| Barramentos multi-bit | Entregue em prévia | BitVector, Splitter/Combiner, avaliação vetorial e exportação HDL dimensionada |
+| Chips customizados hierárquicos | Entregue em prévia | Composição local, expansão com limite e ciclo recusado |
 | Aplicativo desktop Tauri/Rust | Investigar depois | Depende de métricas de performance e escopo estabilizado |
 | 3D, PCB, impressão e 250 subagentes | Visão de longo prazo | Não fazem parte do próximo ciclo |
 
@@ -45,14 +45,16 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.8.0** | Barramentos multi-bit | Largura explícita de sinal; operações bitwise; displays binário/hexadecimal; splitter/combiner; limites de largura e testes de compatibilidade | Um circuito de 8 bits consegue ser criado, simulado, salvo e reaberto com resultado determinístico |
 | **v0.9.0** | Workspace sequencial | Edição visual de clock, DFF/TFF, delay, contadores e observação de ticks; pausa, avanço manual e reset | Um contador e um circuito com feedback podem ser simulados sem congelar a interface |
 | **v0.10.0** | Abstração e chips customizados | Pinos de entrada/saída; criação de subcircuito; biblioteca local de chips; execução hierárquica com limites de profundidade | Um subcircuito salvo pode ser reutilizado como componente em outro projeto |
+| **v0.10.1** | Barramentos visuais particionáveis | Splitter/Combiner, partições editáveis, avaliação vetorial multi-saída e persistência reversível | Um barramento pode ser dividido, recombinado, salvo e reaberto |
+| **v0.10.2** | Chips multi-bit combinacionais DLS | Allowlist estrutural de `4-ADD` e bancos AND/NAND/OR/XOR de 8 bits, biblioteca local e portas heterogêneas | Um chip multi-bit suportado pode ser importado, reutilizado, avaliado e exportado localmente |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
-## 4. Próximo ciclo: v0.7.1
+## 4. Histórico do ciclo v0.7.1
 
-A primeira implementação organizada foi o **editor visual combinacional** e está disponível em prévia. O próximo ciclo concentra-se em usabilidade e confiabilidade: desfazer/refazer, atalhos, seleção consistente, layout inicial e testes de interação. A calculadora de expressões continua funcionando de forma independente do editor.
+A primeira implementação organizada foi o **editor visual combinacional** e está disponível em prévia. O ciclo seguinte concentrou-se em usabilidade e confiabilidade: desfazer/refazer, atalhos, seleção consistente, layout inicial e testes de interação. A calculadora de expressões continua funcionando de forma independente do editor.
 
-O editor terá um modelo de dados próprio, independente dos objetos internos do React Flow. A interface converterá esse modelo para nós e arestas visuais; a engine receberá um netlist normalizado. Essa separação permite salvar arquivos estáveis, testar o cálculo sem DOM e futuramente trocar a biblioteca de canvas sem reescrever o domínio.
+O editor passou a ter um modelo de dados próprio, independente dos objetos internos do React Flow. A interface converte esse modelo para nós e arestas visuais; a engine recebe um netlist normalizado. Essa separação permite salvar arquivos estáveis, testar o cálculo sem DOM e trocar a biblioteca de canvas sem reescrever o domínio.
 
 | Item | Decisão para v0.7.0 |
 | --- | --- |
