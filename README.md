@@ -36,7 +36,8 @@ O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca a
 | v0.8.0-rc.1 | Barramentos multi-bit, tabela verdade vetorial, seleção de linhas e exportação HDL dimensionada |
 | v0.8.0 (prévia anterior) | ALGO-001 executor determinístico local-first e ALGO-002 Watch/BranchTrace |
 | v0.9.0-rc.1 | Workspace sequencial visual, checkpoints temporais, colaboração de runtime e proteção contra ofertas obsoletas |
-| v0.10.1 (em construção) | Splitter/Combiner visuais, partições editáveis, avaliação vetorial multi-saída e persistência reversível |
+| v0.10.1 | Splitter/Combiner visuais, partições editáveis, avaliação vetorial multi-saída e persistência reversível |
+| v0.10.2 | Chips multi-bit combinacionais DLS selecionados, incluindo 4-ADD e bancos de portas de 8 bits, com biblioteca local e portas heterogêneas |
 | v0.9.0 (prévia anterior) | ALGO-003 While, depuração passo a passo e MCP proposicional/algoritmos |
 | — | Biblioteca com 1121 chips importados do Digital Logic Sim |
 
@@ -91,14 +92,22 @@ continua disponível para circuitos escalares e aparece desabilitada para circui
 vetoriais até que o contexto de IA multi-bit seja finalizado. O modo local-first e o
 IndexedDB preservam a largura mesmo sem Supabase configurado.
 
-Na release **v0.10.1 em construção**, o editor também oferece **Splitter** e
+Na release **v0.10.1**, o editor também oferece **Splitter** e
 **Combiner**. O Splitter recebe um barramento e o divide em partes na ordem MSB → LSB;
 o Combiner recebe essas partes e reconstrói um barramento. Selecione a peça e edite
 as partes no painel lateral, por exemplo `3 + 5`. O Splitter exige que a soma feche
-exatamente sua entrada; o Combiner atualiza a largura da saída. As portas são
-serializadas no arquivo `.veritas` e restauradas ao reabrir o projeto.
+exatamente sua entrada; o Combiner atualiza a largura da saída. As portas são serializadas no arquivo `.veritas` e restauradas ao reabrir o projeto.
+
+### Chips multi-bit importados (v0.10.2)
+
+A biblioteca DLS contém muitas definições, mas o Veritas não executa JSON importado nem presume que uma dependência ausente seja um componente válido. A Release 0.10.2 materializa somente uma allowlist de perfis combinacionais conhecidos: `4-ADD`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT` e `8x2-XOR`.
+
+O `4-ADD` preserva três entradas de `4 + 4 + 1` bits, duas saídas de `4 + 1` bits e o carry. Os bancos de portas preservam a estrutura `Splitter → portas escalares → Combiner`, com os canais na convenção MSB → LSB. Ao clicar em **Adicionar ao editor**, o modelo é validado, salvo na biblioteca local do IndexedDB e fica disponível como chip customizado no canvas; as alças anunciam a largura individual de cada porta.
+
+O restante do catálogo continua disponível para consulta. Chips sequenciais, memória, tri-state, conversores e perfis com dependências ou portas fora da allowlist permanecem bloqueados até que exista um contrato vetorial/temporal específico. Assim, a importação não altera o caminho local-first: construir, simular, salvar e exportar continuam funcionando sem conta ou conexão.
 
 ### Performance (v0.4.9)
+
 
 * **Tabela virtualizada.** Uma expressão com 10 variáveis dá 1024 linhas; com as
   colunas de passos intermediários isso passa de 20 mil células. Acima de 200

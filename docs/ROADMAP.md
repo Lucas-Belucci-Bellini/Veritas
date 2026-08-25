@@ -773,3 +773,25 @@ A validação do documento verifica larguras inteiras entre 1 e 64 bits, soma ex
 No editor, os componentes aparecem na paleta, criam handles dinâmicos, podem ter suas partições editadas no painel lateral e preservam `width`/`widths` ao salvar e reabrir projetos `.veritas`. A avaliação vetorial mantém `values` compatível com consumidores existentes e expõe `ports` para que o canvas e integrações possam observar todas as saídas de um Splitter.
 
 Critérios verificados nesta fatia: round-trip 8 bits com partição `3 + 5`, preservação MSB → LSB, rejeição de partições que não fecham a largura, typecheck, lint e regressões focadas. A validação completa de release e o smoke visual serão executados antes da consolidação do próximo marco.
+
+
+## Release 0.10.2 — chips multi-bit combinacionais importados — 2026-08-25
+
+A Release 0.10.2 fecha a primeira ponte controlada entre o catálogo real do DLS e o Digital Logic Sim próprio do Veritas. O importador não envia os JSONs de origem para o navegador, não executa código ou dados como programa e não tenta inferir dependências ausentes. Em vez disso, mantém uma allowlist explícita de perfis combinacionais que possuem uma materialização canônica conhecida.
+
+| Perfil DLS suportado | Materialização Veritas | Portas preservadas |
+| --- | --- | --- |
+| `4-ADD` | Ripple-carry estrutural com `1-ADD`, dois Splitters e um Combiner | Entrada `4 + 4 + 1` bits; saída `4 + 1` bits |
+| `AND-8 Bits`, `8x2-AND` | Splitter → oito portas AND → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+| `NAND-8Bits` | Splitter → oito portas NAND → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+| `OR-8 Bits`, `8x2-OR` | Splitter → oito portas OR → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+| `XOR - 8 BIT`, `8x2-XOR` | Splitter → oito portas XOR → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+
+O adaptador `src/chips/catalogVector.ts` valida nomes, portas, larguras, tipos e componentes conhecidos antes de construir um `CircuitDocument`. Para `4-ADD`, a avaliação foi conferida em todas as 512 combinações de dois operandos de 4 bits e carry de entrada; a soma baixa e o carry de saída coincidem com a aritmética ripple-carry. O chip resultante passa pelo mesmo caminho de `buildCustomChipDefinition()`, pode ser salvo na biblioteca local IndexedDB, instanciado em outro documento e exportado para Verilog/VHDL.
+
+A biblioteca visual distingue o modelo escalar do modelo multi-bit pronto para o canvas. Após a importação, o card local de `4-ADD` fica disponível sem conta ou rede, e o nó mostra `IN 4 + 4 + 1 · OUT 4 + 1 bits`. As alças anunciam individualmente 4, 4, 1, 4 e 1 bits, enquanto chips sequenciais, memória, tri-state, conversores e dependências fora da allowlist permanecem bloqueados.
+
+Critérios verificados nesta release: 70 arquivos e 489 testes Vitest; typecheck, lint, build do frontend/lib/MCP stdio/MCP HTTP/plugin; MCP 16 PASS, MCP HTTP 18 PASS, acessibilidade 5 PASS, WASM isolation 5 PASS, Rust 2 PASS e HDL 3 PASS.
+ O smoke local confirmou catálogo → biblioteca local → peça `4-ADD` no canvas, com portas heterogêneas e sem erro de largura. O beta readiness continua bloqueado por credenciais/evidências Supabase externas, e `validate:plugin` não pôde rodar porque o executável `claude` não está instalado no sandbox; nenhum bloqueio altera o modo local-first.
+
+A próxima fatia deve ampliar o contrato de importação apenas para novos perfis combinacionais que possam ser validados por fixtures reais e, em separado, definir o runtime temporal vetorial antes de considerar chips DLS como `8-DELAY`, registradores ou memória. A `main` permanece sem alterações; o trabalho está na branch `feature/chip-hierarchy-v1`, com o incremento funcional no commit `d5b86ae`.

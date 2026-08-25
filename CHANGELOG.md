@@ -2,6 +2,22 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [0.10.2] — 2026-08-25
+
+### Adicionado
+
+- Adaptador seguro para perfis multi-bit combinacionais conhecidos do catálogo DLS: `4-ADD`, `AND-8 Bits`, `8x2-AND`, `NAND-8Bits`, `OR-8 Bits`, `8x2-OR`, `XOR - 8 BIT` e `8x2-XOR`.
+- Materialização explícita em `CircuitDocument`: Splitter → portas escalares → Combiner para bancos vetoriais e ripple-carry de 4 bits para `4-ADD`, sem executar o JSON de origem nem transportar os 45 MB de definições para o navegador.
+- `4-ADD` preserva as portas `4, 4, 1` bits de entrada e `4, 1` bits de saída, incluindo a semântica MSB → LSB e o carry.
+- Biblioteca local e canvas identificam os modelos multi-bit prontos; handles do chip customizado anunciam as larguras individuais e a persistência continua no IndexedDB.
+
+### Validação e limites
+
+- Suíte completa: 70 arquivos e 489 testes aprovados; a nova suíte vetorial contém 10 testes, incluindo todas as 512 combinações do `4-ADD`, instanciação local e exportação Verilog/VHDL.
+- Typecheck, lint, build do frontend, lib, MCP stdio/HTTP e plugin aprovados; MCP 16/16, MCP HTTP 18/18, acessibilidade 5/5, WASM isolation 5/5, Rust 2/2 e HDL 3/3.
+- O gate beta readiness permanece bloqueado por credenciais/evidências externas Supabase ausentes; `validate:plugin` permanece bloqueado porque o executável `claude` não existe no sandbox. Esses bloqueios não afetam o caminho local-first.
+- A implementação é deliberadamente allowlist: chips DLS sequenciais, memória, tri-state, conversores não cobertos e dependências arbitrárias continuam não materializáveis até existir contrato vetorial/temporal correspondente.
+
 ## [Unreleased] — fundação da V1
 
 ### Adicionado
