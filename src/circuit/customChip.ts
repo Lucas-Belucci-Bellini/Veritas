@@ -8,6 +8,7 @@ import {
 } from './editorModel'
 import { normalizeCircuitDocument } from './documentContract'
 import { MAX_CUSTOM_CHIP_DEPTH } from './customChipInstance'
+import { orderCustomChipPins } from './customChipPorts'
 
 export const CUSTOM_CHIP_FORMAT = 'veritas-custom-chip' as const
 export const CUSTOM_CHIP_VERSION = 1 as const
@@ -172,8 +173,7 @@ function assertCustomChipDepthWithinLimit(
 
 function buildPorts(nodes: readonly CircuitNode[]): CustomChipPort[] {
   const used = new Map<string, number>()
-  return [...nodes]
-    .sort((a, b) => a.id.localeCompare(b.id))
+  return orderCustomChipPins(nodes)
     .map((node) => {
       const baseName = (node.label?.trim() || node.id).replace(/\s+/g, ' ')
       const key = baseName.toLocaleLowerCase('pt-BR')

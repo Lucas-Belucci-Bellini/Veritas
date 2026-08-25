@@ -328,6 +328,18 @@ completo, do multiplexador, do comparador de 2 bits. Chips sequenciais
 expressão equivalente, porque a saída deles depende do tempo e não só das
 entradas.
 
+Desde a `0.9.0-rc.18` existe um segundo caminho, e ele preserva a construção: a
+**importação estrutural**, no painel "Digital Logic Sim" da Biblioteca local do
+editor. Em vez de destilar o chip numa expressão, ela transcreve a netlist —
+cada sub-chip vira uma instância do chip correspondente, e a hierarquia que o
+autor montou continua aberta para inspecionar e editar. O NAND é a única folha
+nativa, porque o projeto constrói o próprio AND, OR, NOT e XOR a partir dele.
+Sobre a biblioteca do UMBRA LIMA ALFA, **775 dos 1121 chips** entram por esse
+caminho, contra 388 que o caminho da expressão alcança. Os arquivos são lidos no
+navegador; nada sai da máquina. A importação transcreve a netlist e não afirma
+equivalência com o DLS — para isso existe a comparação de equivalência, que roda
+depois sobre o chip já importado.
+
 ```bash
 npm run chips:import                      # usa ../UMBRA-LIMA-ALFA/Chips
 npm run chips:import -- /caminho/dos/chips # ou aponte para outro projeto DLS
