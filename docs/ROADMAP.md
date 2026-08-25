@@ -4,7 +4,7 @@
 
 ## 1. Estado atual
 
-A versão de referência da implementação local é a **Release 0.11.5**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
+A versão de referência da implementação local é a **Release 0.11.6**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
 
 | Área | Situação real | Evidência no repositório |
 | --- | --- | --- |
@@ -60,8 +60,17 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.11.3** | Negação condicional DLS | `NEGATE-8`, com entrada de dados de 8 bits, controle escalar e saída de 8 bits, usando oito XOR | Uma negação condicional vetorial real pode ser importada, reutilizada, avaliada e exportada localmente |
 | **v0.11.4** | Roteador misto de barramentos DLS | `16 para 8 e 4 bits`, com 16 entradas escalares, dez saídas, AND vetorial e divisão `[4,4]` | Um roteador combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem executar JSON DLS |
 | **v0.11.5** | Expansor vetorial DLS | `ZEXT-4-8`, com quatro entradas escalares, uma constante `0`, Combiner de oito partes e saída de 8 bits | Um expansor combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a oito portas escalares |
+| **v0.11.6** | Expansor de sinal vetorial DLS | `SEXT-4-8`, com quatro entradas escalares, fan-out do bit de sinal e saída de 8 bits | Um expansor de sinal combinacional real pode ser importado, reutilizado, avaliado e exportado localmente sem reduzir a saída a oito portas escalares |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
+
+### Atualização da implementação — Release 0.11.6
+
+A Release 0.11.6 fecha a allowlist do fixture real `Chips/SEXT-4-8.json`, da categoria Outros. O contrato aceito exige nome exato, quatro entradas, oito saídas derivadas, os pinos `A0…A3`/`O0…O7`, oito fios, zero subchips e zero dependências. O importador lê o registro catalogado e materializa um `CircuitDocument`; não executa JSON, não avalia código e não infere dependências.
+
+A construção local cria quatro inputs escalares, um Combiner com oito partes e uma saída vetorial `O0` de 8 bits. Os três primeiros canais recebem `A0`, `A1` e `A2`; os cinco canais restantes recebem o mesmo `A3`. A saída comprovada é `A0 A1 A2 A3 A3 A3 A3 A3` em ordem MSB → LSB, preservando a extensão de sinal real observada nos fios.
+
+Como o registro também contém oito expressões escalares derivadas, a biblioteca prioriza o documento vetorial quando a assinatura allowlisted coincide. Assim, a persistência local, a paleta e o canvas mostram `IN 1 + 1 + 1 + 1 bits · OUT 8 bits`. A suíte focada, os gates locais e o smoke catálogo → IndexedDB → paleta → canvas foram executados; tri-state, memória e estado continuam fora do escopo.
 
 ### Atualização da implementação — Release 0.11.5
 
