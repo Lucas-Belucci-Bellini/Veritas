@@ -16,6 +16,8 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - BENCH-002 adiciona a leitura de capacidade do runtime bruto: o mesmo fixture como `Netlist` passou em 10/100/500/1000/5000 gates, incluindo 5000 em 6.273,959 ms/15.003 ticks. Essa medição interna não altera os limites do editor nem declara suporte oficial para circuitos grandes, persistência, renderização ou desktop.
 - O BENCH-002 foi incluído nos quality gates comuns e desktop; seus relatórios JSON/Markdown são retidos como artefatos de CI por 14 dias. Uma falha bloqueia o avanço do build desktop, mas um workflow verde não cria tag nem promove release automaticamente.
 - Registrada a decisão em `docs/LARGE_CIRCUITS.md`: manter os limites oficiais do `CircuitDocument`, usar o Netlist bruto apenas para diagnóstico do Simulator e exigir contrato versionado, budgets, renderização, persistência, segurança e QA multiplataforma antes de anunciar suporte a circuitos grandes.
+- Adicionados flip-flops JK e SR ao contrato de componentes, Simulator, editor visual, conversão de conexões, watches do runtime e proteção de chips customizados. A semântica é síncrona na borda de subida: JK cobre hold/set/reset/toggle; SR cobre hold/set/reset e trata S=R=1 de forma determinística, preservando o estado anterior.
+- A cobertura de JK/SR inclui regressões de runtime, validação/conversão do editor e watches Q/Q̄ do `documentRuntime`; a inspeção visual interativa ainda permanece `NOT VERIFIED` neste ambiente sem Browser disponível.
 
 ## [0.12.0] — 2026-08-25
 
