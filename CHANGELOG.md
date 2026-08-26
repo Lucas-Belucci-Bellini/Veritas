@@ -11,6 +11,8 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - O workflow desktop passou a bloquear builds nativos sem `test`, typecheck, lint e build web; os runners Windows/Linux também executam smoke de instalação, startup e remoção com limites explícitos.
 - O painel de testbench agora edita casos sequenciais com passos, entradas `0/1/mantém`, ticks e expectativas por saída, usando o mesmo runner declarativo do domínio; a ponte UI→Simulator ganhou regressão permanente para um registrador.
 - Testbenches agora podem ser salvos, atualizados, reabertos, removidos, importados e exportados localmente como `veritas-testbenches` versão 1; a nova tabela IndexedDB é associada ao circuito e o parser recusa formato, modos e limites inválidos.
+- BENCH-001 adiciona `npm run bench:circuit-scale`, um benchmark determinístico separado da suíte padrão que mede o runtime `Simulator` real em cadeias de 10 e 100 gates, com warmup separado, validação de saída, checksum e relatórios JSON/Markdown ignorados em `artifacts/`.
+- A primeira baseline Linux x86_64/Node `v22.13.0` observou 0,577 ms em 220 ticks para 10 gates e 17,271 ms em 2.020 ticks para 100 gates. Os alvos de 500, 1000 e 5000 gates ficaram `NOT SUPPORTED` pelos limites atuais de 256 nós/512 conexões; FPS, memória desktop, startup nativo e tamanho instalado continuam `NOT VERIFIED`.
 
 ## [0.12.0] — 2026-08-25
 
