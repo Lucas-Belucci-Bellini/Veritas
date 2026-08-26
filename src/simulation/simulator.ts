@@ -26,6 +26,8 @@ interface NodeState {
 export interface SimulatorOptions {
   /** Teto de tiques em `settle`, para não rodar para sempre. */
   maxSettleTicks?: number
+  /** Teto acumulado de tiques deste runtime, incluindo chamadas anteriores. */
+  maxTotalTicks?: number
 }
 
 export interface SimulatorNodeState {
@@ -46,6 +48,8 @@ export interface SimulatorState {
 
 export const DEFAULT_MAX_SETTLE_TICKS = 200
 export const MAX_SETTLE_TICKS = 10_000
+export const DEFAULT_MAX_TOTAL_TICKS = 100_000
+export const MAX_TOTAL_TICKS = 1_000_000
 
 /**
  * Simulador de circuitos por tiques.
@@ -60,10 +64,12 @@ export class Simulator {
   private readonly nodes = new Map<string, NodeState>()
   private readonly order: string[] = []
   private readonly maxSettleTicks: number
+  private readonly maxTotalTicks: number
   private ticks = 0
 
   constructor(netlist: Netlist, options: SimulatorOptions = {}) {
     this.maxSettleTicks = normalizeSettleBudget(options.maxSettleTicks ?? DEFAULT_MAX_SETTLE_TICKS, false)
+    this.maxTotalTicks = normalizeTotalTickBudget(options.maxTotalTicks ?? DEFAULT_MAX_TOTAL_TICKS)
 
     for (const spec of netlist.components) {
       if (this.nodes.has(spec.id)) {
@@ -145,6 +151,10 @@ export class Simulator {
       throw new Error('O estado do simulador não corresponde ao netlist atual.')
     }
 
+    if (state.tickCount > this.maxTotalTicks) {
+      throw new RangeError(`O estado excede o orçamento total de ${this.maxTotalTicks} tiques do simulador.`)
+    }
+
     for (const [id, node] of this.nodes) {
       const saved = state.nodes[id]
       if (!saved || saved.outputs.length !== node.outputs.length || saved.next.length !== node.next.length) {
@@ -166,7 +176,11 @@ export class Simulator {
   }
 
   tick(count = 1): void {
-    for (let index = 0; index < count; index += 1) {
+    const requested = normalizeTickCount(count)
+    if (this.ticks + requested > this.maxTotalTicks) {
+      throw new RangeError(`O simulador excederia o orçamento total de ${this.maxTotalTicks} tiques.`)
+    }
+    for (let index = 0; index < requested; index += 1) {
       this.evaluate()
       this.propagate()
       this.ticks += 1
@@ -183,6 +197,7 @@ export class Simulator {
   settle(maxTicks = this.maxSettleTicks): boolean {
     const budget = normalizeSettleBudget(maxTicks, true)
     for (let index = 0; index < budget; index += 1) {
+      if (this.ticks >= this.maxTotalTicks) return false
       const before = this.serialize()
       this.tick()
       if (this.serialize() === before) return true
@@ -343,6 +358,20 @@ export class Simulator {
 
 function isBooleanArray(values: readonly unknown[]): values is boolean[] {
   return values.every((value) => typeof value === 'boolean')
+}
+
+function normalizeTickCount(value: number): number {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError('A quantidade de tiques deve ser um inteiro finito não negativo.')
+  }
+  return value
+}
+
+function normalizeTotalTickBudget(value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_TOTAL_TICKS) {
+    throw new RangeError(`O orçamento total deve ser um inteiro entre 1 e ${MAX_TOTAL_TICKS}.`)
+  }
+  return value
 }
 
 function normalizeSettleBudget(value: number, allowZero: boolean): number {

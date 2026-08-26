@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { collectVariables, evaluate, parse } from '../engine'
 import { assignmentForRow } from '../engine/truthTable'
 import { netlistFromAst } from './fromAst'
-import { MAX_SETTLE_TICKS, Simulator } from './simulator'
+import { MAX_SETTLE_TICKS, MAX_TOTAL_TICKS, Simulator } from './simulator'
 import type { Netlist } from './components'
 
 describe('validação do circuito', () => {
@@ -78,6 +78,29 @@ describe('lógica combinacional', () => {
     expect(() => sim.settle(MAX_SETTLE_TICKS + 1)).toThrow('orçamento de settle')
     expect(sim.settle(0)).toBe(false)
     expect(sim.tickCount).toBe(0)
+  })
+
+  it('limita o orçamento total de tiques e rejeita contagens inválidas', () => {
+    const sim = new Simulator(andCircuit, { maxTotalTicks: 3 })
+    sim.tick(3)
+    expect(sim.tickCount).toBe(3)
+    expect(() => sim.tick()).toThrow('orçamento total')
+    expect(() => sim.tick(-1)).toThrow('quantidade de tiques')
+    expect(() => sim.tick(1.5)).toThrow('quantidade de tiques')
+    expect(() => sim.tick(Number.POSITIVE_INFINITY)).toThrow('quantidade de tiques')
+    expect(() => new Simulator(andCircuit, { maxTotalTicks: 0 })).toThrow('orçamento total')
+    expect(() => new Simulator(andCircuit, { maxTotalTicks: MAX_TOTAL_TICKS + 1 })).toThrow('orçamento total')
+  })
+
+  it('rejeita restoreState acima do orçamento sem mutar o runtime', () => {
+    const source = new Simulator(andCircuit, { maxTotalTicks: 2 })
+    source.setInput('a', true)
+    source.tick(2)
+
+    const target = new Simulator(andCircuit, { maxTotalTicks: 1 })
+    expect(() => target.restoreState(source.exportState())).toThrow('excede o orçamento total')
+    expect(target.tickCount).toBe(0)
+    expect(target.read('a')).toBe(false)
   })
 
   it('trata entrada solta como falso', () => {
