@@ -21,6 +21,7 @@
     "test:rust": "cargo test --manifest-path engine-rs/Cargo.toml --offline",
     "bench:rust": "cargo bench --manifest-path engine-rs/Cargo.toml --offline --bench throughput",
     "bench:compare": "node scripts/engine-comparison-benchmark.mjs",
+    "bench:circuit-scale": "node scripts/logic-scale-benchmark.mjs",
     "beta:rust": "node scripts/rust-engine-acceptance.mjs",
     "beta:wasm": "node scripts/wasm-readiness.mjs",
     "beta:wasm:parity": "node scripts/wasm-netlist-parity.mjs",
