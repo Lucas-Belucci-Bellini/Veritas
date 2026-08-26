@@ -152,6 +152,32 @@ jobs:
           Start-Sleep -Seconds 2
           if (Test-Path $installDir) { throw 'Install directory remains after uninstall' }
 
+      - name: Smoke test Linux Debian package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$deb"
+          sudo dpkg -i "$deb"
+          cleanup() { sudo dpkg -r veritas >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          test -x /usr/bin/veritas
+          test -f /usr/share/applications/veritas.desktop
+          set +e
+          GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 xvfb-run -a -s '-screen 0 1440x960x24' timeout --signal=TERM --kill-after=5s 10s /usr/bin/veritas >/tmp/veritas-linux-smoke.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/veritas-linux-smoke.log
+          rm -f /tmp/veritas-linux-smoke.log
+          case "$status" in
+            0|124|143) ;;
+            *) echo "Veritas Linux startup failed with exit code $status"; exit "$status" ;;
+          esac
+          sudo dpkg -r veritas
+          trap - EXIT
+          test ! -e /usr/bin/veritas
+
       - name: Package macOS app
         if: runner.os == 'macOS'
         shell: bash
