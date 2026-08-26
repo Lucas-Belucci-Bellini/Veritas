@@ -513,6 +513,18 @@ npm run build      # build de produção em dist/
   npm run smoke:release  # smoke HTTP/PWA contra SMOKE_URL ou a URL padrão
 ```
 
+### Aplicativo desktop
+
+O Veritas também possui um shell desktop leve em Tauri 2, com os assets Vite embutidos no binário. Ele preserva o fluxo local-first/offline-first/privacy-first: não exige conta, servidor local, telemetria ou rede para calcular, simular, salvar no IndexedDB e exportar circuitos. A prévia atual do shell é `0.1.0-alpha.1`.
+
+```bash
+npm run desktop:dev          # executa o shell Tauri em desenvolvimento
+npm run desktop:build:linux  # gera .deb e .AppImage no Linux
+npm run desktop:build        # usa os targets configurados no Tauri
+```
+
+A distribuição planejada cobre Windows, macOS e Linux. O instalador Windows será um `.exe` NSIS produzido em runner Windows; o workflow também prepara `.app`/`.dmg` para macOS e `.deb`/`.AppImage` para Linux. A compilação Linux já foi validada localmente. Builds nativos de Windows e macOS devem ocorrer em seus respectivos runners, com assinatura mantida fora do repositório. O início formal dos testes do aplicativo está reservado para a `0.5.0`; a `1.0.0` só será promovida após estabilidade comprovada em todos os alvos suportados. O guia completo está em [`docs/DESKTOP.md`](./docs/DESKTOP.md).
+
 ## Como o código está organizado
 
 ```

@@ -67,6 +67,19 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.12.0** | Reversor escalar DLS | `BITREV-8`, com oito entradas, oito saídas e conexões diretas em ordem invertida | Um reversor combinacional real de oito bits pode ser importado, reutilizado, avaliado e exportado localmente sem executar JSON DLS |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
+| **desktop 0.1.x-alpha** | Shell desktop leve | Tauri 2 sobre o build Vite/React, assets embutidos e execução local em Windows, macOS e Linux | O shell compila no Linux; o workflow prepara `.exe` NSIS, `.app`/`.dmg` e `.deb`/`.AppImage` em runners nativos |
+| **desktop 0.5.0** | Início dos testes do aplicativo | Matriz de instalação, offline, IndexedDB, simulação, importação/exportação e remoção nos três sistemas | Os testes públicos começam somente depois de checklist repetível e artefatos por plataforma |
+| **desktop 1.0.0** | Promoção estável | Regressão completa, atualização, acessibilidade, desempenho, assinatura e segurança de distribuição | Só é criada com estabilidade comprovada em todos os alvos suportados e sem bloqueios críticos abertos |
+
+### Atualização da implementação — Desktop 0.1.0-alpha.1
+
+O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.
+
+O build Linux foi validado localmente com Rust/Cargo 1.98.0, gerando o executável otimizado `veritas`, `Veritas_0.1.0-alpha.1_amd64.deb` e `Veritas_0.1.0-alpha.1_amd64.AppImage`. O workflow [`desktop-release.yml`](../.github/workflows/desktop-release.yml) prepara builds nativos em `ubuntu-22.04`, `windows-latest` e `macos-latest`; o alvo Windows usa NSIS para gerar o instalador `.exe`, e o alvo macOS usa `.app`/`.dmg`.
+
+A compilação e a assinatura de Windows e macOS não são declaradas como validadas no sandbox Linux. Windows exige WebView2 e Microsoft C++ Build Tools; macOS exige Xcode ou Command Line Tools. A assinatura Authenticode e a notarização Apple permanecem fora do repositório e são pré-requisitos para tratar os artefatos como distribuição estável.
+
+O marco desktop `0.5.0` inicia os testes formais por plataforma, com instalação limpa, inicialização sem rede, persistência, importação/exportação, simulação combinacional e temporal, acessibilidade e remoção. A versão desktop `1.0.0` só será promovida depois de estabilidade comprovada em Windows, macOS e Linux, atualização verificada, ausência de bloqueios críticos e documentação final. Até lá, o shell é uma prévia experimental.
 
 ### Atualização da implementação — Release 0.12.0
 
