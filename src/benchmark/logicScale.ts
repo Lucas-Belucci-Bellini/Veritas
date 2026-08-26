@@ -3,6 +3,7 @@ import {
   MAX_CIRCUIT_NODES,
   type CircuitDocument,
 } from '../circuit'
+import type { Netlist } from '../simulation/components'
 
 export const LOGIC_SCALE_TARGETS = [10, 100, 500, 1000, 5000] as const
 
@@ -41,6 +42,27 @@ export function createLogicScalePlan(
           }),
     }
   })
+}
+
+export function createNotChainNetlist(gates: number): Netlist {
+  if (!Number.isInteger(gates) || gates < 1) throw new Error('A cadeia precisa ter ao menos um gate.')
+
+  const components: Netlist['components'] = [
+    { id: 'input', type: 'input' },
+  ]
+  for (let index = 0; index < gates; index += 1) {
+    components.push({
+      id: `not-${index}`,
+      type: 'not',
+      inputs: [{ node: index === 0 ? 'input' : `not-${index - 1}` }],
+    })
+  }
+  components.push({
+    id: 'output',
+    type: 'output',
+    inputs: [{ node: `not-${gates - 1}` }],
+  })
+  return { components }
 }
 
 export function createNotChainDocument(gates: number): CircuitDocument {

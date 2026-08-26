@@ -3,6 +3,7 @@ import { evaluateCircuit, toNetlist, validateCircuit } from '../circuit'
 import {
   createLogicScalePlan,
   createNotChainDocument,
+  createNotChainNetlist,
   LOGIC_SCALE_TARGETS,
   maxSupportedNotChainGates,
 } from './logicScale'
@@ -46,6 +47,20 @@ describe('logic scale benchmark fixtures', () => {
     expect(evaluateCircuit(createNotChainDocument(10), { input: true }).outputs.output).toBe(true)
     expect(evaluateCircuit(createNotChainDocument(11), { input: true }).outputs.output).toBe(false)
     expect(evaluateCircuit(createNotChainDocument(100), { input: false }).outputs.output).toBe(false)
+  })
+
+  test('builds large deterministic raw netlists without changing document limits', () => {
+    for (const gates of [500, 1000, 5000]) {
+      const netlist = createNotChainNetlist(gates)
+      expect(netlist.components).toHaveLength(gates + 2)
+      expect(netlist.components[0]).toEqual({ id: 'input', type: 'input' })
+      expect(netlist.components.at(-1)).toEqual({
+        id: 'output',
+        type: 'output',
+        inputs: [{ node: `not-${gates - 1}` }],
+      })
+      expect(JSON.stringify(netlist)).toBe(JSON.stringify(createNotChainNetlist(gates)))
+    }
   })
 
   test('fails closed when a requested chain exceeds the document contract', () => {

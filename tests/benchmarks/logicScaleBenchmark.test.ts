@@ -3,13 +3,21 @@ import { createHash } from 'node:crypto'
 import { hrtime, memoryUsage } from 'node:process'
 import { describe, expect, test } from 'vitest'
 import { createDocumentRuntime } from '../../src/simulation/documentRuntime'
-import { createLogicScalePlan, createNotChainDocument, LOGIC_SCALE_TARGETS } from '../../src/benchmark/logicScale'
+import {
+  createLogicScalePlan,
+  createNotChainDocument,
+  createNotChainNetlist,
+  LOGIC_SCALE_TARGETS,
+} from '../../src/benchmark/logicScale'
+import { Simulator } from '../../src/simulation/simulator'
 import { toNetlist, validateCircuit } from '../../src/circuit'
+import type { Netlist } from '../../src/simulation/components'
 
-const WARMUP_ITERATIONS = 3
-const MEASURED_ITERATIONS = 20
+const DOCUMENT_WARMUP_ITERATIONS = 3
+const DOCUMENT_MEASURED_ITERATIONS = 20
+const RAW_WARMUP_ITERATIONS = 1
 
-interface SupportedMeasurement {
+interface RuntimeMeasurement {
   gates: number
   status: 'MEASURED'
   nodes: number
@@ -37,7 +45,7 @@ interface UnsupportedMeasurement {
   reason: string
 }
 
-type Measurement = SupportedMeasurement | UnsupportedMeasurement
+type DocumentMeasurement = RuntimeMeasurement | UnsupportedMeasurement
 
 function rssKb(): number {
   return Math.round(memoryUsage().rss / 1024)
@@ -47,16 +55,26 @@ function expectedOutput(gates: number, input: boolean): boolean {
   return gates % 2 === 0 ? input : !input
 }
 
-function measureSupported(gates: number): SupportedMeasurement {
-  const document = createNotChainDocument(gates)
-  if (validateCircuit(document).length > 0) throw new Error(`Fixture inválido para ${gates} gates.`)
-  const netlist = toNetlist(document)
+function rawMeasuredIterations(gates: number): number {
+  if (gates >= 5000) return 3
+  if (gates >= 1000) return 5
+  if (gates >= 500) return 10
+  return 20
+}
+
+function measureRuntime(
+  gates: number,
+  netlist: Netlist,
+  createRuntime: () => Simulator,
+  warmupIterations: number,
+  measuredIterations: number,
+): RuntimeMeasurement {
   const ticksPerIteration = gates + 1
   const runtimeStarted = hrtime.bigint()
-  const runtime = createDocumentRuntime(document)
+  const runtime = createRuntime()
   const runtimeInitElapsedNs = Number(hrtime.bigint() - runtimeStarted)
 
-  for (let iteration = 0; iteration < WARMUP_ITERATIONS; iteration += 1) {
+  for (let iteration = 0; iteration < warmupIterations; iteration += 1) {
     const input = iteration % 2 === 0
     runtime.setInput('input', input)
     runtime.tick(ticksPerIteration)
@@ -69,7 +87,7 @@ function measureSupported(gates: number): SupportedMeasurement {
   const observedOutputs: string[] = []
   const expectedOutputs: string[] = []
   const started = hrtime.bigint()
-  for (let iteration = 0; iteration < MEASURED_ITERATIONS; iteration += 1) {
+  for (let iteration = 0; iteration < measuredIterations; iteration += 1) {
     const input = iteration % 2 === 0
     const expected = expectedOutput(gates, input)
     runtime.setInput('input', input)
@@ -87,16 +105,16 @@ function measureSupported(gates: number): SupportedMeasurement {
     gates,
     status: 'MEASURED',
     nodes: netlist.components.length,
-    connections: document.connections.length,
-    warmup_iterations: WARMUP_ITERATIONS,
-    iterations: MEASURED_ITERATIONS,
+    connections: gates + 1,
+    warmup_iterations: warmupIterations,
+    iterations: measuredIterations,
     ticks_per_iteration: ticksPerIteration,
-    total_ticks: MEASURED_ITERATIONS * ticksPerIteration,
+    total_ticks: measuredIterations * ticksPerIteration,
     expected_outputs: expectedOutputs.join(''),
     observed_outputs: observed,
     output_checksum_sha256: createHash('sha256').update(observed).digest('hex'),
     elapsed_ns: elapsedNs,
-    average_ns_per_tick: elapsedNs / (MEASURED_ITERATIONS * ticksPerIteration),
+    average_ns_per_tick: elapsedNs / (measuredIterations * ticksPerIteration),
     rss_before_kb: rssBeforeKb,
     rss_after_kb: rssAfterKb,
     rss_delta_kb: rssAfterKb - rssBeforeKb,
@@ -104,39 +122,67 @@ function measureSupported(gates: number): SupportedMeasurement {
   }
 }
 
-function measureTarget(gates: number): Measurement {
+function measureDocumentTarget(gates: number): DocumentMeasurement {
   const plan = createLogicScalePlan([gates])[0]
-  return plan.supported
-    ? measureSupported(gates)
-    : {
-        gates,
-        status: 'NOT SUPPORTED',
-        nodes: plan.nodes,
-        connections: plan.connections,
-        reason: plan.reason ?? 'A escala excede os limites atuais do documento.',
-      }
+  if (!plan.supported) {
+    return {
+      gates,
+      status: 'NOT SUPPORTED',
+      nodes: plan.nodes,
+      connections: plan.connections,
+      reason: plan.reason ?? 'A escala excede os limites atuais do documento.',
+    }
+  }
+
+  const document = createNotChainDocument(gates)
+  if (validateCircuit(document).length > 0) throw new Error(`Fixture inválido para ${gates} gates.`)
+  const netlist = toNetlist(document)
+  return measureRuntime(
+    gates,
+    netlist,
+    () => createDocumentRuntime(document),
+    DOCUMENT_WARMUP_ITERATIONS,
+    DOCUMENT_MEASURED_ITERATIONS,
+  )
 }
 
-const measurements = LOGIC_SCALE_TARGETS.map(measureTarget)
+function measureRawTarget(gates: number): RuntimeMeasurement {
+  const netlist = createNotChainNetlist(gates)
+  return measureRuntime(
+    gates,
+    netlist,
+    () => new Simulator(netlist),
+    RAW_WARMUP_ITERATIONS,
+    rawMeasuredIterations(gates),
+  )
+}
+
+const documentMeasurements = LOGIC_SCALE_TARGETS.map(measureDocumentTarget)
+const rawNetlistMeasurements = LOGIC_SCALE_TARGETS.map(measureRawTarget)
 
 function writeMeasurementsIfRequested(): void {
   const outputPath = process.env.VERITAS_LOGIC_SCALE_OUTPUT
   if (!outputPath) return
   fs.mkdirSync(new URL('.', `file://${outputPath}`).pathname, { recursive: true })
   fs.writeFileSync(outputPath, `${JSON.stringify({
-    schema: 'veritas-logic-scale-measurements-v1',
+    schema: 'veritas-logic-scale-measurements-v2',
     benchmark: 'deterministic-not-chain',
-    warmup_iterations: WARMUP_ITERATIONS,
-    measured_iterations: MEASURED_ITERATIONS,
-    measurements,
+    document_warmup_iterations: DOCUMENT_WARMUP_ITERATIONS,
+    document_measured_iterations: DOCUMENT_MEASURED_ITERATIONS,
+    raw_warmup_iterations: RAW_WARMUP_ITERATIONS,
+    document_measurements: documentMeasurements,
+    raw_netlist_measurements: rawNetlistMeasurements,
   }, null, 2)}\n`)
 }
 
 describe('logic scale benchmark', () => {
-  test('measures supported targets and reports unsupported targets without fabricating data', () => {
-    expect(measurements).toHaveLength(5)
-    expect(measurements.map((measurement) => measurement.gates)).toEqual([10, 100, 500, 1000, 5000])
-    for (const measurement of measurements) {
+  test('measures product targets and raw runtime capacity without fabricating data', () => {
+    expect(documentMeasurements).toHaveLength(5)
+    expect(rawNetlistMeasurements).toHaveLength(5)
+    expect(documentMeasurements.map((measurement) => measurement.gates)).toEqual([10, 100, 500, 1000, 5000])
+    expect(rawNetlistMeasurements.map((measurement) => measurement.gates)).toEqual([10, 100, 500, 1000, 5000])
+
+    for (const measurement of documentMeasurements) {
       expect(measurement.nodes).toBe(measurement.gates + 2)
       expect(measurement.connections).toBe(measurement.gates + 1)
       if (measurement.status === 'MEASURED') {
@@ -149,6 +195,18 @@ describe('logic scale benchmark', () => {
       } else {
         expect(measurement.reason).toMatch(/limita/i)
       }
+    }
+
+    for (const measurement of rawNetlistMeasurements) {
+      expect(measurement.status).toBe('MEASURED')
+      expect(measurement.nodes).toBe(measurement.gates + 2)
+      expect(measurement.connections).toBe(measurement.gates + 1)
+      expect(measurement.observed_outputs).toBe(measurement.expected_outputs)
+      expect(measurement.output_checksum_sha256).toMatch(/^[a-f0-9]{64}$/)
+      expect(measurement.elapsed_ns).toBeGreaterThan(0)
+      expect(measurement.average_ns_per_tick).toBeGreaterThan(0)
+      expect(measurement.ticks_per_iteration).toBe(measurement.gates + 1)
+      expect(measurement.total_ticks).toBe(measurement.iterations * measurement.ticks_per_iteration)
     }
     writeMeasurementsIfRequested()
   })

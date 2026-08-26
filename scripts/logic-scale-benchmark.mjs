@@ -70,36 +70,48 @@ function renderMeasurement(measurement) {
   ]
 }
 
-function renderReport(report) {
-  const measured = report.measurements.filter((measurement) => measurement.status === 'MEASURED')
-  const unsupported = report.measurements.filter((measurement) => measurement.status !== 'MEASURED')
+function renderMeasurementTable(title, measurements) {
   const lines = [
-    '# BENCH-001 — benchmark determinístico de escala de gates',
-    '',
-    `- **Status:** BASELINE RECORDED — ${measured.length} alvo(s) medido(s); ${unsupported.length} alvo(s) não suportado(s) pelo contrato atual`,
-    '- **Topologia:** `input → N × NOT → output`, gerada deterministicamente; não há aleatoriedade nem dados simulados.',
-    '- **Runtime medido:** `createDocumentRuntime`/`Simulator` de produção; a janela inclui `setInput` e `tick`, e exclui construção do documento, validação, netlist e inicialização do runtime.',
-    `- **Aquecimento:** ${report.warmup_iterations} iterações por alvo, fora da janela medida; **iterações medidas:** ${report.measured_iterations}.`,
-    `- **Node:** ${report.environment.node}; **plataforma:** ${report.environment.platform}/${report.environment.arch}; **CPU:** ${report.environment.cpu}.`,
-    `- **Versão do projeto:** ${report.environment.package_version}.`,
+    `### ${title}`,
     '',
     '| Gates | Nós | Conexões | Estado | Iterações | Ticks | Tempo total | Média/tick | RSS Node antes → depois | Saída |',
     '| ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- |',
   ]
-  for (const measurement of report.measurements) {
+  for (const measurement of measurements) {
     lines.push(`| ${renderMeasurement(measurement).join(' | ')} |`)
   }
-  lines.push(
+  return lines
+}
+
+function renderReport(report) {
+  const documentMeasured = report.document_measurements.filter((measurement) => measurement.status === 'MEASURED')
+  const documentUnsupported = report.document_measurements.filter((measurement) => measurement.status !== 'MEASURED')
+  const lines = [
+    '# BENCH-002 — capacidade bruta do Simulator em escala de gates',
+    '',
+    `- **Status:** BASELINE RECORDED — runtime bruto medido em ${report.raw_netlist_measurements.length} alvos; caminho de produto medido em ${documentMeasured.length} e não suportado em ${documentUnsupported.length}.`,
+    '- **Topologia:** `input → N × NOT → output`, gerada deterministicamente; não há aleatoriedade nem dados simulados.',
+    '- **Caminho de produto:** `CircuitDocument → toNetlist → createDocumentRuntime`/`Simulator`; os limites oficiais do documento são preservados.',
+    '- **Caminho de capacidade:** `Netlist → Simulator`; mede somente a capacidade do runtime bruto e não transforma esse resultado em suporte do editor, storage ou formato `.veritas`.',
+    '- **Medição:** a janela inclui `setInput` e `tick`, e exclui construção, validação, netlist e inicialização do runtime. O aquecimento fica fora da janela.',
+    `- **Node:** ${report.environment.node}; **plataforma:** ${report.environment.platform}/${report.environment.arch}; **CPU:** ${report.environment.cpu}.`,
+    `- **Versão do projeto:** ${report.environment.package_version}.`,
+    '',
+    ...renderMeasurementTable('CircuitDocument — suporte do produto', report.document_measurements),
+    '',
+    ...renderMeasurementTable('Netlist bruto — capacidade do Simulator', report.raw_netlist_measurements),
     '',
     '## Limites e interpretação',
     '',
-    'Os alvos de 500, 1000 e 5000 gates não foram medidos porque uma cadeia linear exige, respectivamente, 502, 1002 e 5002 nós, acima do limite atual de 256 nós do `CircuitDocument` (e também acima do limite de 512 conexões para 1000 e 5000). Eles permanecem **NOT SUPPORTED**, não são zero, estimativa ou resultado inventado.',
+    'O caminho `CircuitDocument` continua bloqueando 500, 1000 e 5000 gates porque uma cadeia linear exige 502, 1002 e 5002 nós, acima do limite atual de 256 nós; 1000 e 5000 também excedem o limite de 512 conexões. Esses alvos são **NOT SUPPORTED** no produto.',
+    '',
+    'O caminho Netlist bruto mediu os cinco alvos para identificar a capacidade do Simulator, mas isso não equivale a suporte oficial: ainda faltam contratos de documento, editor, persistência, import/export, renderização e UX para circuitos grandes.',
     '',
     'O RSS é uma amostra do processo Node e não representa memória isolada do simulador. Renderização/FPS, memória de simulação interativa no desktop, startup nativo, tamanho instalado e comparação entre sistemas operacionais permanecem **NOT VERIFIED** neste benchmark.',
     '',
-    'Números brutos só são comparáveis com execuções repetidas na mesma máquina, sistema operacional, arquitetura, versão do Node e estado equivalente do processo. Esta baseline não autoriza declarar suporte a 5000 gates, superioridade entre runtimes ou promoção de release estável.',
+    'Números brutos só são comparáveis com execuções repetidas na mesma máquina, sistema operacional, arquitetura, versão do Node e estado equivalente do processo. Esta baseline não promove uma release estável.',
     '',
-  )
+  ]
   return `${lines.join('\n')}\n`
 }
 
@@ -110,13 +122,16 @@ try {
   const raw = readJson(rawOutputPath)
   const packageJson = readJson(path.join(repoRoot, 'package.json'))
   const report = {
-    schema: 'veritas-logic-scale-benchmark-v1',
+    schema: 'veritas-logic-scale-benchmark-v2',
+    benchmark_id: 'BENCH-002',
     status: 'BASELINE_RECORDED',
     benchmark: raw.benchmark,
     topology: 'deterministic-not-chain',
-    warmup_iterations: raw.warmup_iterations,
-    measured_iterations: raw.measured_iterations,
-    measurements: raw.measurements,
+    document_warmup_iterations: raw.document_warmup_iterations,
+    document_measured_iterations: raw.document_measured_iterations,
+    raw_warmup_iterations: raw.raw_warmup_iterations,
+    document_measurements: raw.document_measurements,
+    raw_netlist_measurements: raw.raw_netlist_measurements,
     environment: {
       node: version(process.execPath, ['--version']),
       platform: process.platform,
@@ -130,12 +145,13 @@ try {
       native_startup: 'NOT VERIFIED',
       installed_size: 'NOT VERIFIED',
       cross_platform_comparison: 'NOT VERIFIED',
+      official_large_document_support: 'NOT VERIFIED',
     },
   }
   fs.writeFileSync(reportJsonPath, `${JSON.stringify(report, null, 2)}\n`)
   fs.writeFileSync(reportMarkdownPath, renderReport(report))
-  console.log(`BENCH-001 BASELINE RECORDED: relatório em ${path.relative(repoRoot, reportMarkdownPath)}`)
+  console.log(`BENCH-002 BASELINE RECORDED: relatório em ${path.relative(repoRoot, reportMarkdownPath)}`)
 } catch (error) {
-  console.error(`BENCH-001 FAIL: ${error instanceof Error ? error.message : String(error)}`)
+  console.error(`BENCH-002 FAIL: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1
 }
