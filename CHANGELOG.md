@@ -23,6 +23,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - O workspace sequencial ganhou a demo `register-4bit`, um registrador paralelo didático composto por quatro DFFs com clock compartilhado, controles D0–D3 e watches Q0–Q3; a captura simultânea e a retenção entre bordas têm regressão determinística.
 - O workspace sequencial ganhou a demo `counter-4bit`, um contador síncrono de 4 bits construído com quatro TFFs e carry combinacional AND. Cada pulso manual percorre a acomodação declarada de dois tiques e a regressão cobre 0000 → 1111 → 0000.
 - O `Simulator` passou a validar os budgets de `settle()` e de tiques totais de forma fail-closed: apenas inteiros finitos entre 1 e 10.000 para acomodação e entre 1 e 1.000.000 para o orçamento acumulado, com `settle(0)` permitido como janela vazia; `tick()` e `restoreState()` não ultrapassam o limite. Clocks e feedback oscilantes continuam limitados sem loops infinitos. A decisão está documentada em `docs/FEEDBACK_HARDENING.md`.
+- Adicionado `diagnoseSettle()` como caminho opt-in para diferenciar estabilização, ciclo detectado e esgotamento de budget, incluindo início e período do ciclo quando observáveis; `settle()` preserva sua semântica compatível baseada nas saídas.
 
 ## [0.12.0] — 2026-08-25
 
