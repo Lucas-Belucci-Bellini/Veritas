@@ -1,7 +1,7 @@
 import { Simulator } from './simulator'
 import type { Netlist } from './components'
 
-export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'jk-clock' | 'sr-clock' | 'register-4bit' | 'delay' | 'feedback-counter'
+export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'jk-clock' | 'sr-clock' | 'register-4bit' | 'counter-4bit' | 'delay' | 'feedback-counter'
 export type SequentialControlMode = 'auto-clock' | 'manual-input' | 'manual-clock'
 
 export interface SequentialWatch {
@@ -18,6 +18,8 @@ export interface SequentialDemo {
   controls: readonly string[]
   initialInputs: Readonly<Record<string, boolean>>
   watch: readonly SequentialWatch[]
+  /** Tiques baixos adicionais para acomodar lógica combinacional após um pulso. */
+  clockSettleTicks?: number
   netlist: Netlist
 }
 
@@ -159,6 +161,41 @@ const REGISTER_4BIT: SequentialDemo = {
   },
 }
 
+const COUNTER_4BIT: SequentialDemo = {
+  id: 'counter-4bit',
+  title: 'Contador síncrono de 4 bits',
+  description: 'Cada pulso de clock incrementa o contador de 0000 a 1111.',
+  controlMode: 'manual-clock',
+  controls: ['clk'],
+  initialInputs: { clk: false },
+  clockSettleTicks: 2,
+  watch: [
+    { nodeId: 'clk', label: 'CLK' },
+    { nodeId: 'ff0', label: 'Q0 · LSB' },
+    { nodeId: 'ff1', label: 'Q1' },
+    { nodeId: 'ff2', label: 'Q2' },
+    { nodeId: 'ff3', label: 'Q3 · MSB' },
+  ],
+  netlist: {
+    components: [
+      { id: 'one', type: 'constant', options: { value: true } },
+      { id: 'clk', type: 'input' },
+      { id: 'carry1', type: 'and', inputs: [{ node: 'ff0' }, { node: 'one' }] },
+      { id: 'carry2', type: 'and', inputs: [{ node: 'ff0' }, { node: 'ff1' }] },
+      { id: 'carry3a', type: 'and', inputs: [{ node: 'ff0' }, { node: 'ff1' }] },
+      { id: 'carry3', type: 'and', inputs: [{ node: 'carry3a' }, { node: 'ff2' }] },
+      { id: 'ff0', type: 'tff', inputs: [{ node: 'one' }, { node: 'clk' }] },
+      { id: 'ff1', type: 'tff', inputs: [{ node: 'carry1' }, { node: 'clk' }] },
+      { id: 'ff2', type: 'tff', inputs: [{ node: 'carry2' }, { node: 'clk' }] },
+      { id: 'ff3', type: 'tff', inputs: [{ node: 'carry3' }, { node: 'clk' }] },
+      { id: 'qout0', type: 'output', inputs: [{ node: 'ff0' }] },
+      { id: 'qout1', type: 'output', inputs: [{ node: 'ff1' }] },
+      { id: 'qout2', type: 'output', inputs: [{ node: 'ff2' }] },
+      { id: 'qout3', type: 'output', inputs: [{ node: 'ff3' }] },
+    ],
+  },
+}
+
 const DELAY: SequentialDemo = {
   id: 'delay',
   title: 'Atraso de propagação',
@@ -208,6 +245,7 @@ export const SEQUENTIAL_DEMOS: readonly SequentialDemo[] = [
   JK_CLOCK,
   SR_CLOCK,
   REGISTER_4BIT,
+  COUNTER_4BIT,
   DELAY,
   FEEDBACK_COUNTER,
 ]
@@ -239,14 +277,21 @@ export function applySequentialInputs(
 export function pulseClock(
   simulator: Simulator,
   inputId: string,
+  settleTicks = 0,
 ): readonly SequentialSnapshot[] {
+  const boundedSettleTicks = Math.max(0, Math.floor(settleTicks))
   simulator.setInput(inputId, true)
   simulator.tick()
   const high = snapshotSequentialSimulator(simulator)
   simulator.setInput(inputId, false)
   simulator.tick()
   const low = snapshotSequentialSimulator(simulator)
-  return [high, low]
+  const settled: SequentialSnapshot[] = []
+  for (let index = 0; index < boundedSettleTicks; index += 1) {
+    simulator.tick()
+    settled.push(snapshotSequentialSimulator(simulator))
+  }
+  return [high, low, ...settled]
 }
 
 export function outputValue(

@@ -96,6 +96,20 @@ describe('workspace sequencial', () => {
     expect(['ff0', 'ff1', 'ff2', 'ff3'].map((id) => simulator.read(id))).toEqual([false, true, false, false])
   })
 
+  it('conta de 0000 a 1111 e reinicia no contador síncrono 4-bit', () => {
+    const simulator = createSequentialSimulator('counter-4bit')
+    const demo = getSequentialDemo('counter-4bit')
+    expect(demo.controlMode).toBe('manual-clock')
+    expect(demo.clockSettleTicks).toBe(2)
+    const readCount = () => ['ff3', 'ff2', 'ff1', 'ff0'].map((id) => (simulator.read(id) ? '1' : '0')).join('')
+
+    expect(readCount()).toBe('0000')
+    for (const expected of ['0001', '0010', '0011', '0100', '0101', '0110', '0111', '1000', '1001', '1010', '1011', '1100', '1101', '1110', '1111', '0000']) {
+      pulseClock(simulator, 'clk', demo.clockSettleTicks)
+      expect(readCount()).toBe(expected)
+    }
+  })
+
   it('captura D na borda de subida do clock automático', () => {
     const simulator = createSequentialSimulator('dff-clock')
     simulator.setInput('d', true)

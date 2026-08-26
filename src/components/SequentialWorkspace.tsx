@@ -45,7 +45,7 @@ export function SequentialWorkspace() {
   }
 
   function changeDemo(value: string) {
-    if (!['dff-clock', 'tff-clock', 'jk-clock', 'sr-clock', 'register-4bit', 'delay', 'feedback-counter'].includes(value)) return
+    if (!['dff-clock', 'tff-clock', 'jk-clock', 'sr-clock', 'register-4bit', 'counter-4bit', 'delay', 'feedback-counter'].includes(value)) return
     reset(value as SequentialDemoId)
   }
 
@@ -64,7 +64,7 @@ export function SequentialWorkspace() {
     const nextSnapshots: SequentialSnapshot[] = []
     if (demo.controlMode === 'manual-clock') {
       for (let index = 0; index < RUN_TICKS / 2; index += 1) {
-        nextSnapshots.push(...pulseClock(simulator, 'clk'))
+        nextSnapshots.push(...pulseClock(simulator, 'clk', demo.clockSettleTicks))
       }
       setInputs((currentInputs) => ({ ...currentInputs, clk: false }))
     } else {
@@ -78,7 +78,7 @@ export function SequentialWorkspace() {
   }
 
   function manualPulse() {
-    const nextSnapshots = pulseClock(simulator, 'clk')
+    const nextSnapshots = pulseClock(simulator, 'clk', demo.clockSettleTicks)
     setInputs((currentInputs) => ({ ...currentInputs, clk: false }))
     setTimeline((currentTimeline) => appendSnapshots(currentTimeline, nextSnapshots))
   }
@@ -112,6 +112,7 @@ export function SequentialWorkspace() {
             <option value="jk-clock">Flip-flop JK com clock</option>
             <option value="sr-clock">Flip-flop SR com clock</option>
             <option value="register-4bit">Registrador paralelo de 4 bits</option>
+            <option value="counter-4bit">Contador síncrono de 4 bits</option>
             <option value="delay">Atraso de propagação</option>
             <option value="feedback-counter">Contador com feedback</option>
           </select>
