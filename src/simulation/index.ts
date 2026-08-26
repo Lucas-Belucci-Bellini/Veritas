@@ -1,3 +1,4 @@
 export * from './components'
+export * from './documentRuntime'
 export * from './fromAst'
 export * from './simulator'

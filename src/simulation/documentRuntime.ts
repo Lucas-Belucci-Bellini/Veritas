@@ -35,6 +35,21 @@ export interface DocumentRuntimeState {
   timeline: DocumentRuntimeSnapshot[]
 }
 
+export interface DocumentRuntimeDiagnosticPreviewOptions extends DocumentRuntimeOptions {
+  /** Entradas a aplicar na cópia antes do diagnóstico. */
+  inputs?: Readonly<Record<string, boolean>>
+  /** Estado a restaurar na cópia antes de aplicar as entradas. */
+  simulatorState?: SimulatorState
+  /** Budget explícito desta execução diagnóstica. */
+  maxTicks?: number
+}
+
+export interface DocumentRuntimeDiagnosticPreview {
+  diagnostic: SettleDiagnostic
+  snapshot: DocumentRuntimeSnapshot
+  simulatorState: SimulatorState
+}
+
 export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
   const runtimeDocument = applyClockPeriods(document, options.clockPeriods)
   const executableDocument = runtimeDocument.nodes.some((node) => node.type === 'custom-chip')
@@ -72,6 +87,23 @@ export function diagnoseDocumentRuntime(
   maxTicks?: number,
 ): SettleDiagnostic {
   return simulator.diagnoseSettle(maxTicks)
+}
+
+export function diagnoseDocumentRuntimePreview(
+  document: CircuitDocument,
+  options: DocumentRuntimeDiagnosticPreviewOptions = {},
+): DocumentRuntimeDiagnosticPreview {
+  const { inputs, simulatorState, maxTicks, ...runtimeOptions } = options
+  const simulator = createDocumentRuntime(document, runtimeOptions)
+  if (simulatorState) simulator.restoreState(simulatorState)
+  for (const [id, value] of Object.entries(inputs ?? {})) simulator.setInput(id, value)
+
+  const diagnostic = diagnoseDocumentRuntime(simulator, maxTicks)
+  return {
+    diagnostic,
+    snapshot: snapshotDocumentRuntime(simulator, document, options.customChips),
+    simulatorState: simulator.exportState(),
+  }
 }
 
 export function snapshotDocumentRuntime(
