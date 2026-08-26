@@ -8,7 +8,7 @@ Para cada fixture, a expressão é processada por `parse()` e `buildTruthTable()
 
 A regressão cobre as portas AND, NAND, OR, NOR, XOR, XNOR e NOT, além de saídas de meio somador, somador completo e multiplexador 2:1. Um caso só passa quando todas as linhas concordam e o circuito estabiliza. Qualquer divergência, circuito não estabilizado ou erro de contrato faz o teste falhar; como a suíte faz parte dos gates, isso bloqueia a release.
 
-A suíte não executa JSON DLS, código importado ou expressões como programa. Fixtures futuras devem reutilizar os módulos de domínio e testbench existentes, declarar limites explícitos e incluir contraexemplos quando a intenção for de divergência.
+A suíte não executa JSON DLS, código importado ou expressões como programa. O teste `sequential-testbench.test.ts` cobre a ponte entre o modelo puro usado pela UI e o `runTestbench`: cria um roteiro para um registrador, converte-o para o contrato declarativo e verifica a execução no Simulator. Fixtures futuras devem reutilizar os módulos de domínio e testbench existentes, declarar limites explícitos e incluir contraexemplos quando a intenção for de divergência.
 
 ## Extensões planejadas
 

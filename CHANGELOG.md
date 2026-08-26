@@ -9,6 +9,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - Adicionado baseline permanente `Expression → TruthTable` versus `Circuit → Simulator` em `tests/regression/`, cobrindo portas fundamentais, meio somador, somador completo e multiplexador.
 - Adicionados testes determinísticos do medidor desktop e do gerador `desktop-release-manifest.json`/`SHA256SUMS`, incluindo rejeição fail-closed de assets inesperados.
 - O workflow desktop passou a bloquear builds nativos sem `test`, typecheck, lint e build web; os runners Windows/Linux também executam smoke de instalação, startup e remoção com limites explícitos.
+- O painel de testbench agora edita casos sequenciais com passos, entradas `0/1/mantém`, ticks e expectativas por saída, usando o mesmo runner declarativo do domínio; a ponte UI→Simulator ganhou regressão permanente para um registrador.
 
 ## [0.12.0] — 2026-08-25
 

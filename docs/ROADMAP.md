@@ -113,6 +113,8 @@ A suíte permanente `tests/regression/cross-runtime.test.ts` compara `buildTruth
 
 A publicação quality-gated `desktop-v0.1.0-alpha.1` também executou um smoke nativo Windows: instalação silenciosa em diretório temporário, localização do binário, startup por oito segundos, existência de atalho e desinstalação. Esses cinco pontos agora têm evidência `SMOKE VERIFIED` no runner Windows; editor, persistência, simulação, offline, atualização e encerramento normal continuam fora da evidência disponível.
 
+O painel de testbench deixou de ser apenas combinacional: agora permite criar casos sequenciais, editar passos, alternar entradas entre `0`, `1` e `mantém`, definir ticks e conferir expectativas por saída. A transformação continua declarativa e reutiliza `runTestbench`; `tests/regression/sequential-testbench.test.ts` prova a ponte UI→Simulator com um registrador. A verificação visual interativa do painel não foi executada neste ambiente porque o navegador de sandbox não estava disponível; o preview HTTP e o build web passaram.
+
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 
 O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.
