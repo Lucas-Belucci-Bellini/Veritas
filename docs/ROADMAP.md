@@ -123,7 +123,15 @@ Foi criado um benchmark de escala separado da suíte padrão, executável por `n
 
 A primeira baseline foi realmente executada em Linux x86_64, Node `v22.13.0`, CPU reportada como AMD EPYC e versão do projeto `0.9.0-rc.15`. Em 10 gates foram observados 0,577 ms em 220 ticks, média de 0,003 ms/tick e RSS Node de 70.632 para 70.632 kB; em 100 gates, 17,271 ms em 2.020 ticks, média de 0,009 ms/tick e RSS de 75.440 para 81.364 kB. Esses valores são específicos da máquina/processo e não são comparação científica entre plataformas.
 
-Os alvos de 500, 1000 e 5000 gates foram classificados honestamente como `NOT SUPPORTED`, sem zero, estimativa ou dado fabricado: a cadeia exigiria 502, 1002 e 5002 nós, enquanto o contrato atual limita documentos a 256 nós e 512 conexões. Renderização/FPS, memória isolada da simulação, startup nativo, tamanho instalado, offline e comparação multiplataforma seguem `NOT VERIFIED`. Este marco mede a lacuna e não promove uma release nem declara suporte a circuitos grandes.
+Os alvos de 500, 1000 e 5000 gates foram classificados honestamente como `NOT SUPPORTED` no caminho de produto, sem zero, estimativa ou dado fabricado: a cadeia exigiria 502, 1002 e 5002 nós, enquanto o contrato atual limita documentos a 256 nós e 512 conexões. Renderização/FPS, memória isolada da simulação, startup nativo, tamanho instalado, offline e comparação multiplataforma seguem `NOT VERIFIED`. Este marco mede a lacuna e não promove uma release nem declara suporte a circuitos grandes.
+
+### Atualização da implementação — BENCH-002 — 2026-08-26
+
+O benchmark foi ampliado com uma segunda camada deliberadamente separada: a mesma topologia é gerada como `Netlist` bruto e executada diretamente pelo `Simulator`, sem passar pelo limite de `CircuitDocument`, editor, storage ou import/export. Isso permitiu medir a capacidade interna do runtime nos cinco alvos, sem relaxar o contrato do produto.
+
+Na mesma execução Linux x86_64/Node `v22.13.0`, o Netlist bruto passou nos cinco alvos: 10 gates em 0,582 ms/220 ticks, 100 em 15,438 ms/2.020 ticks, 500 em 211,942 ms/5.010 ticks, 1000 em 423,762 ms/5.005 ticks e 5000 em 6.273,959 ms/15.003 ticks. O RSS Node observado foi, respectivamente, 81.136→81.136 kB, 81.136→81.396 kB, 81.396→81.396 kB, 81.396→98.028 kB e 100.200→100.200 kB. O RSS é apenas uma amostra do processo e não memória isolada do simulador.
+
+Esse resultado demonstra uma fronteira útil: o runtime bruto consegue processar a topologia determinística de 5000 gates nesta máquina, mas o produto ainda não suporta esse circuito porque `CircuitDocument` limita cardinalidade e porque faltam UX, renderização, persistência, import/export, responsividade e QA desktop para essa escala. A próxima decisão de arquitetura deve ser explícita e testada; não é permitido aumentar os limites apenas para transformar uma medição interna em promessa de produto.
 
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 

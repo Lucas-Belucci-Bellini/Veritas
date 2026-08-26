@@ -51,11 +51,12 @@ O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian,
 | Testbench sequencial UI→domínio | 4 testes puros de rascunho e 1 regressão cross-layer com registrador, além de 19 testes do runner de domínio | PASSED localmente |
 | Testbench local persistente | 4 testes: CRUD por circuito, ordenação, round-trip/import e rejeição de JSON/formato/modos inválidos | PASSED localmente |
 | Medição Linux | `npm run desktop:metrics`, baseline de tamanho, spawn e RSS ocioso; simulação e installed size explicitamente não inferidos | PASSED para medidas disponíveis; demais campos `NOT VERIFIED` |
-| BENCH-001 — escala de gates | `npm run bench:circuit-scale`; cadeia determinística `input → N × NOT → output`, runtime `Simulator`, warmup separado, checksum e JSON/Markdown | BASELINE RECORDED: 10/100 medidos no Linux x86_64; 500/1000/5000 `NOT SUPPORTED` pelos limites atuais; FPS, memória desktop e startup nativo `NOT VERIFIED` |
+| BENCH-001 — escala de gates | `npm run bench:circuit-scale`; cadeia determinística `input → N × NOT → output`, runtime `Simulator`, warmup separado, checksum e JSON/Markdown | BASELINE RECORDED: caminho `CircuitDocument` mediu 10/100 no Linux x86_64; 500/1000/5000 `NOT SUPPORTED` pelos limites atuais; FPS, memória desktop e startup nativo `NOT VERIFIED` |
+| BENCH-002 — capacidade bruta do runtime | Mesmo fixture como `Netlist` bruto, executado diretamente pelo `Simulator`, sem alterar limites do editor | BASELINE RECORDED: 10/100/500/1000/5000 medidos no Linux x86_64; isso não promove suporte oficial, persistência, editor ou renderização nessa escala |
 
 A regressão cruzada usa `buildTruthTable(parse(expression))` como intenção e `createDocumentRuntime()`/`Simulator` como execução do `CircuitDocument`. Qualquer divergência ou não-estabilização faz o teste falhar e impede o gate automatizado da release; isso não transforma um teste local em validação de runtime desktop.
 
-O BENCH-001 mediu, nesta execução Linux x86_64/Node `v22.13.0`, 0,577 ms em 220 ticks para 10 gates e 17,271 ms em 2.020 ticks para 100 gates. Os valores são baseline da máquina/processo, não são comparáveis entre plataformas sem ambiente equivalente e não promovem suporte a circuitos acima dos limites do documento.
+O BENCH-001 mediu, nesta execução Linux x86_64/Node `v22.13.0`, 0,577 ms em 220 ticks para 10 gates e 17,271 ms em 2.020 ticks para 100 gates. O BENCH-002 também executou o Netlist bruto nos cinco alvos, incluindo 5000 gates em 6.273,959 ms/15.003 ticks. Os valores são baseline da máquina/processo, não são comparáveis entre plataformas sem ambiente equivalente e não promovem suporte editorial, persistência ou renderização nessa escala.
 
 ## Início formal dos testes — desktop `0.5.0`
 
