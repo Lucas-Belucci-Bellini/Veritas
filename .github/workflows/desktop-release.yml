@@ -115,6 +115,43 @@ jobs:
           if ($null -eq $installer) { throw "Instalador NSIS não encontrado" }
           Copy-Item $installer.FullName "Veritas-Setup.exe" -Force
 
+      - name: Smoke test Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installDir = Join-Path $env:RUNNER_TEMP 'veritas-install-smoke'
+          Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+          $installer = (Resolve-Path 'Veritas-Setup.exe').Path
+          $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "NSIS install failed with exit code $($install.ExitCode)" }
+          if (-not (Test-Path $installDir)) { throw 'Install directory was not created' }
+
+          $app = Get-ChildItem $installDir -Filter '*.exe' -File | Where-Object { $_.Name -notmatch 'uninstall|unins' } | Select-Object -First 1
+          if ($null -eq $app) { throw 'Installed Veritas executable was not found' }
+          $started = Start-Process -FilePath $app.FullName -PassThru
+          Start-Sleep -Seconds 8
+          if ($started.HasExited) { throw "Veritas exited during startup with code $($started.ExitCode)" }
+          Stop-Process -Id $started.Id -Force
+
+          $shortcutRoots = @(
+            (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'),
+            (Join-Path $env:USERPROFILE 'Desktop')
+          )
+          $shortcuts = foreach ($root in $shortcutRoots) {
+            if (Test-Path $root) {
+              Get-ChildItem $root -Filter '*.lnk' -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'Veritas' }
+            }
+          }
+          if (@($shortcuts).Count -eq 0) { throw 'No Veritas shortcut was created' }
+
+          $uninstaller = Get-ChildItem $installDir -Filter 'uninstall*.exe' -File | Select-Object -First 1
+          if ($null -eq $uninstaller) { throw 'NSIS uninstaller was not found' }
+          $remove = Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw "NSIS uninstall failed with exit code $($remove.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Test-Path $installDir) { throw 'Install directory remains after uninstall' }
+
       - name: Package macOS app
         if: runner.os == 'macOS'
         shell: bash
