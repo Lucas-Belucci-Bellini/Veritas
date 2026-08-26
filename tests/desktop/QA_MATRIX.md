@@ -9,7 +9,7 @@ Um workflow concluído prova somente que uma etapa de automação terminou. Cada
 | Plataforma | Build | Artefato | Integridade/metadata | Startup | Editor/simulação | Persistência/remoção | Estado de promoção |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Linux x86_64 | PASSED | PASSED | PASSED | PASSED em execução controlada | NOT VERIFIED por fluxo interativo completo | NOT VERIFIED | Prévia técnica |
-| Windows x64 | PASSED no runner nativo | PASSED: NSIS `.exe` | PASSED: PE32/NSIS, `MZ`, SHA-256 | NOT VERIFIED | NOT VERIFIED | NOT VERIFIED | Não estável |
+| Windows x64 | PASSED no runner nativo | PASSED: NSIS `.exe` | PASSED: PE32/NSIS, `MZ`, SHA-256 | SMOKE VERIFIED no runner nativo | NOT VERIFIED | Instalação/atalho/desinstalação: SMOKE VERIFIED; persistência: NOT VERIFIED | Não estável |
 | macOS arm64 | PASSED no runner nativo | PASSED: `.dmg` e `.app.zip` | PASSED: trailer DMG/ZIP íntegro, SHA-256 | NOT VERIFIED | NOT VERIFIED | NOT VERIFIED | Não estável |
 
 A release pública [`desktop-v0.1.0-alpha.1`](https://github.com/Lucas-Belucci-Bellini/Veritas/releases/tag/desktop-v0.1.0-alpha.1) é uma **pré-release**. Ela contém artefatos para os três alvos, `SHA256SUMS` e `desktop-release-manifest.json`, mas não é uma declaração de suporte estável.
@@ -22,20 +22,20 @@ A release pública [`desktop-v0.1.0-alpha.1`](https://github.com/Lucas-Belucci-B
 | Executável/instalador | Arquivo `.exe` presente e PE/NSIS | PASSED |
 | SHA-256 | Hash publicado e reproduzível | PASSED |
 | Release | Asset anexado a uma release prévia | PASSED |
-| Instalação limpa | Instalar em Windows limpo | NOT VERIFIED |
-| Atalho | Criar e abrir atalho | NOT VERIFIED |
-| Inicialização | Abrir sem erro | NOT VERIFIED |
+| Instalação limpa | Instalar em diretório temporário no runner Windows nativo | SMOKE VERIFIED; Windows limpo de usuário final ainda não verificado |
+| Atalho | Criar e localizar atalho Veritas | SMOKE VERIFIED no runner Windows; abrir pelo atalho ainda não verificado |
+| Inicialização | Abrir sem erro por 8 segundos | SMOKE VERIFIED no runner Windows; startup da UI/editor ainda não verificado |
 | Editor | Criar e editar circuito | NOT VERIFIED |
 | Persistência | Salvar e reabrir projeto | NOT VERIFIED |
 | Offline | Repetir fluxo sem rede | NOT VERIFIED |
 | Simulação | Avaliar circuito e sequência | NOT VERIFIED |
-| Encerramento | Fechar normalmente | NOT VERIFIED |
-| Desinstalação | Remover sem deixar instalação inválida | NOT VERIFIED |
+| Encerramento | Fechar normalmente | NOT VERIFIED; smoke encerra o processo de teste à força após startup |
+| Desinstalação | Remover sem deixar instalação inválida | SMOKE VERIFIED no runner Windows; máquina de usuário final ainda não verificada |
 | Atualização | Atualizar preservando projetos | NOT VERIFIED |
 
 ## Gate macOS
 
-O runner macOS confirmou build, bundle e upload de `Veritas_0.1.0-alpha.1_aarch64.dmg` e do ZIP do `.app`. Startup, editor, simulação, IndexedDB, atualização, assinatura e notarização continuam **NOT VERIFIED**. O suporte final deve incluir uma matriz para arm64 e, se o produto prometer Intel, um alvo Intel separado.
+O runner macOS confirmou build, bundle e upload de `Veritas_0.1.0-alpha.1_aarch64.dmg` e do ZIP do `.app`. Startup, editor, simulação, IndexedDB, atualização, assinatura e notarização continuam **NOT VERIFIED**. O smoke de instalação Windows não é evidência para macOS. O suporte final deve incluir uma matriz para arm64 e, se o produto prometer Intel, um alvo Intel separado.
 
 ## Gate Linux
 

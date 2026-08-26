@@ -111,6 +111,8 @@ O medidor desktop foi refatorado para expor helpers determinísticos, separar a 
 
 A suíte permanente `tests/regression/cross-runtime.test.ts` compara `buildTruthTable(parse(expression))` com `createDocumentRuntime()`/`Simulator` para todas as combinações das portas AND, NAND, OR, NOR, XOR, XNOR e NOT, além de meio somador, somador completo e multiplexador 2:1. São 12 casos e 16 testes novos incluindo métricas; uma divergência ou não-estabilização falha o teste, portanto o gate de release não pode prosseguir. Os fixtures são `CircuitDocument` declarativos e não executam JSON DLS, código importado ou uma linguagem de expressões.
 
+A publicação quality-gated `desktop-v0.1.0-alpha.1` também executou um smoke nativo Windows: instalação silenciosa em diretório temporário, localização do binário, startup por oito segundos, existência de atalho e desinstalação. Esses cinco pontos agora têm evidência `SMOKE VERIFIED` no runner Windows; editor, persistência, simulação, offline, atualização e encerramento normal continuam fora da evidência disponível.
+
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 
 O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.
