@@ -4,8 +4,10 @@ import {
   createCombinationalCase,
   createSequentialCase,
   cycleStepInput,
+  draftCasesFromDocument,
   toggleExpectedOutput,
   toTestbenchCases,
+  toTestbenchDocument,
   type DraftPortNames,
 } from './testbenchDraft'
 
@@ -53,6 +55,18 @@ describe('testbenchDraft', () => {
     expect(clampStepTicks('12')).toBe(12)
     expect(clampStepTicks('999')).toBe(200)
     expect(clampStepTicks('invalid')).toBe(1)
+  })
+
+  it('faz round-trip do documento persistido sem perder os dois modos', () => {
+    const cases = [createCombinationalCase(PORTS), createSequentialCase(PORTS)]
+    const document = toTestbenchDocument('  Meu roteiro  ', cases)
+
+    expect(document).toMatchObject({
+      format: 'veritas-testbench',
+      version: 1,
+      name: 'Meu roteiro',
+    })
+    expect(draftCasesFromDocument(document)).toEqual(cases)
   })
 
   it('converte os dois modos para o documento declarativo do domínio', () => {

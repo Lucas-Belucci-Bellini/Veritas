@@ -1,4 +1,9 @@
-import type { TestbenchCase } from '../circuit'
+import {
+  TESTBENCH_FORMAT,
+  TESTBENCH_VERSION,
+  type TestbenchCase,
+  type TestbenchDocument,
+} from '../circuit'
 
 export interface DraftPortNames {
   inputs: string[]
@@ -71,6 +76,39 @@ export function toggleExpectedOutput(step: DraftStep, name: string): DraftStep {
 
 export function clampStepTicks(value: string): number {
   return Math.min(200, Math.max(1, Number(value) || 1))
+}
+
+export function toTestbenchDocument(
+  name: string,
+  cases: DraftCase[],
+): TestbenchDocument {
+  return {
+    format: TESTBENCH_FORMAT,
+    version: TESTBENCH_VERSION,
+    name: name.trim() || 'Testbench sem nome',
+    cases: toTestbenchCases(cases),
+  }
+}
+
+export function draftCasesFromDocument(
+  document: TestbenchDocument,
+): DraftCase[] {
+  return document.cases.map((testCase) =>
+    testCase.steps
+      ? {
+          mode: 'sequential',
+          steps: testCase.steps.map((step) => ({
+            set: { ...(step.set ?? {}) },
+            ticks: Math.min(200, Math.max(1, Math.floor(step.ticks ?? 1))),
+            expect: { ...(step.expect ?? {}) },
+          })),
+        }
+      : {
+          mode: 'combinational',
+          inputs: { ...(testCase.inputs ?? {}) },
+          expect: { ...(testCase.expect ?? {}) },
+        },
+  )
 }
 
 export function toTestbenchCases(cases: DraftCase[]): TestbenchCase[] {

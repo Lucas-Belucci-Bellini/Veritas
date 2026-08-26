@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -10,14 +10,15 @@ import {
 import {
   collectCircuitPorts,
   runTestbench,
-  TESTBENCH_FORMAT,
-  TESTBENCH_VERSION,
   type CircuitDocument,
   type CustomChipLibraryEntry,
   type TestbenchReport,
 } from '../circuit'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
 import { useCustomChips } from '../hooks/useCustomChips'
+import { useTestbenchProjects } from '../hooks/useTestbenchProjects'
+import { download } from '../lib/export'
+import { serializeTestbenchProjects } from '../storage/testbenches'
 import { CircuitPicker } from './CircuitPicker'
 import {
   clampStepTicks,
@@ -25,9 +26,10 @@ import {
   createSequentialCase,
   createStep,
   cycleStepInput as cycleStepInputDraft,
+  draftCasesFromDocument,
   type DraftCase,
   type DraftPortNames,
-  toTestbenchCases,
+  toTestbenchDocument,
   toggleExpectedOutput as toggleExpectedOutputDraft,
 } from './testbenchDraft'
 
@@ -50,8 +52,13 @@ export function TestbenchPanel() {
   const customChips = useCustomChips()
   const [circuitId, setCircuitId] = useState<number | ''>('')
   const [cases, setCases] = useState<DraftCase[]>([])
+  const [savedTestbenchId, setSavedTestbenchId] = useState<number | null>(null)
+  const [testbenchName, setTestbenchName] = useState('')
+  const [storageMessage, setStorageMessage] = useState<string | null>(null)
   const [report, setReport] = useState<TestbenchReport | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const testbenchFileInput = useRef<HTMLInputElement>(null)
+  const savedTestbenches = useTestbenchProjects(circuitId)
 
   const project = projects.find((item) => item.id === circuitId)
   const ports = useMemo(
@@ -75,9 +82,12 @@ export function TestbenchPanel() {
     item.mode === 'sequential' ? [{ item, index }] : [],
   )
 
-  // Trocar de circuito invalida os casos: as colunas e portas mudam.
+  // Trocar de circuito invalida o rascunho: as portas e testbenches mudam.
   useEffect(() => {
     setCases([])
+    setSavedTestbenchId(null)
+    setTestbenchName('')
+    setStorageMessage(null)
     setReport(null)
     setError(null)
   }, [circuitId])
@@ -197,6 +207,100 @@ export function TestbenchPanel() {
     )
   }
 
+  const startNew = () => {
+    setSavedTestbenchId(null)
+    setTestbenchName('')
+    setCases([])
+    setReport(null)
+    setStorageMessage(null)
+    setError(null)
+  }
+
+  const handleSave = async () => {
+    if (!project || cases.length === 0 || savedTestbenches.unavailable) return
+    setError(null)
+    try {
+      const document = toTestbenchDocument(
+        testbenchName || `Testes de ${project.name}`,
+        cases,
+      )
+      const input = { name: document.name, document }
+      if (savedTestbenchId === null) {
+        const id = await savedTestbenches.save(input)
+        setSavedTestbenchId(id)
+      } else {
+        await savedTestbenches.update(savedTestbenchId, input)
+      }
+      setTestbenchName(document.name)
+      setStorageMessage('Testbench salvo neste navegador.')
+    } catch (cause) {
+      setStorageMessage(null)
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Não foi possível salvar o testbench.',
+      )
+    }
+  }
+
+  const handleLoad = (id: number) => {
+    const saved = savedTestbenches.projects.find((item) => item.id === id)
+    if (!saved) return
+    setSavedTestbenchId(saved.id)
+    setTestbenchName(saved.name)
+    setCases(draftCasesFromDocument(saved.document))
+    setReport(null)
+    setError(null)
+    setStorageMessage(`Testbench “${saved.name}” carregado.`)
+  }
+
+  const handleRemove = async (id: number) => {
+    setError(null)
+    try {
+      await savedTestbenches.remove(id)
+      if (savedTestbenchId === id) startNew()
+      else setStorageMessage('Testbench removido deste navegador.')
+    } catch (cause) {
+      setStorageMessage(null)
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Não foi possível remover o testbench.',
+      )
+    }
+  }
+
+  const handleImport = async (file: File) => {
+    setError(null)
+    try {
+      const count = await savedTestbenches.importFile(await file.text())
+      setStorageMessage(
+        `${count} testbench${count === 1 ? '' : 's'} importado${count === 1 ? '' : 's'}.`,
+      )
+    } catch (cause) {
+      setStorageMessage(null)
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Não foi possível importar o testbench.',
+      )
+    }
+  }
+
+  const handleExport = () => {
+    if (!project || savedTestbenches.projects.length === 0) return
+    download(
+      'testbenches.veritas-testbench',
+      new Blob(
+        [serializeTestbenchProjects(savedTestbenches.projects, project.name)],
+        {
+          type: 'application/json',
+        },
+      ),
+    )
+    setStorageMessage('Testbenches exportados para este dispositivo.')
+  }
+
   const handleRun = () => {
     if (!project || cases.length === 0) return
     setError(null)
@@ -204,12 +308,10 @@ export function TestbenchPanel() {
       setReport(
         runTestbench(
           project.document,
-          {
-            format: TESTBENCH_FORMAT,
-            version: TESTBENCH_VERSION,
-            name: `Testes de ${project.name}`,
-            cases: toTestbenchCases(cases),
-          },
+          toTestbenchDocument(
+            testbenchName || `Testes de ${project.name}`,
+            cases,
+          ),
           { customChips: chipEntries },
         ),
       )
@@ -268,6 +370,115 @@ export function TestbenchPanel() {
               projects={projects}
             />
           </div>
+
+          <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <label className="min-w-56 flex-1 text-xs text-slate-500 dark:text-slate-400">
+              Nome do testbench
+              <input
+                value={testbenchName}
+                onChange={(event) => setTestbenchName(event.target.value)}
+                placeholder={
+                  project ? `Testes de ${project.name}` : 'Nome do testbench'
+                }
+                disabled={!project || Boolean(savedTestbenches.unavailable)}
+                className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-brand-400 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                aria-label="Nome do testbench"
+              />
+            </label>
+            <button
+              type="button"
+              className="key"
+              disabled={!project}
+              onClick={startNew}
+            >
+              Novo
+            </button>
+            <button
+              type="button"
+              className="key gap-2"
+              disabled={
+                cases.length === 0 || Boolean(savedTestbenches.unavailable)
+              }
+              onClick={() => void handleSave()}
+            >
+              {savedTestbenchId === null ? 'Salvar' : 'Atualizar'}
+            </button>
+            <button
+              type="button"
+              className="key gap-2"
+              disabled={savedTestbenches.projects.length === 0}
+              onClick={handleExport}
+            >
+              Exportar
+            </button>
+            <button
+              type="button"
+              className="key gap-2"
+              disabled={!project || Boolean(savedTestbenches.unavailable)}
+              onClick={() => testbenchFileInput.current?.click()}
+            >
+              Importar
+            </button>
+            <input
+              ref={testbenchFileInput}
+              type="file"
+              accept=".veritas-testbench,application/json"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) void handleImport(file)
+                event.target.value = ''
+              }}
+            />
+          </div>
+
+          {savedTestbenches.unavailable ? (
+            <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+              {savedTestbenches.unavailable}
+            </p>
+          ) : null}
+          {savedTestbenches.error ? (
+            <p
+              role="alert"
+              className="mt-3 text-sm text-rose-600 dark:text-rose-400"
+            >
+              {savedTestbenches.error}
+            </p>
+          ) : null}
+          {savedTestbenches.projects.length > 0 ? (
+            <div className="mt-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+                Testbenches salvos neste circuito
+              </h3>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {savedTestbenches.projects.map((saved) => (
+                  <li key={saved.id} className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className={`chip-tag max-w-64 truncate ${savedTestbenchId === saved.id ? 'border-brand-400 text-brand-600 dark:text-brand-300' : ''}`}
+                      aria-pressed={savedTestbenchId === saved.id}
+                      onClick={() => handleLoad(saved.id)}
+                    >
+                      {saved.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="key h-7 px-2 hover:border-rose-400 hover:text-rose-600"
+                      aria-label={`Excluir testbench ${saved.name}`}
+                      onClick={() => void handleRemove(saved.id)}
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {storageMessage ? (
+            <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
+              {storageMessage}
+            </p>
+          ) : null}
 
           {ports && ports.outputs.length === 0 ? (
             <p className="mt-4 text-sm text-amber-600 dark:text-amber-400">
