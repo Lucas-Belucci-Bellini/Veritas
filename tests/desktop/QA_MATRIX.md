@@ -8,7 +8,7 @@ Um workflow concluído prova somente que uma etapa de automação terminou. Cada
 
 | Plataforma | Build | Artefato | Integridade/metadata | Startup | Editor/simulação | Persistência/remoção | Estado de promoção |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Linux x86_64 | PASSED | PASSED | PASSED | PASSED em execução controlada | NOT VERIFIED por fluxo interativo completo | NOT VERIFIED | Prévia técnica |
+| Linux x86_64 | PASSED | PASSED | PASSED | SMOKE VERIFIED: `.deb` instalado e binário iniciado sob Xvfb | NOT VERIFIED por fluxo interativo completo | Instalação/remoção do `.deb`: SMOKE VERIFIED; persistência: NOT VERIFIED | Prévia técnica |
 | Windows x64 | PASSED no runner nativo | PASSED: NSIS `.exe` | PASSED: PE32/NSIS, `MZ`, SHA-256 | SMOKE VERIFIED no runner nativo | NOT VERIFIED | Instalação/atalho/desinstalação: SMOKE VERIFIED; persistência: NOT VERIFIED | Não estável |
 | macOS arm64 | PASSED no runner nativo | PASSED: `.dmg` e `.app.zip` | PASSED: trailer DMG/ZIP íntegro, SHA-256 | NOT VERIFIED | NOT VERIFIED | NOT VERIFIED | Não estável |
 
@@ -39,7 +39,7 @@ O runner macOS confirmou build, bundle e upload de `Veritas_0.1.0-alpha.1_aarch6
 
 ## Gate Linux
 
-O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian, o AppImage, os metadados e a inicialização controlada do binário foram verificados no sandbox. Ainda faltam instalação limpa do `.deb`, execução distribuída do AppImage em uma distribuição independente, atualização, remoção e smoke funcional interativo completo.
+O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian, o AppImage, os metadados e a inicialização controlada do binário foram verificados no sandbox. O runner Linux também instalou o `.deb`, confirmou `/usr/bin/veritas` e `Veritas.desktop`, iniciou o app sob Xvfb e removeu o pacote; esses pontos são `SMOKE VERIFIED`. Ainda faltam execução distribuída do AppImage em uma distribuição independente, atualização e smoke funcional interativo completo do editor/simulador.
 
 ## Gates automatizados do núcleo e da distribuição
 

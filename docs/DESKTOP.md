@@ -32,7 +32,7 @@ Os dados brutos ficam em `artifacts/desktop-metrics-0.1.0-alpha.1.json` e a vers
 
 ## Testes por maturidade
 
-A versão `0.5.0` será o primeiro marco público de testes do aplicativo. Antes de promovê-la, cada plataforma precisa ter instalação limpa, inicialização sem rede, persistência IndexedDB, importação/exportação `.veritas`, simulação combinacional, simulação temporal, exportação Verilog/VHDL e remoção limpa. Também serão exigidos testes de atualização, tamanho do artefato, ausência de chamadas de rede no modo offline e smoke visual do canvas.
+A versão `0.5.0` será o primeiro marco público de testes do aplicativo. Antes de promovê-la, cada plataforma precisa ter instalação limpa, inicialização sem rede, persistência IndexedDB, importação/exportação `.veritas`, simulação combinacional, simulação temporal, exportação Verilog/VHDL e remoção limpa. Também serão exigidos testes de atualização, tamanho do artefato, ausência de chamadas de rede no modo offline e smoke visual do canvas. A prévia atual já possui smoke de pacote/índice/startup/remoção em runners Windows e Linux, mas ainda não possui o roteiro funcional completo.
 
 | Marco | Critério de promoção |
 | --- | --- |
@@ -45,7 +45,7 @@ A existência de um instalador `.exe` não será tratada como sinônimo de estab
 
 ## Windows e o instalador `.exe`
 
-O workflow usa o bundle NSIS do Tauri e produz um instalador `.exe` em `src-tauri/target/release/bundle/nsis/`, normalizado para o nome oficial `Veritas-Setup.exe` antes do upload. A primeira prévia pública já publicou esse arquivo na release desktop e o smoke nativo Windows é executado antes do upload. O Windows precisa do WebView2 e das Microsoft C++ Build Tools para desenvolvimento e build. O modo configurado usa o bootstrapper silencioso do WebView2 quando o runtime não estiver presente; a política final de distribuição será confirmada nos testes da 0.5.0 para equilibrar instalação leve e execução offline.
+O workflow usa o bundle NSIS do Tauri e produz um instalador `.exe` em `src-tauri/target/release/bundle/nsis/`, normalizado para o nome oficial `Veritas-Setup.exe` antes do upload. A primeira prévia pública já publicou esse arquivo na release desktop e o smoke nativo Windows é executado antes do upload. No Linux, o mesmo workflow instala o `.deb`, confirma o desktop entry e inicia o binário sob Xvfb antes de publicar. O Windows precisa do WebView2 e das Microsoft C++ Build Tools para desenvolvimento e build. O modo configurado usa o bootstrapper silencioso do WebView2 quando o runtime não estiver presente; a política final de distribuição será confirmada nos testes da 0.5.0 para equilibrar instalação leve e execução offline.
 
 A distribuição pública do `.exe` deverá receber assinatura Authenticode antes de ser tratada como release estável. Certificados, segredo de assinatura e eventual notarização não serão armazenados no repositório. Enquanto a assinatura não estiver configurada, o artefato pode ser usado para testes internos, mas deve ser identificado como prévia.
 
