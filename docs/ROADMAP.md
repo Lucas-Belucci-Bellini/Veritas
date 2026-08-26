@@ -4,7 +4,7 @@
 
 ## 1. Estado atual
 
-A versão de referência da implementação local é a **Release 0.11.8**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica e servidor MCP.
+A versão de referência da implementação local é a **Release 0.12.0**, na branch `feature/chip-hierarchy-v1`. O projeto possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos, composição hierárquica, allowlist DLS combinacional e servidor MCP. O shell desktop atual é a prévia independente `desktop-v0.1.0-alpha.1`; ele tem builds nativos publicados, mas ainda não tem runtime interativo Windows/macOS verificado.
 
 | Área | Situação real | Evidência no repositório |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ A versão de referência da implementação local é a **Release 0.11.8**, na br
 | Monitoramento de IA | Entregue em prévia | `veritas_ai_metrics`, Realtime, cliente e painel |
 | Barramentos multi-bit | Entregue em prévia | BitVector, Splitter/Combiner, avaliação vetorial e exportação HDL dimensionada |
 | Chips customizados hierárquicos | Entregue em prévia | Composição local, expansão com limite e ciclo recusado |
-| Aplicativo desktop Tauri/Rust | Investigar depois | Depende de métricas de performance e escopo estabilizado |
+| Aplicativo desktop Tauri/Rust | Prévia técnica `desktop-v0.1.0-alpha.1` | Build Linux e inicialização controlada local; Windows/macOS têm build nativo publicado, mas runtime interativo **NOT VERIFIED** |
 | 3D, PCB, impressão e 250 subagentes | Visão de longo prazo | Não fazem parte do próximo ciclo |
 
 ## 2. Decisões de produto
@@ -33,7 +33,7 @@ O Veritas será construído primeiro como uma ferramenta **local-first, client-s
 
 A calculadora de expressões continua sendo uma experiência de entrada rápida. O próximo salto do produto não é adicionar mais painéis à tela atual, mas permitir que o usuário **edite o circuito visualmente**, simule esse circuito e converta o resultado para uma expressão ou tabela verdade quando isso for matematicamente possível.
 
-Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, renderização 3D e fabricação física serão tratados como linhas de produto posteriores. Eles só entram após existir uma base estável de projeto, eventos, validação, versionamento e limites de execução.
+Recursos de nuvem, colaboração, agentes em larga escala, renderização 3D e fabricação física continuam sendo linhas posteriores. O desktop nativo já entrou como shell Tauri leve, mas só poderá avançar de alpha para beta/estável após QA nativo, métricas, assinatura e critérios de promoção explícitos. Todas as fases preservam o núcleo local-first/offline-first/privacy-first e a fronteira de que IA propõe, valida, mostra preview, aguarda confirmação e só então aplica.
 
 ## 3. Roadmap por releases
 
@@ -71,11 +71,45 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **desktop 0.5.0** | Início dos testes do aplicativo | Matriz de instalação, offline, IndexedDB, simulação, importação/exportação e remoção nos três sistemas | Os testes públicos começam somente depois de checklist repetível e artefatos por plataforma |
 | **desktop 1.0.0** | Promoção estável | Regressão completa, atualização, acessibilidade, desempenho, assinatura e segurança de distribuição | Só é criada com estabilidade comprovada em todos os alvos suportados e sem bloqueios críticos abertos |
 
+### Trajetória mestre de maturidade — desktop 0.5.0 até Veritas 2.5.0
+
+A tabela abaixo materializa o alvo ampliado sem reclassificar funcionalidades de prévia como estabilidade. O núcleo atual já contém várias capacidades dos marcos históricos; o trabalho futuro é endurecer contratos, regressões, desempenho, distribuição e experiência multiplataforma. Cada marco só fecha com código necessário, testes, documentação, commit, tag, release e relatório quando houver uma mudança publicável.
+
+| Marco | Foco | Estado real e escopo disciplinado | Gate de saída |
+| --- | --- | --- | --- |
+| **desktop 0.5.0** | Início formal de QA do produto | Planejado; a prévia `0.1.0-alpha.1` já fornece o shell e os pacotes, mas ainda faltam smoke nativo interativo e instalação/remoção em Windows/macOS | Matriz repetível Windows/macOS/Linux para instalação, inicialização offline, editor, IndexedDB, simulação, import/export, acessibilidade, atualização, encerramento e remoção; classificar cada item como `BUILD VERIFIED`, `RUNTIME VERIFIED`, `SMOKE VERIFIED` ou `NOT VERIFIED` |
+| **v0.6.0** | Fortalecimento da simulação sequencial | Base de clock, delay, DFF, TFF, reset, Step/Run e timeline já existe; JK/SR, waveform e hardening de feedback permanecem trabalho planejado | Casos fundamentais determinísticos, limites de ticks, ausência de loops de UI, comparação temporal e regressão em cada release |
+| **v0.7.0** | Maturidade do editor | Editor combinacional, seleção, undo/redo, conexão, layout e persistência já estão em prévia; multi-seleção, clipboard e ergonomia multiplataforma ainda exigem cobertura de produto | Operações drag/drop, seleção, conexão/desconexão, snap, zoom/pan, undo/redo, copy/paste, duplicate, delete, alinhamento e auto-layout cobertas por testes e smoke visual |
+| **v0.8.0** | Multi-bit completo e seguro | BitVector, larguras, Splitter/Combiner, avaliação vetorial, HDL e allowlist DLS já existem em prévia; cobertura ampla, limites e performance continuam sendo endurecidos | 1/2/4/8/16/32/64 bits, validação de largura, binário/hexadecimal, compatibilidade de documentos, regressão vetorial e nenhum truncamento silencioso |
+| **v0.9.0** | Workspace sequencial | Workspace visual, Watch, Step/Run/Reset, timeline e checkpoints existem; waveform, componentes adicionais e QA de persistência/colaboração precisam fechar | Roteiros temporais determinísticos, feedback seguro, restauração validada, isolamento entre documentos e nenhuma aplicação remota silenciosa |
+| **v1.0.0** | Primeira estabilidade do produto | Não iniciada como release estável; a regra é estabilidade acima de velocidade e uso de RCs se necessário | Core, engine, editor, simulator, storage, import/export, Windows, macOS, Linux, testes, CI, performance, documentação, zero P0 e zero P1 conhecidos; atualização, remoção, assinatura e offline verificados |
+| **v1.1.0** | Portabilidade de projetos e migrações | Planejado; consolidar versões do formato `.veritas`, diagnósticos de migração e compatibilidade entre web/PWA/desktop | Fixtures versionados, migração explícita ou rejeição clara, round-trip e rollback sem perda de dados |
+| **v1.2.0** | HDL e interoperabilidade controladas | Exportação Verilog/VHDL existe em prévia; importação e casos de incompatibilidade ainda devem ser especificados, não inferidos | Golden files HDL, parser/validator de entrada quando contratado, mensagens acionáveis e equivalência ou divergência demonstrável |
+| **v1.3.0** | Testbench e assertions | Testbench declarativo já existe como base; asserções sobre sinais dependem de contrato formal e reuso do parser, nunca `eval`/`Function` | Casos PASS/FAIL, `assert ALWAYS/NEVER` com limites, contraexemplos, snapshots e regressão bloqueante |
+| **v1.4.0** | Performance e limites reais | Baseline local de desktop existe; benchmark de 10/100/500/1000/5000 gates e memória de simulação ainda é planejado | Tempo, RSS, startup, tamanho de download/instalação, tempo de simulação e renderização medidos por plataforma, com comparação entre releases e investigação de regressões |
+| **v1.5.0** | Acessibilidade e experiência educacional | Cobertura inicial existe; ampliar teclado, foco, mensagens, tutoriais e exemplos didáticos | Testes automatizados e smoke de teclado/leitor, canvas compreensível, limites explicados e fluxos para estudantes sem conta |
+| **v1.6.0** | Atualização e distribuição segura | Pipeline nativo e manifesto/checksum existem; assinatura Authenticode, assinatura Apple/notarização e atualização runtime ainda não verificadas | Instalação, atualização, preservação de projetos, rollback e desinstalação nativos, com credenciais fora do repositório |
+| **v1.7.0** | Colaboração e sincronização opt-in | Supabase/Realtime existem como caminhos opcionais; conflitos, privacidade, offline e recuperação precisam de auditoria contínua | Local-first intacto, sincronização explícita, conflitos visíveis, RLS/roles verificados e nenhum dado enviado sem ação do usuário |
+| **v1.8.0** | IA controlada | Propostas e validação conservadoras já existem em partes; contratos de intenção, preview, confirmação, logs e rollback devem ser uniformizados | Nenhuma alteração silenciosa, schema validado, diff mostrado, confirmação explícita e fallback local seguro |
+| **v1.9.0** | Pré-2.0 hardening | Planejado; fechar contratos públicos, telemetria opt-in, compatibilidade e inventário de dependências antes da mudança arquitetural | Auditoria de dependências, API/formatos documentados, regressão completa e decisão explícita de entrada em 2.0 |
+| **v2.0.0** | Nova geração arquitetural | Não iniciada; antes dela devem existir `docs/V2_ARCHITECTURE.md`, `docs/V2_MIGRATION.md` e `docs/V2_MASTER_PLAN.md` aprovados no repositório | Engine, simulator, storage, plugins, verification, AI contracts, desktop e migration system definidos, versionados e migráveis sem quebra silenciosa |
+| **v2.1.0** | Modularidade | Planejado; separar Core, Engine, Circuit, Simulator, Storage, Renderer, HDL, Verification, AI, Plugins e Desktop evitando dependências circulares | Boundaries verificáveis, testes por módulo e nenhum acoplamento circular introduzido |
+| **v2.2.0** | Plugins seguros | Planejado; gates, chips, exporters, analyzers e visualizations por contratos declarativos | Manifesto/permissions, sandbox ou capability boundary adequada, validação, versão e rejeição de execução arbitrária |
+| **v2.3.0** | Workspace profissional | Planejado; tabs, project explorer, hierarchy, component browser, inspector, command palette, waveform, simulation e verification panels | Projetos grandes navegáveis, ações reversíveis, desempenho medido e persistência compatível |
+| **v2.4.0** | Verificação automatizada | Planejado; testbench, assertions, regression, equivalence, snapshots e benchmarks como fluxo de produto | Testbench reproduzível com PASS/FAIL, contraexemplo, snapshot, benchmark e release bloqueada quando houver divergência |
+| **v2.5.0** | Objetivo desta fase | Não é uma data nem uma promessa antecipada; é o produto final desta trajetória | Engine/editor/simulator estáveis; lógica combinacional/sequencial; multi-bit; chips customizados; verification; testbench; HDL; projetos; plugins; IA controlada; desktop Windows/macOS/Linux; performance, segurança, documentação, CI/CD e releases reais |
+
+### Regras de release e classificação de evidência
+
+Uma release oficial deve ter mudança intencional, commits rastreáveis, testes e gates (`lint`, `typecheck`, `test`, `build`), tag, GitHub Release, changelog, artefatos e relatório. Alpha, beta e RC são válidos quando o marco ainda não é estável; CI verde não promove automaticamente a versão. Para cada asset, o manifesto deve registrar `filename`, `platform`, `architecture`, `size`, `sha256`, `commit` e `version`.
+
+`BUILD VERIFIED` significa que o runner nativo produziu e validou o artefato. `RUNTIME VERIFIED` exige executar o aplicativo nesse sistema; `SMOKE VERIFIED` exige concluir o roteiro funcional definido. O sandbox Linux não pode converter um build Windows/macOS em validação de runtime. A ausência de hardware nativo é um bloqueio de evidência, não uma licença para afirmar sucesso.
+
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 
 O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.
 
-O build Linux foi validado localmente com Rust/Cargo 1.98.0, gerando o executável otimizado `veritas`, `Veritas_0.1.0-alpha.1_amd64.deb` e `Veritas_0.1.0-alpha.1_amd64.AppImage`. O workflow [`desktop-release.yml`](../.github/workflows/desktop-release.yml) prepara builds nativos em `ubuntu-22.04`, `windows-latest` e `macos-latest`; o alvo Windows usa NSIS para gerar o instalador `.exe`, e o alvo macOS usa `.app`/`.dmg`.
+O build Linux foi validado localmente com Rust/Cargo 1.98.0, gerando o executável otimizado `veritas`, `Veritas_0.1.0-alpha.1_amd64.deb` e `Veritas_0.1.0-alpha.1_amd64.AppImage`. O workflow [`desktop-release.yml`](../.github/workflows/desktop-release.yml) prepara builds nativos em `ubuntu-22.04`, `windows-latest` e `macos-latest`; o alvo Windows usa NSIS e normaliza o arquivo para `Veritas-Setup.exe`, e o alvo macOS usa `.app.zip`/`.dmg`. A release pública também anexa `SHA256SUMS` e `desktop-release-manifest.json`; a tag final e o manifesto apontam para o mesmo commit de build.
 
 A compilação e a assinatura de Windows e macOS não são declaradas como validadas no sandbox Linux. Windows exige WebView2 e Microsoft C++ Build Tools; macOS exige Xcode ou Command Line Tools. A assinatura Authenticode e a notarização Apple permanecem fora do repositório e são pré-requisitos para tratar os artefatos como distribuição estável.
 
@@ -194,7 +228,7 @@ Para cada release, será produzido um pequeno registro com as decisões tomadas,
 | Arquivos importados corromperem projetos | Validação de esquema, versão de formato e rejeição defensiva |
 | O roadmap crescer mais rápido que a capacidade de entrega | Releases curtas, backlog priorizado e itens fora de escopo explícitos |
 | Integrações com IA alterarem dados sem controle | Propostas declarativas, dry-run, logs e confirmação do usuário |
-| Migração prematura para desktop atrasar o produto web | Medir performance primeiro e só então decidir a fronteira Rust/Tauri |
+| Desktop ser confundido com estabilidade | Manter shell Tauri separado do núcleo, exigir QA nativo, assinatura, métricas e classificação `BUILD VERIFIED`/`RUNTIME VERIFIED` antes de promover |
 
 ## 9. Referências
 
