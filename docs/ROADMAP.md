@@ -133,6 +133,8 @@ Na mesma execução Linux x86_64/Node `v22.13.0`, o Netlist bruto passou nos cin
 
 Esse resultado demonstra uma fronteira útil: o runtime bruto consegue processar a topologia determinística de 5000 gates nesta máquina, mas o produto ainda não suporta esse circuito porque `CircuitDocument` limita cardinalidade e porque faltam UX, renderização, persistência, import/export, responsividade e QA desktop para essa escala. A próxima decisão de arquitetura deve ser explícita e testada; não é permitido aumentar os limites apenas para transformar uma medição interna em promessa de produto.
 
+O BENCH-002 agora faz parte dos quality gates de `.github/workflows/quality.yml` e do job de qualidade de `.github/workflows/desktop-release.yml`. Cada execução retém o JSON e o Markdown como artefato de CI por 14 dias; o resultado não é anexado como instalador, não altera a tag e não transforma um workflow verde em release automaticamente. Se o benchmark falhar, a cadeia de build desktop não avança porque o job nativo depende do quality gate.
+
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 
 O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.

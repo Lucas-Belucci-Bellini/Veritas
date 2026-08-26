@@ -51,6 +51,21 @@ jobs:
       - name: Build web
         run: npm run build
 
+      - name: Circuit scale benchmark
+        run: npm run bench:circuit-scale
+
+      - name: Upload performance benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veritas-desktop-performance-benchmark-${{ github.run_id }}
+          path: |
+            artifacts/logic-scale-benchmark.md
+            artifacts/logic-scale-benchmark.json
+            artifacts/logic-scale-measurements.json
+          if-no-files-found: ignore
+          retention-days: 14
+
   build:
     needs: quality
     name: Build ${{ matrix.platform }}

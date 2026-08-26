@@ -14,6 +14,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - BENCH-001 adiciona `npm run bench:circuit-scale`, um benchmark determinístico separado da suíte padrão que mede o runtime `Simulator` real em cadeias de 10 e 100 gates, com warmup separado, validação de saída, checksum e relatórios JSON/Markdown ignorados em `artifacts/`.
 - A primeira baseline Linux x86_64/Node `v22.13.0` observou 0,577 ms em 220 ticks para 10 gates e 17,271 ms em 2.020 ticks para 100 gates. Os alvos de 500, 1000 e 5000 gates ficaram `NOT SUPPORTED` pelos limites atuais de 256 nós/512 conexões; FPS, memória desktop, startup nativo e tamanho instalado continuam `NOT VERIFIED`.
 - BENCH-002 adiciona a leitura de capacidade do runtime bruto: o mesmo fixture como `Netlist` passou em 10/100/500/1000/5000 gates, incluindo 5000 em 6.273,959 ms/15.003 ticks. Essa medição interna não altera os limites do editor nem declara suporte oficial para circuitos grandes, persistência, renderização ou desktop.
+- O BENCH-002 foi incluído nos quality gates comuns e desktop; seus relatórios JSON/Markdown são retidos como artefatos de CI por 14 dias. Uma falha bloqueia o avanço do build desktop, mas um workflow verde não cria tag nem promove release automaticamente.
 
 ## [0.12.0] — 2026-08-25
 
