@@ -613,6 +613,9 @@ export function TestbenchPanel() {
                           </h4>
                           <CaseResultBadge result={result} />
                         </header>
+                        {result?.diagnostic ? (
+                          <DiagnosticStatus diagnostic={result.diagnostic} />
+                        ) : null}
 
                         <ol className="mt-3 space-y-2">
                           {item.steps.map((step, stepIndex) => {
@@ -855,6 +858,59 @@ function CaseResultBadge({ result }: { result: CaseResult | undefined }) {
   )
 }
 
+function DiagnosticStatus({
+  diagnostic,
+}: {
+  diagnostic: NonNullable<CaseResult['diagnostic']>
+}) {
+  const warning = diagnostic.status !== 'stabilized'
+  return (
+    <p
+      role="status"
+      className={
+        `mt-2 text-xs ${warning ? 'text-amber-700 dark:text-amber-300' : 'text-slate-500 dark:text-slate-400'}`
+      }
+    >
+      {formatDiagnostic(diagnostic)}
+    </p>
+  )
+}
+
+function DiagnosticSummary({ report }: { report: TestbenchReport }) {
+  const diagnostics = report.cases.filter((item) => item.diagnostic && item.diagnostic.status !== 'stabilized')
+  if (diagnostics.length === 0) return null
+  return (
+    <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/30" role="status">
+      <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+        Diagnóstico bounded: {diagnostics.length} caso(s) não estabilizaram na janela de diagnóstico.
+      </p>
+      <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-amber-800 dark:text-amber-300">
+        {diagnostics.map((item) => (
+          <li key={item.index}>
+            {item.name}: {formatDiagnostic(item.diagnostic!)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function formatDiagnostic(diagnostic: NonNullable<CaseResult['diagnostic']>): string {
+  if (diagnostic.status === 'stabilized') {
+    return `Diagnóstico: estabilizado após ${diagnostic.ticksExecuted} tique(s).`
+  }
+  if (diagnostic.status === 'cycle-detected') {
+    const cycle = diagnostic.cyclePeriod === undefined
+      ? 'período desconhecido'
+      : `período ${diagnostic.cyclePeriod}`
+    const start = diagnostic.cycleStartTick === undefined
+      ? 'início desconhecido'
+      : `início no tique ${diagnostic.cycleStartTick}`
+    return `Diagnóstico: ciclo detectado (${start}, ${cycle}; ${diagnostic.ticksExecuted} tique(s) observados).`
+  }
+  return `Diagnóstico: budget esgotado após ${diagnostic.ticksExecuted} tique(s), sem estabilização observada.`
+}
+
 function TestbenchSummary({ report }: { report: TestbenchReport }) {
   if (report.status === 'invalid') {
     return (
@@ -886,6 +942,7 @@ function TestbenchSummary({ report }: { report: TestbenchReport }) {
           casos — para uma prova sobre todas as combinações possíveis, use a
           equivalência entre circuitos.
         </p>
+        <DiagnosticSummary report={report} />
       </div>
     )
   }
@@ -900,6 +957,7 @@ function TestbenchSummary({ report }: { report: TestbenchReport }) {
         As linhas e passos marcados mostram, ao lado da saída esperada, o valor
         que o circuito realmente produziu.
       </p>
+      <DiagnosticSummary report={report} />
     </div>
   )
 }

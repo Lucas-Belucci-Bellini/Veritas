@@ -452,6 +452,17 @@ describe('run_testbench', () => {
     ],
   }
 
+  const sequentialClock: CircuitDocument = {
+    format: 'veritas-circuit',
+    version: 1,
+    name: 'clock',
+    nodes: [
+      { id: 'clk', type: 'clock', position: { x: 0, y: 0 }, label: 'CLK', options: { period: 1 } },
+      { id: 'out', type: 'output', position: { x: 180, y: 0 }, label: 'OUT' },
+    ],
+    connections: [{ source: { node: 'clk', port: 0 }, target: { node: 'out', port: 0 } }],
+  }
+
   it('aprova um circuito que satisfaz os vetores', () => {
     const result = runTestbenchTool({ document: halfAdder('and'), testbench: table })
 
@@ -480,6 +491,25 @@ describe('run_testbench', () => {
     expect(result.text).toContain('documento de teste inválido')
     expect(result.text).toContain('missing-expectation')
     expect(result.text).toContain('Nenhum caso foi executado')
+  })
+
+  it('expõe diagnóstico bounded de ciclo no resultado headless', () => {
+    const result = runTestbenchTool({
+      document: sequentialClock,
+      testbench: {
+        format: 'veritas-testbench',
+        version: 1,
+        name: 'clock',
+        cases: [{ name: 'ciclo', steps: [{ ticks: 1, expect: { OUT: false } }] }],
+      },
+    })
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('Resultado: todos os casos passaram')
+    expect(result.text).toContain('Diagnóstico bounded por caso:')
+    expect(result.text).toContain('ciclo detectado')
+    expect(result.text).toContain('início no tique 1')
+    expect(result.text).toContain('período 2')
   })
 
   it('recusa circuito fora do formato', () => {

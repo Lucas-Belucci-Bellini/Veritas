@@ -1,4 +1,8 @@
-import { createDocumentRuntime } from '../simulation/documentRuntime'
+import {
+  createDocumentRuntime,
+  diagnoseDocumentRuntimePreview,
+} from '../simulation/documentRuntime'
+import type { SettleDiagnostic } from '../simulation/simulator'
 import { evaluateCircuit } from './evaluate'
 import { CircuitValidationError, type CircuitDocument } from './editorModel'
 import { normalizeCircuitDocument } from './documentContract'
@@ -12,10 +16,14 @@ import type { CustomChipLibraryEntry } from './customChip'
 export const TESTBENCH_FORMAT = 'veritas-testbench'
 export const TESTBENCH_VERSION = 1
 
+export type TestbenchCaseDiagnostic = SettleDiagnostic
+
 /** Teto de casos em um documento de teste. */
 export const MAX_TESTBENCH_CASES = 512
 /** Teto de tiques somados em todos os casos sequenciais. */
 export const MAX_TESTBENCH_TICKS = 1000
+/** Teto da janela diagnóstica adicional por caso sequencial. */
+export const MAX_TESTBENCH_DIAGNOSTIC_TICKS = 64
 
 /**
  * Um passo de um caso sequencial: aplica entradas, roda tiques e — quando há
@@ -57,6 +65,7 @@ export type TestbenchIssueCode =
   | 'duplicate-port-name'
   | 'cases-exceeded'
   | 'ticks-exceeded'
+  | 'diagnostic-budget-invalid'
 
 export interface TestbenchIssue {
   code: TestbenchIssueCode
@@ -82,6 +91,8 @@ export interface TestbenchCaseResult {
   status: 'passed' | 'failed'
   /** Somente as saídas que não bateram, em ordem canônica. */
   mismatches: TestbenchMismatch[]
+  /** Diagnóstico bounded do estado final, somente para casos sequenciais. */
+  diagnostic?: SettleDiagnostic
 }
 
 export interface TestbenchReport {
@@ -95,6 +106,8 @@ export interface TestbenchReport {
 
 export interface TestbenchOptions {
   customChips?: readonly CustomChipLibraryEntry[]
+  /** Janela bounded usada para diagnosticar o estado final de cada caso sequencial. */
+  diagnosticTicks?: number
 }
 
 /**
@@ -113,6 +126,9 @@ export function runTestbench(
   testbench: TestbenchDocument,
   options: TestbenchOptions = {},
 ): TestbenchReport {
+  const optionIssues = validateTestbenchOptions(options)
+  if (optionIssues.length > 0) return invalid(optionIssues)
+
   const normalized = normalizeCircuitDocument(document)
   const identity = collectCircuitPorts(normalized)
 
@@ -207,12 +223,14 @@ function runSequentialCase(
     }
   })
 
+  const diagnostic = diagnoseSequentialCase(document, runtime, options)
   return {
     index,
     name: caseName(testCase, index),
     mode: 'sequential',
     status: mismatches.length === 0 ? 'passed' : 'failed',
     mismatches,
+    diagnostic,
   }
 }
 
@@ -230,15 +248,57 @@ function evaluate(
 
 function buildRuntime(document: CircuitDocument, options: TestbenchOptions) {
   try {
-    return createDocumentRuntime(document, { customChips: options.customChips })
+    return createDocumentRuntime(document, {
+      customChips: options.customChips,
+      maxTotalTicks: MAX_TESTBENCH_TICKS + diagnosticTicks(options),
+    })
   } catch (error) {
     throw new Error(`Circuito inválido: ${describe(error)}`)
+  }
+}
+
+function diagnoseSequentialCase(
+  document: CircuitDocument,
+  runtime: ReturnType<typeof createDocumentRuntime>,
+  options: TestbenchOptions,
+): SettleDiagnostic {
+  try {
+    return diagnoseDocumentRuntimePreview(document, {
+      customChips: options.customChips,
+      maxTotalTicks: MAX_TESTBENCH_TICKS + diagnosticTicks(options),
+      maxTicks: diagnosticTicks(options),
+      simulatorState: runtime.exportState(),
+    }).diagnostic
+  } catch (error) {
+    throw new Error(`Não foi possível diagnosticar o caso sequencial: ${describe(error)}`)
   }
 }
 
 function describe(error: unknown): string {
   if (error instanceof CircuitValidationError) return error.issues[0]?.message ?? error.message
   return error instanceof Error ? error.message : 'motivo desconhecido'
+}
+
+function validateTestbenchOptions(options: TestbenchOptions): TestbenchIssue[] {
+  if (options.diagnosticTicks === undefined) return []
+  if (
+    !Number.isInteger(options.diagnosticTicks) ||
+    options.diagnosticTicks < 1 ||
+    options.diagnosticTicks > MAX_TESTBENCH_DIAGNOSTIC_TICKS
+  ) {
+    return [
+      {
+        code: 'diagnostic-budget-invalid',
+        message:
+          `O budget diagnóstico precisa ser um inteiro entre 1 e ${MAX_TESTBENCH_DIAGNOSTIC_TICKS} tiques.`,
+      },
+    ]
+  }
+  return []
+}
+
+function diagnosticTicks(options: TestbenchOptions): number {
+  return options.diagnosticTicks ?? MAX_TESTBENCH_DIAGNOSTIC_TICKS
 }
 
 function validateTestbenchShape(testbench: TestbenchDocument): TestbenchIssue[] {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_TESTBENCH_CASES,
+  MAX_TESTBENCH_DIAGNOSTIC_TICKS,
   MAX_TESTBENCH_TICKS,
   runTestbench,
   TESTBENCH_FORMAT,
@@ -123,6 +124,64 @@ describe('runTestbench', () => {
 
     expect(report.status).toBe('passed')
     expect(report.cases[0]?.mode).toBe('sequential')
+    expect(report.cases[0]?.diagnostic).toMatchObject({ status: 'stabilized' })
+  })
+
+  it('anexa diagnóstico de ciclo ao caso sequencial sem alterar PASS/FAIL', () => {
+    const clock = doc(
+      'clock',
+      [node('clk', 'clock', 'CLK', { period: 1 }), node('out', 'output', 'OUT')],
+      [link('clk', 'out')],
+    )
+
+    const report = runTestbench(
+      clock,
+      bench([{ name: 'primeiro nível', steps: [{ ticks: 1, expect: { OUT: false } }] }], 'clock'),
+      { diagnosticTicks: 8 },
+    )
+
+    expect(report.status).toBe('passed')
+    expect(report.cases[0]?.diagnostic).toEqual({
+      status: 'cycle-detected',
+      ticksExecuted: 2,
+      cycleStartTick: 1,
+      cyclePeriod: 2,
+    })
+  })
+
+  it('anexa budget esgotado quando a janela diagnóstica termina antes do ciclo', () => {
+    const clock = doc(
+      'clock',
+      [node('clk', 'clock', 'CLK', { period: 1 }), node('out', 'output', 'OUT')],
+      [link('clk', 'out')],
+    )
+
+    const report = runTestbench(
+      clock,
+      bench([{ steps: [{ ticks: 1, expect: { OUT: false } }] }], 'clock'),
+      { diagnosticTicks: 1 },
+    )
+
+    expect(report.status).toBe('passed')
+    expect(report.cases[0]?.diagnostic).toEqual({
+      status: 'budget-exhausted',
+      ticksExecuted: 1,
+    })
+  })
+
+  it('recusa budget diagnóstico inválido antes de executar os casos', () => {
+    const report = runTestbench(halfAdder('and'), HALF_ADDER_TABLE, {
+      diagnosticTicks: MAX_TESTBENCH_DIAGNOSTIC_TICKS + 1,
+    })
+
+    expect(report.status).toBe('invalid')
+    expect(report.issues).toEqual([
+      {
+        code: 'diagnostic-budget-invalid',
+        message: expect.stringContaining('entre 1 e 64 tiques'),
+      },
+    ])
+    expect(report.total).toBe(0)
   })
 
   it('aponta o tique e o passo quando um caso sequencial falha', () => {

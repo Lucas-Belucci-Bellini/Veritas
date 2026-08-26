@@ -68,6 +68,7 @@ export type {
 } from './differential'
 export {
   MAX_TESTBENCH_CASES,
+  MAX_TESTBENCH_DIAGNOSTIC_TICKS,
   MAX_TESTBENCH_TICKS,
   runTestbench,
   TESTBENCH_FORMAT,
@@ -77,6 +78,7 @@ export type {
   TestbenchCase,
   TestbenchCaseResult,
   TestbenchDocument,
+  TestbenchCaseDiagnostic,
   TestbenchIssue,
   TestbenchIssueCode,
   TestbenchMismatch,

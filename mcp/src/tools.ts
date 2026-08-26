@@ -728,6 +728,7 @@ function formatTestbenchReport(report: TestbenchReport): string {
       'O circuito satisfez todos os vetores declarados. Isso cobre exatamente os casos escritos —',
       'para uma prova sobre todo o espaço de entrada, use circuit_equivalence.',
     )
+    appendDiagnostics(lines, report)
     return lines.join('\n')
   }
 
@@ -741,7 +742,31 @@ function formatTestbenchReport(report: TestbenchReport): string {
       )
     }
   }
+  appendDiagnostics(lines, report)
   return lines.join('\n')
+}
+
+function appendDiagnostics(lines: string[], report: TestbenchReport): void {
+  const diagnostics = report.cases.filter((item) => item.diagnostic)
+  if (diagnostics.length === 0) return
+
+  lines.push('', 'Diagnóstico bounded por caso:')
+  for (const item of diagnostics) {
+    const diagnostic = item.diagnostic!
+    lines.push(`- ${item.name}: ${formatDiagnostic(diagnostic)}`)
+  }
+}
+
+function formatDiagnostic(diagnostic: NonNullable<TestbenchReport['cases'][number]['diagnostic']>): string {
+  if (diagnostic.status === 'stabilized') {
+    return `estabilizado após ${diagnostic.ticksExecuted} tique(s)`
+  }
+  if (diagnostic.status === 'cycle-detected') {
+    const cycle = diagnostic.cyclePeriod === undefined ? 'período desconhecido' : `período ${diagnostic.cyclePeriod}`
+    const start = diagnostic.cycleStartTick === undefined ? 'início desconhecido' : `início no tique ${diagnostic.cycleStartTick}`
+    return `ciclo detectado (${start}, ${cycle}; ${diagnostic.ticksExecuted} tique(s) observados)`
+  }
+  return `budget esgotado após ${diagnostic.ticksExecuted} tique(s)`
 }
 
 export const MCP_MAX_TESTBENCH_CASES = MAX_TESTBENCH_CASES
