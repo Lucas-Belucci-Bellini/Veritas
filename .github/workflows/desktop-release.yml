@@ -144,14 +144,22 @@ jobs:
           path: desktop-artifacts
           merge-multiple: true
 
-      - name: Generate checksums
+      - name: Generate manifest and checksums
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          RELEASE_COMMIT: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          (
-            cd desktop-artifacts
-            find . -type f -print0 | sort -z | xargs -0 sha256sum
-          ) > SHA256SUMS
+          version="${RELEASE_TAG#desktop-}"
+          version="${version#v}"
+          node scripts/generate-desktop-manifest.mjs \
+            --input-dir desktop-artifacts \
+            --manifest-out desktop-release-manifest.json \
+            --checksums-out SHA256SUMS \
+            --version "$version" \
+            --tag "$RELEASE_TAG" \
+            --commit "$RELEASE_COMMIT"
 
       - name: Attach installers to GitHub release
         env:
@@ -170,4 +178,4 @@ jobs:
             esac
           done < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
           find desktop-artifacts -type f -print0 | xargs -0 gh release upload "$RELEASE_TAG" --clobber
-          gh release upload "$RELEASE_TAG" SHA256SUMS --clobber
+          gh release upload "$RELEASE_TAG" SHA256SUMS desktop-release-manifest.json --clobber
