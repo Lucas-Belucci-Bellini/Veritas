@@ -34,7 +34,9 @@ jobs:
           - platform: windows
             os: windows-latest
             args: "--bundles nsis"
-            artifact_glob: "src-tauri/target/release/bundle/nsis/*.exe"
+            artifact_glob: |
+              src-tauri/target/release/bundle/nsis/*.exe
+              Veritas-Setup.exe
           - platform: macos
             os: macos-latest
             args: "--bundles app,dmg"
@@ -73,6 +75,14 @@ jobs:
 
       - name: Build desktop bundles
         run: npm exec -- tauri build ${{ matrix.args }}
+
+      - name: Normalize Windows installer name
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if ($null -eq $installer) { throw "Instalador NSIS não encontrado" }
+          Copy-Item $installer.FullName "Veritas-Setup.exe" -Force
 
       - name: Package macOS app
         if: runner.os == 'macOS'
@@ -139,4 +149,6 @@ jobs:
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --title "Veritas Desktop $RELEASE_TAG" --prerelease --generate-notes
           fi
+          legacy_asset="Veritas_0.1.0-alpha.1_x64-setup.exe"
+          gh release delete-asset "$RELEASE_TAG" "$legacy_asset" --yes >/dev/null 2>&1 || true
           find desktop-artifacts -type f -print0 | xargs -0 gh release upload "$RELEASE_TAG" --clobber
