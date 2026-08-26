@@ -6,7 +6,7 @@
 
 **Repositório oficial:** https://github.com/Lucas-Belucci-Bellini/Veritas
 
-**Meta da trajetória:** Veritas v2.5.0.
+**Meta da trajetória:** Veritas v5.0.0, seguindo primeiro os gates até v2.5.0 e depois `docs/VERITAS_V3_V5_ROADMAP.md`.
 
 **Princípio definitivo:** não construir apenas um site que calcula portas lógicas; construir uma **Digital Logic Platform** multiplataforma, distribuível, leve, rápida, offline-first, local-first, privacy-first, determinística, modular, visual, segura, extensível e adequada tanto para estudantes quanto para projetos maiores.
 
@@ -14,7 +14,7 @@
 
 ## 1. INSTRUÇÃO PRINCIPAL PARA O AGENTE
 
-Continue autonomamente o desenvolvimento do Veritas até a trajetória v2.5.0. O trabalho anterior já existe e não deve ser reiniciado. Não apague, não reescreva e não substitua partes funcionais sem necessidade. Preserve o que já funciona, escolha o próximo bloqueio técnico real, implemente uma mudança pequena e testável, execute os gates, documente a evidência, faça commits separados quando houver código e documentação, publique no branch correto e reporte somente progresso real.
+Continue autonomamente o desenvolvimento do Veritas até a trajetória v5.0.0. O trabalho anterior já existe e não deve ser reiniciado. Não apague, não reescreva e não substitua partes funcionais sem necessidade. Preserve o que já funciona, escolha o próximo bloqueio técnico real, implemente uma mudança pequena e testável, execute os gates, documente a evidência, faça commits separados quando houver código e documentação, publique no branch correto e reporte somente progresso real. Para os marcos posteriores à v2.5.0, siga `docs/VERITAS_V3_V5_ROADMAP.md`.
 
 A arquitetura obrigatória continua sendo:
 
@@ -48,7 +48,7 @@ experiência do usuário
 velocidade de implementação
 ```
 
-**Estabilidade é mais importante que velocidade.** A v1.0.0 só pode existir quando estiver realmente estável. A v2.5.0 só pode existir quando todos os critérios finais estiverem comprovados.
+**Estabilidade é mais importante que velocidade.** A v1.0.0 só pode existir quando estiver realmente estável. A v2.5.0 e a v5.0.0 só podem existir quando todos os critérios finais de cada trajetória estiverem comprovados.
 
 ---
 
@@ -263,10 +263,10 @@ O snapshot abaixo registra o estado comprovado durante a continuidade que origin
 
 | Item | Snapshot conhecido |
 |---|---|
-| Branch de desenvolvimento | `feature/chip-hierarchy-v1` |
-| HEAD conhecido antes deste documento | `9c00f9a` — `docs: record diagnostics preview action` |
-| `main` conhecida | `ad09284c6ee144b399766e2432b87f0001ac4f64` |
-| Core informado pelo `package.json` | `0.9.0-rc.15` |
+| Branch de desenvolvimento | `main` após integração; `feature/chip-hierarchy-v1` preservada |
+| HEAD conhecido após a integração | `37d3c01` — `merge: integrate feature branch into main` |
+| `main` conhecida | `37d3c015efab184f0f8015fcd0c641fcd421fc84` |
+| Core informado pelo `package.json` | `0.9.0-rc.18` |
 | Release core observada | `v0.9.0-rc.18`, prerelease |
 | Release desktop observada | `desktop-v0.1.0-alpha.1`, prerelease |
 | Workflow desktop histórico bem-sucedido | `32922086872` |
@@ -384,6 +384,8 @@ O incremento só pode ser considerado concluído quando:
 ---
 
 ## 7. ROADMAP EXECUTÁVEL ATÉ v2.5.0
+
+> A trajetória pós-v2.5.0 até v5.0.0 está em [`VERITAS_V3_V5_ROADMAP.md`](./VERITAS_V3_V5_ROADMAP.md). Ela é complementar a esta seção e não promove nenhuma versão automaticamente.
 
 As seções a seguir são a lista completa de trabalho. O agente deve avançar na ordem de dependência e pode quebrar cada seção em vários commits/releases intermediários. Não é permitido declarar um marco concluído porque somente parte da funcionalidade foi implementada.
 
@@ -1498,15 +1500,37 @@ Se a auditoria inicial não revelar mudança posterior, seguir esta ordem:
 10. Continuar hardening de editor, multi-bit e project system.
 11. Criar docs de v2 antes da arquitetura 2.0.0.
 12. Só depois avançar para modularidade, plugins, professional workspace e automated verification.
+13. Após a v2.5.0, seguir `docs/VERITAS_V3_V5_ROADMAP.md` para v2.6.0–v5.0.0.
+14. Não promover v3, v4 ou v5 sem os gates específicos de plataforma, segurança, migração e distribuição.
 ```
 
 Essa ordem pode mudar somente se a auditoria encontrar um bloqueio mais crítico. Se mudar, explicar causa, impacto e decisão no relatório.
 
 ---
 
-## 17. COMANDO FINAL
+## 17. EXTENSÃO DA TRAJETÓRIA ATÉ v5.0.0
 
-Continue o desenvolvimento do Veritas até a v2.5.0.
+A meta do Veritas foi ampliada de v2.5.0 para v5.0.0. O detalhamento executável está em [`VERITAS_V3_V5_ROADMAP.md`](./VERITAS_V3_V5_ROADMAP.md). A extensão não autoriza pular releases nem afirmar que v3, v4 ou v5 já existem.
+
+A sequência pós-v2.5.0 é:
+
+```text
+v2.6.0 verification no produto
+v2.7.0 segurança da execução
+v2.8.0 migrações e portabilidade
+v2.9.0 preparação arquitetural
+v3.0–v3.9 modularidade, plugins, workspace e produto profissional
+v4.0–v4.9 plataforma extensível, reprodutibilidade e distribuição segura
+v5.0.0 Digital Logic Platform madura
+```
+
+A v5.0.0 só poderá ser promovida quando core, editor, simulator, verification, HDL, plugins, IA controlada, projetos, desktop e distribuição estiverem integrados, migráveis, reproduzíveis e validados em Windows, macOS e Linux. `Veritas-Setup.exe` continua requisito oficial do Windows.
+
+---
+
+## 18. COMANDO FINAL
+
+Continue o desenvolvimento do Veritas até a v5.0.0, seguindo primeiro a trajetória v2.5.0 e depois `docs/VERITAS_V3_V5_ROADMAP.md`.
 
 Não reinicie.
 
@@ -1542,11 +1566,13 @@ Mantenha React → Vite → Tauri 2 → Rust.
 
 Mantenha local-first, offline-first, privacy-first, seguro e determinístico.
 
-Construa corretamente até a **Veritas Digital Logic Platform v2.5.0**.
+Construa corretamente até a **Veritas Digital Logic Platform v5.0.0**, sem antecipar versões e sem confundir roadmap com release.
 
 ---
 
 ## Referências
+
+[4]: ./VERITAS_V3_V5_ROADMAP.md "Trajetória pós-v2.5.0 até v5.0.0"
 
 [1]: https://github.com/Lucas-Belucci-Bellini/Veritas "Repositório oficial do Veritas"
 

@@ -4,6 +4,10 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 
 ## [Unreleased]
 
+### Trajetória de plataforma
+
+- A trajetória de continuidade foi ampliada de v2.5.0 para v5.0.0. `docs/VERITAS_V3_V5_ROADMAP.md` define os marcos pós-v2.5.0 — verification, segurança de execução, migrações, modularidade, plugins, workspace profissional, reprodutibilidade, distribuição e o gate final de Digital Logic Platform — sem promover qualquer versão automaticamente.
+
 ### Qualidade e distribuição
 
 - Adicionado baseline permanente `Expression → TruthTable` versus `Circuit → Simulator` em `tests/regression/`, cobrindo portas fundamentais, meio somador, somador completo e multiplexador.

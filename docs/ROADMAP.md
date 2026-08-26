@@ -4,7 +4,7 @@
 
 ## 1. Estado atual
 
-A versão de referência do repositório é a **v0.8.0-rc.1**. O projeto já possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial básica e servidor MCP.
+A versão de referência do repositório é a **v0.9.0-rc.18**, atualmente publicada na `main` pelo merge `37d3c01`. O projeto já possui um motor lógico reutilizável, interface React, tabela verdade virtualizada, visualização de circuito derivada da expressão, projetos locais, PWA, simplificação, mapas de Karnaugh, formas normais, simulação sequencial, editor visual, barramentos multi-bit, chips customizados hierárquicos, testbench declarativo, comparação temporal, HDL, servidor MCP e shell Tauri 2. A release desktop pública `desktop-v0.1.0-alpha.1` permanece histórica; builds e artefatos não equivalem a runtime interativo verificado.
 
 | Área | Situação real | Evidência no repositório |
 | --- | --- | --- |
@@ -22,9 +22,9 @@ A versão de referência do repositório é a **v0.8.0-rc.1**. O projeto já pos
 | Colaboração Realtime | Entregue em prévia | Broadcast, Presence, convite por papel e canvas visualizador |
 | Exportação Verilog/VHDL | Entregue em prévia | `src/circuit/export.ts` e testes determinísticos |
 | Monitoramento de IA | Entregue em prévia | `veritas_ai_metrics`, Realtime, cliente e painel |
-| Barramentos multi-bit | Backlog priorizado | Ainda não existe no modelo de dados |
-| Chips customizados hierárquicos | Backlog posterior | Depende do editor e do modelo de subcircuitos |
-| Aplicativo desktop Tauri/Rust | Investigar depois | Depende de métricas de performance e escopo estabilizado |
+| Barramentos multi-bit | Entregue em prévia | `src/bus/`, avaliação vetorial, Splitter/Combiner, HDL e catálogo DLS; limites e performance ainda exigem endurecimento |
+| Chips customizados hierárquicos | Entregue em prévia | Biblioteca local, expansão, ciclo/profundidade e importação estrutural allowlist; barramentos internos continuam limitados |
+| Aplicativo desktop Tauri/Rust | Prévia técnica | Tauri 2, builds e manifesto/checksums; runtime interativo Windows/macOS/Linux ainda não verificado integralmente |
 | 3D, PCB, impressão e 250 subagentes | Visão de longo prazo | Não fazem parte do próximo ciclo |
 
 ## 2. Decisões de produto
@@ -43,12 +43,13 @@ Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, rende
 | **v0.7.1** | Usabilidade e confiabilidade do editor | Seleção, exclusão, atalhos, desfazer/refazer, layout inicial, validação de ciclos combinacionais, testes de interação e persistência do novo formato | O editor é utilizável em projetos pequenos e não perde dados em operações comuns |
 | **v0.7.2** | Integrações colaborativas e industriais | Colaboração Realtime privada com Presence/Broadcast, convite editor/visualizador, histórico remoto, exportação Verilog/VHDL, Edge Function autenticada e painel de métricas de IA | Usuários autenticados compartilham um circuito com papéis explícitos, exportam um netlist válido e acompanham telemetria sem expor dados de terceiros |
 | **v0.8.0** | Barramentos multi-bit | Largura explícita de sinal; operações bitwise; displays binário/hexadecimal; splitter/combiner; limites de largura e testes de compatibilidade | Um circuito de 8 bits consegue ser criado, simulado, salvo e reaberto com resultado determinístico |
-| **v0.9.0** | Workspace sequencial | Edição visual de clock, DFF/TFF, delay, contadores e observação de ticks; pausa, avanço manual e reset | Um contador e um circuito com feedback podem ser simulados sem congelar a interface |
+| **v0.9.0** | Workspace sequencial | Edição visual de clock, DFF/TFF/JK/SR, delay, contadores, Step/Run/Reset, timeline, waveform e observação de ticks | Roteiros temporais determinísticos, budgets, diagnóstico bounded e ausência de loops de UI |
 | **v0.10.0** | Abstração e chips customizados | Pinos de entrada/saída; criação de subcircuito; biblioteca local de chips; execução hierárquica com limites de profundidade | Um subcircuito salvo pode ser reutilizado como componente em outro projeto |
+| **v0.10.1–v0.12.0** | Expansão multi-bit e catálogo DLS | Barramentos particionáveis, comparadores, somadores, operadores vetoriais, multiplexador, inversores, extensores e `BITREV-4/8` em allowlist estrutural | Cada perfil suportado tem contrato, testes, avaliação local e rejeição fail-closed |
 | **v1.0.0** | Plataforma estável para pessoas e IAs | API de contexto do canvas; operações MCP de leitura e simulação; plano de mudanças; dry-run; logs; documentação de integração | Uma IA consegue consultar e propor alterações sem editar silenciosamente o projeto |
 | **v1.x** | Expansão controlada | Barramentos, chips customizados, desktop Tauri/Rust, agentes de fundo e recursos 3D | Cada iniciativa tem caso de uso validado, orçamento técnico e modelo de segurança definido |
 
-## 4. Próximo ciclo: v0.7.1
+## 4. Histórico do ciclo inicial: v0.7.1
 
 A primeira implementação organizada foi o **editor visual combinacional** e está disponível em prévia. O próximo ciclo concentra-se em usabilidade e confiabilidade: desfazer/refazer, atalhos, seleção consistente, layout inicial e testes de interação. A calculadora de expressões continua funcionando de forma independente do editor.
 
@@ -65,7 +66,7 @@ O editor terá um modelo de dados próprio, independente dos objetos internos do
 | Persistência | Novo formato versionado dentro de `.veritas`, mantendo compatibilidade de leitura |
 | Segurança | Sem execução de código importado; validar tipos, IDs, referências e limites |
 
-## 5. Backlog organizado
+## 5. Backlog histórico do ciclo inicial
 
 Os itens abaixo serão implementados nessa ordem. Cada item deve gerar código, teste e documentação mínima antes de ser marcado como concluído.
 
@@ -84,7 +85,7 @@ Os itens abaixo serão implementados nessa ordem. Cada item deve gerar código, 
 | VRT-011 | P1 | Testes cruzados entre expressão, circuito e tabela | VRT-003, VRT-007, engine atual |
 | VRT-012 | P2 | Tutorial inicial de uso e exemplos de circuitos | VRT-005 |
 
-## 6. Fora do próximo ciclo
+## 6. Fora do ciclo inicial
 
 Não serão iniciados no ciclo v0.7.0 o sync com Supabase, autenticação, CRDT, WebSockets, 250 subagentes, WebLLM, integração de GitHub com permissões de escrita, Tauri, Rust, Three.js, exportação para PCB, G-Code ou impressão 3D. Essas ideias continuam registradas no `issue.md`, mas iniciar qualquer uma delas agora aumentaria a superfície técnica antes de o editor possuir um modelo estável.
 
@@ -107,7 +108,23 @@ Para cada release, será produzido um pequeno registro com as decisões tomadas,
 | Integrações com IA alterarem dados sem controle | Propostas declarativas, dry-run, logs e confirmação do usuário |
 | Migração prematura para desktop atrasar o produto web | Medir performance primeiro e só então decidir a fronteira Rust/Tauri |
 
-## 9. Referências
+## 9. Trajetória pós-v2.5.0 até v5.0.0
+
+A partir da v2.6.0, o trabalho deixa de ser apenas a soma de features do editor e passa a tratar o Veritas como uma plataforma integrada. O detalhamento executável está em [`VERITAS_V3_V5_ROADMAP.md`](./VERITAS_V3_V5_ROADMAP.md).
+
+| Marco | Foco | Gate resumido |
+|---|---|---|
+| **v2.6.0** | Verification no produto | Testbench com `PASS`/`FAIL`/`INVALID`, diagnóstico bounded, snapshots e contraexemplos |
+| **v2.7.0** | Segurança da execução | Classificação estática de ciclos, budgets de operações/memória e cancelamento seguro |
+| **v2.8.0** | Migrações e portabilidade | Formato versionado, round-trip, recovery e rejeição clara |
+| **v2.9.0** | Pré-3.0 hardening | APIs inventariadas, dependências auditadas e decisão de entrada em 3.0 |
+| **v3.0.0–v3.9.0** | Modularidade e produto profissional | Boundaries, plugins seguros, workspace, acessibilidade, colaboração, IA controlada, HDL e escala |
+| **v4.0.0–v4.9.0** | Plataforma extensível e distribuível | Pacotes, reprodutibilidade, serviços opt-in, automação bounded e distribuição assinada |
+| **v5.0.0** | Digital Logic Platform madura | Produto integrado, migrável, reproduzível e validado em Windows/macOS/Linux |
+
+Nenhum desses marcos é considerado lançado apenas por existir no documento. Cada release exige código, testes, documentação, commit, tag, artefatos, checksums e evidência de plataforma proporcional à promessa.
+
+## 10. Referências
 
 [1]: https://github.com/Lucas-Belucci-Bellini/Veritas/blob/main/issue.md "Registro de descoberta do Veritas"
 [2]: https://reactflow.dev/ "React Flow — documentação oficial"
