@@ -63,6 +63,14 @@ describe('logic scale benchmark fixtures', () => {
     }
   })
 
+  test('accepts the maximum linear chain allowed by the current document limit', () => {
+    const document = createNotChainDocument(maxSupportedNotChainGates())
+
+    expect(validateCircuit(document)).toEqual([])
+    expect(document.nodes).toHaveLength(256)
+    expect(document.connections).toHaveLength(255)
+  })
+
   test('fails closed when a requested chain exceeds the document contract', () => {
     expect(() => createNotChainDocument(255)).toThrow(/limita/i)
     expect(() => createNotChainDocument(500)).toThrow(/limita/i)

@@ -135,6 +135,8 @@ Esse resultado demonstra uma fronteira útil: o runtime bruto consegue processar
 
 O BENCH-002 agora faz parte dos quality gates de `.github/workflows/quality.yml` e do job de qualidade de `.github/workflows/desktop-release.yml`. Cada execução retém o JSON e o Markdown como artefato de CI por 14 dias; o resultado não é anexado como instalador, não altera a tag e não transforma um workflow verde em release automaticamente. Se o benchmark falhar, a cadeia de build desktop não avança porque o job nativo depende do quality gate.
 
+A decisão de capacidade está registrada em [`docs/LARGE_CIRCUITS.md`](LARGE_CIRCUITS.md): o limite oficial permanece em 256 nós/512 conexões, enquanto o `Netlist` bruto continua sendo usado apenas para diagnóstico do Simulator. Os testes de fixture agora cobrem tanto o máximo linear editorial válido de 254 gates quanto a rejeição fail-closed de 255 gates; nenhuma medição interna é promovida a suporte de produto sem contrato de dados, budgets, renderização, persistência, segurança e QA multiplataforma.
+
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 
 O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.

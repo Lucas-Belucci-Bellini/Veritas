@@ -15,6 +15,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - A primeira baseline Linux x86_64/Node `v22.13.0` observou 0,577 ms em 220 ticks para 10 gates e 17,271 ms em 2.020 ticks para 100 gates. Os alvos de 500, 1000 e 5000 gates ficaram `NOT SUPPORTED` pelos limites atuais de 256 nós/512 conexões; FPS, memória desktop, startup nativo e tamanho instalado continuam `NOT VERIFIED`.
 - BENCH-002 adiciona a leitura de capacidade do runtime bruto: o mesmo fixture como `Netlist` passou em 10/100/500/1000/5000 gates, incluindo 5000 em 6.273,959 ms/15.003 ticks. Essa medição interna não altera os limites do editor nem declara suporte oficial para circuitos grandes, persistência, renderização ou desktop.
 - O BENCH-002 foi incluído nos quality gates comuns e desktop; seus relatórios JSON/Markdown são retidos como artefatos de CI por 14 dias. Uma falha bloqueia o avanço do build desktop, mas um workflow verde não cria tag nem promove release automaticamente.
+- Registrada a decisão em `docs/LARGE_CIRCUITS.md`: manter os limites oficiais do `CircuitDocument`, usar o Netlist bruto apenas para diagnóstico do Simulator e exigir contrato versionado, budgets, renderização, persistência, segurança e QA multiplataforma antes de anunciar suporte a circuitos grandes.
 
 ## [0.12.0] — 2026-08-25
 

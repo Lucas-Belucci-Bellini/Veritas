@@ -58,6 +58,8 @@ A regressão cruzada usa `buildTruthTable(parse(expression))` como intenção e 
 
 O BENCH-001 mediu, nesta execução Linux x86_64/Node `v22.13.0`, 0,577 ms em 220 ticks para 10 gates e 17,271 ms em 2.020 ticks para 100 gates. O BENCH-002 também executou o Netlist bruto nos cinco alvos, incluindo 5000 gates em 6.273,959 ms/15.003 ticks. Os valores são baseline da máquina/processo, não são comparáveis entre plataformas sem ambiente equivalente e não promovem suporte editorial, persistência ou renderização nessa escala.
 
+A decisão de capacidade em `docs/LARGE_CIRCUITS.md` mantém os limites canônicos de 256 nós, 512 conexões e 500.000 bytes serializados. A fixture cobre o máximo linear válido de 254 gates e recusa 255 gates; o caminho Netlist bruto é diagnóstico do Simulator, não evidência de suporte oficial do editor.
+
 ## Início formal dos testes — desktop `0.5.0`
 
 A `0.5.0` só será aberta quando houver builds por plataforma e um conjunto de máquinas ou runners capazes de executar os fluxos. O checklist mínimo será repetido em cada sistema: instalar, criar circuito, conectar portas, simular, salvar projeto local, fechar, reabrir, exportar/importar `.veritas`, exportar Verilog/VHDL, testar sem rede, atualizar e desinstalar. O resultado deverá incluir logs, versões do sistema, hash dos artefatos e a classificação de cada caso como `BUILD VERIFIED`, `RUNTIME VERIFIED`, `SMOKE VERIFIED`, `FAILED` ou `NOT VERIFIED`.
