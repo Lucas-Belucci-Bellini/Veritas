@@ -1,0 +1,292 @@
+name: Veritas desktop release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag existente da release que receberá os instaladores, por exemplo v0.1.0-alpha.1"
+        required: true
+        type: string
+  push:
+    tags:
+      - "desktop-v*.*.*"
+
+concurrency:
+  group: veritas-desktop-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build web
+        run: npm run build
+
+      - name: Circuit scale benchmark
+        run: npm run bench:circuit-scale
+
+      - name: Upload performance benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veritas-desktop-performance-benchmark-${{ github.run_id }}
+          path: |
+            artifacts/logic-scale-benchmark.md
+            artifacts/logic-scale-benchmark.json
+            artifacts/logic-scale-measurements.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  build:
+    needs: quality
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-22.04
+            args: "--bundles deb,appimage"
+            artifact_glob: |
+              src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/appimage/*.AppImage
+          - platform: windows
+            os: windows-latest
+            args: "--bundles nsis"
+            artifact_glob: "Veritas-Setup.exe"
+          - platform: macos
+            os: macos-latest
+            args: "--bundles app,dmg"
+            artifact_glob: |
+              src-tauri/target/release/bundle/dmg/*.dmg
+              Veritas_0.1.0-alpha.1_*.app.zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+
+      - name: Install Tauri CLI
+        run: npm exec -- tauri --version
+
+      - name: Build desktop bundles
+        run: npm exec -- tauri build ${{ matrix.args }}
+
+      - name: Normalize Windows installer name
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if ($null -eq $installer) { throw "Instalador NSIS não encontrado" }
+          Copy-Item $installer.FullName "Veritas-Setup.exe" -Force
+
+      - name: Smoke test Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installDir = Join-Path $env:RUNNER_TEMP 'veritas-install-smoke'
+          Remove-Item $installDir -Recurse -Force -ErrorAction SilentlyContinue
+          $installer = (Resolve-Path 'Veritas-Setup.exe').Path
+          $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "NSIS install failed with exit code $($install.ExitCode)" }
+          if (-not (Test-Path $installDir)) { throw 'Install directory was not created' }
+
+          $app = Get-ChildItem $installDir -Filter '*.exe' -File | Where-Object { $_.Name -notmatch 'uninstall|unins' } | Select-Object -First 1
+          if ($null -eq $app) { throw 'Installed Veritas executable was not found' }
+          $started = Start-Process -FilePath $app.FullName -PassThru
+          Start-Sleep -Seconds 8
+          if ($started.HasExited) { throw "Veritas exited during startup with code $($started.ExitCode)" }
+          Stop-Process -Id $started.Id -Force
+
+          $shortcutRoots = @(
+            (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'),
+            (Join-Path $env:USERPROFILE 'Desktop')
+          )
+          $shortcuts = foreach ($root in $shortcutRoots) {
+            if (Test-Path $root) {
+              Get-ChildItem $root -Filter '*.lnk' -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'Veritas' }
+            }
+          }
+          if (@($shortcuts).Count -eq 0) { throw 'No Veritas shortcut was created' }
+
+          $uninstaller = Get-ChildItem $installDir -Filter 'uninstall*.exe' -File | Select-Object -First 1
+          if ($null -eq $uninstaller) { throw 'NSIS uninstaller was not found' }
+          $remove = Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw "NSIS uninstall failed with exit code $($remove.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Test-Path $installDir) { throw 'Install directory remains after uninstall' }
+
+      - name: Smoke test Linux Debian package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$deb"
+          sudo dpkg -i "$deb"
+          cleanup() { sudo dpkg -r veritas >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          test -x /usr/bin/veritas
+          test -f /usr/share/applications/Veritas.desktop
+          set +e
+          GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 xvfb-run -a -s '-screen 0 1440x960x24' timeout --signal=TERM --kill-after=5s 10s /usr/bin/veritas >/tmp/veritas-linux-smoke.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/veritas-linux-smoke.log
+          rm -f /tmp/veritas-linux-smoke.log
+          case "$status" in
+            0|124|143) ;;
+            *) echo "Veritas Linux startup failed with exit code $status"; exit "$status" ;;
+          esac
+          sudo dpkg -r veritas
+          trap - EXIT
+          test ! -e /usr/bin/veritas
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app"
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64) suffix="aarch64" ;;
+            x86_64) suffix="x86_64" ;;
+            *) suffix="$arch" ;;
+          esac
+          ditto -c -k --sequesterRsrc --keepParent "$app" "Veritas_0.1.0-alpha.1_${suffix}.app.zip"
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: veritas-desktop-${{ matrix.platform }}
+          path: |
+            ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Attach desktop installers
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout release repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="$INPUT_TAG"
+          else
+            tag="$REF_NAME"
+          fi
+          if [[ ! "$tag" =~ ^(desktop-)?v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "A tag precisa ser desktop-vX.Y.Z ou vX.Y.Z: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: veritas-desktop-*
+          path: desktop-artifacts
+          merge-multiple: true
+
+      - name: Generate manifest and checksums
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#desktop-}"
+          version="${version#v}"
+          node scripts/generate-desktop-manifest.mjs \
+            --input-dir desktop-artifacts \
+            --manifest-out desktop-release-manifest.json \
+            --checksums-out SHA256SUMS \
+            --version "$version" \
+            --tag "$RELEASE_TAG" \
+            --commit "$RELEASE_COMMIT"
+
+      - name: Attach installers to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --title "Veritas Desktop $RELEASE_TAG" --prerelease --generate-notes
+          fi
+          while IFS= read -r asset; do
+            case "$asset" in
+              Veritas_0.1.0-alpha.1_x64-setup.exe|veritas-desktop-*.app.zip|Veritas_0.1.0-alpha.1_*.app.zip)
+                gh release delete-asset "$RELEASE_TAG" "$asset" --yes >/dev/null 2>&1 || true
+                ;;
+            esac
+          done < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
+          find desktop-artifacts -type f -print0 | xargs -0 gh release upload "$RELEASE_TAG" --clobber
+          gh release upload "$RELEASE_TAG" SHA256SUMS desktop-release-manifest.json --clobber

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Cpu, Search } from 'lucide-react'
+import { catalogChipToCircuitDocument } from '../chips/catalogCircuit'
+import { catalogMultiBitChipToCircuitDocument, isCatalogMultiBitChipImportable } from '../chips/catalogVector'
 import { loadCatalog, type ChipCatalog, type ChipEntry } from '../chips/types'
+import { createCustomChipProject, listCustomChipProjects } from '../storage/customChips'
 
 interface ChipLibraryProps {
   onUseExpression: (expression: string) => void
@@ -11,9 +14,9 @@ const PAGE_SIZE = 24
 /**
  * Biblioteca de chips importada do Digital Logic Sim.
  *
- * Cada chip combinacional foi simulado durante o build e destilado em uma
- * expressão booleana mínima, então dá para levar qualquer um deles direto para
- * a calculadora e ver a tabela verdade e o circuito equivalente.
+ * Chips escalares continuam usando as expressões derivadas do build. A fatia
+ * vetorial também materializa perfis DLS explicitamente suportados, preservando
+ * portas, larguras e o circuito estrutural no fluxo local do editor.
  */
 export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
   const [catalog, setCatalog] = useState<ChipCatalog | null>(null)
@@ -22,6 +25,31 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
   const [category, setCategory] = useState('Todas')
   const [onlyDerived, setOnlyDerived] = useState(true)
   const [limit, setLimit] = useState(PAGE_SIZE)
+  const [importing, setImporting] = useState<string | null>(null)
+  const [notice, setNotice] = useState('')
+
+  async function importChip(chip: ChipEntry): Promise<void> {
+    const document = catalogMultiBitChipToCircuitDocument(chip) ?? catalogChipToCircuitDocument(chip)
+    if (!document) {
+      setNotice(`"${chip.name}" ainda não possui um modelo materializável para o canvas.`)
+      return
+    }
+    setImporting(chip.name)
+    setNotice('')
+    try {
+      const existing = await listCustomChipProjects()
+      if (existing.some((project) => project.name === document.name)) {
+        setNotice(`"${document.name}" já está disponível na biblioteca local do editor.`)
+        return
+      }
+      const id = await createCustomChipProject({ name: document.name, document })
+      setNotice(`"${document.name}" foi adicionado à biblioteca local (ID ${id}) e já pode ser usado no canvas.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível adicionar o chip ao editor.')
+    } finally {
+      setImporting(null)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -43,7 +71,7 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
     if (!catalog) return []
     const needle = query.trim().toLowerCase()
     return catalog.chips.filter((chip) => {
-      if (onlyDerived && !chip.derivedOutputs) return false
+      if (onlyDerived && !chip.derivedOutputs && !isCatalogMultiBitChipImportable(chip)) return false
       if (category !== 'Todas' && chip.category !== category) return false
       if (needle && !chip.name.toLowerCase().includes(needle)) return false
       return true
@@ -102,10 +130,16 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
               onChange={(event) => setOnlyDerived(event.target.checked)}
               className="accent-brand-500"
             />
-            Só com expressão
+            Só com modelos prontos
           </label>
         </div>
       </header>
+
+      {notice && (
+        <p role="status" className="mb-4 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-700 dark:border-brand-900/70 dark:bg-brand-950/30 dark:text-brand-200">
+          {notice}
+        </p>
+      )}
 
       {failed ? (
         <p className="py-6 text-center text-sm text-slate-400">
@@ -121,7 +155,7 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {matches.slice(0, limit).map((chip) => (
-              <ChipCard key={chip.name} chip={chip} onUse={onUseExpression} />
+              <ChipCard key={chip.name} chip={chip} onUse={onUseExpression} onImport={(selected) => void importChip(selected)} importing={importing === chip.name} />
             ))}
           </div>
 
@@ -141,8 +175,8 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
 
       {catalog && (
         <p className="mt-4 text-xs text-slate-400 dark:text-slate-600">
-          Origem: {catalog.source}. As expressões foram derivadas simulando cada
-          netlist e minimizando o resultado com Quine-McCluskey.
+          Origem: {catalog.source}. Modelos escalares usam expressões derivadas;
+          perfis multi-bit suportados preservam a estrutura vetorial no editor local.
         </p>
       )}
     </section>
@@ -152,11 +186,19 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
 function ChipCard({
   chip,
   onUse,
+  onImport,
+  importing,
 }: {
   chip: ChipEntry
   onUse: (expression: string) => void
+  onImport: (chip: ChipEntry) => void
+  importing: boolean
 }) {
   const parts = Object.entries(chip.parts)
+  const scalarDocument = catalogChipToCircuitDocument(chip)
+  const multiBitDocument = catalogMultiBitChipToCircuitDocument(chip)
+  const materializedDocument = multiBitDocument ?? scalarDocument
+  const isMultiBitModel = Boolean(multiBitDocument)
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-brand-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-brand-700">
@@ -178,33 +220,55 @@ function ChipCard({
         </p>
       )}
 
-      {chip.derivedOutputs ? (
-        <ul className="mt-2 space-y-1.5">
-          {chip.derivedOutputs.map((output) => (
-            <li key={output.name} className="text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-slate-500 dark:text-slate-400">
-                  {output.name}
-                </span>
-                {output.expression && (
-                  <button
-                    type="button"
-                    onClick={() => onUse(output.expression!)}
-                    className="rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-brand-600 transition hover:border-brand-400 dark:border-slate-700 dark:text-brand-300"
-                  >
-                    Abrir na calculadora
-                  </button>
-                )}
-              </div>
-              <code className="expr mt-0.5 block truncate font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                {output.expression ?? 'expressão longa demais para exibir'}
-              </code>
-            </li>
-          ))}
-        </ul>
+      {materializedDocument ? (
+        <>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              {isMultiBitModel ? 'Modelo multi-bit pronto para o canvas' : 'Modelo escalar pronto para o canvas'}
+            </span>
+            <button
+              type="button"
+              onClick={() => onImport(chip)}
+              disabled={importing}
+              className="rounded-md border border-violet-200 px-2 py-0.5 text-[11px] font-medium text-violet-700 transition hover:border-violet-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-800 dark:text-violet-300"
+              title="Adicionar este chip à biblioteca local e disponibilizá-lo no canvas"
+            >
+              {importing ? 'Adicionando…' : 'Adicionar ao editor'}
+            </button>
+          </div>
+          {chip.derivedOutputs ? (
+            <ul className="mt-2 space-y-1.5">
+            {chip.derivedOutputs.map((output) => (
+              <li key={output.name} className="text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">
+                    {output.name}
+                  </span>
+                  {output.expression && (
+                    <button
+                      type="button"
+                      onClick={() => onUse(output.expression!)}
+                      className="rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-brand-600 transition hover:border-brand-400 dark:border-slate-700 dark:text-brand-300"
+                    >
+                      Abrir na calculadora
+                    </button>
+                  )}
+                </div>
+                <code className="expr mt-0.5 block truncate font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                  {output.expression ?? 'expressão longa demais para exibir'}
+                </code>
+              </li>
+            ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs text-slate-400 dark:text-slate-600">
+              Perfil estrutural importado do DLS; larguras e portas são preservadas no circuito local.
+            </p>
+          )}
+        </>
       ) : (
         <p className="mt-2 text-xs text-slate-400 dark:text-slate-600">
-          Sequencial ou multi-bit — sem expressão booleana equivalente.
+          Sequencial ou multi-bit ainda não suportado nesta V1.
         </p>
       )}
     </article>

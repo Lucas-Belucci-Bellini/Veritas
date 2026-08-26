@@ -33,11 +33,13 @@ export interface CustomChipDefinition {
   outputs: CustomChipPort[]
 }
 
-const STATEFUL_TYPES: readonly EditorComponentType[] = ['clock', 'dff', 'tff', 'delay']
+const STATEFUL_TYPES: readonly EditorComponentType[] = ['clock', 'dff', 'tff', 'jk', 'sr', 'delay']
 
 export interface CustomChipBuildOptions {
   /** Definições disponíveis para resolver instâncias aninhadas dentro do chip. */
   customChips?: readonly CustomChipLibraryEntry[]
+  /** Limite opcional de profundidade usado ao validar uma definição. */
+  maxDepth?: number
   /**
    * ID do próprio chip quando ele está sendo atualizado.
    *
@@ -47,6 +49,9 @@ export interface CustomChipBuildOptions {
    */
   selfId?: number
 }
+
+/** Nome histórico mantido para consumidores do contrato de definição. */
+export type CustomChipDefinitionOptions = CustomChipBuildOptions
 
 /**
  * Cria uma definição serializável sem mutar o documento original.
@@ -74,10 +79,11 @@ export function buildCustomChipDefinition(
   // Um chip pode conter outros chips: é o que permite subir de meio somador
   // para somador completo, e daí para uma ALU. O motor (avaliação e
   // elaboração) já recursava; o que faltava era deixar construir.
+  validateNestedDefinitions(normalizedDocument, customChips, options.maxDepth ?? MAX_CUSTOM_CHIP_DEPTH)
   if (options.selfId !== undefined) assertNoCustomChipCycle(normalizedDocument, customChips, options.selfId)
-  assertCustomChipDepthWithinLimit(normalizedDocument, customChips)
+  assertCustomChipDepthWithinLimit(normalizedDocument, customChips, options.maxDepth)
   if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) {
-    throw new Error('Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF ou delay.')
+    throw new Error('Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF, JK, SR ou delay.')
   }
 
   const inputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === 'input'))
@@ -139,7 +145,11 @@ function assertNoCustomChipCycle(
 function assertCustomChipDepthWithinLimit(
   document: CircuitDocument,
   customChips: readonly CustomChipLibraryEntry[],
+  maxDepth = MAX_CUSTOM_CHIP_DEPTH,
 ): void {
+  if (!Number.isInteger(maxDepth) || maxDepth < 1) {
+    throw new Error('O limite de profundidade da hierarquia precisa ser um inteiro positivo.')
+  }
   const byId = new Map(customChips.map((entry) => [entry.id, entry]))
   const cache = new Map<number, number>()
 
@@ -164,10 +174,42 @@ function assertCustomChipDepthWithinLimit(
 
   // O chip em construção é mais um nível acima da hierarquia que ele contém.
   const depth = depthOf(document, new Set()) + 1
-  if (depth > MAX_CUSTOM_CHIP_DEPTH) {
+  if (depth > maxDepth) {
     throw new Error(
-      `A hierarquia deste chip teria ${depth} níveis; o limite seguro é ${MAX_CUSTOM_CHIP_DEPTH}.`,
+      `A hierarquia deste chip teria ${depth} níveis; o limite seguro é ${maxDepth}.`,
     )
+  }
+}
+
+function validateNestedDefinitions(
+  document: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[],
+  maxDepth: number,
+  stack: readonly number[] = [],
+  depth = 0,
+): void {
+  if (!Number.isInteger(maxDepth) || maxDepth < 1) {
+    throw new Error('O limite de profundidade da hierarquia precisa ser um inteiro positivo.')
+  }
+
+  const definitions = new Map(customChips.map((entry) => [entry.id, entry] as const))
+  for (const node of document.nodes) {
+    if (node.type !== 'custom-chip') continue
+    const id = node.options?.customChipId
+    const entry = definitions.get(id ?? NaN)
+    if (!entry) continue
+    if (stack.includes(entry.id)) {
+      throw new Error(`A definição do chip "${entry.definition.name}" contém uma referência recursiva.`)
+    }
+    if (depth >= maxDepth) {
+      throw new Error(`A hierarquia de chips excede o limite seguro de ${maxDepth} níveis.`)
+    }
+    const childIssues = validateCircuit(entry.definition.document, { allowBuses: true, customChips })
+    if (childIssues.length > 0) throw new CircuitValidationError(childIssues)
+    if (entry.definition.document.nodes.some((child) => STATEFUL_TYPES.includes(child.type))) {
+      throw new Error('Chips customizados desta versão precisam ser combinacionais; remova os componentes sequenciais.')
+    }
+    validateNestedDefinitions(entry.definition.document, customChips, maxDepth, [...stack, entry.id], depth + 1)
   }
 }
 

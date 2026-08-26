@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CircuitDocument, CustomChipLibraryEntry } from '../circuit'
 import {
   createDocumentRuntime,
+  diagnoseDocumentRuntimePreview,
   documentInputIds,
   documentWatches,
   runtimeValue,
   snapshotDocumentRuntime,
+  type DocumentRuntimeDiagnosticPreview,
   type DocumentRuntimeSnapshot,
   type DocumentRuntimeState,
 } from '../simulation/documentRuntime'
@@ -24,6 +26,7 @@ import {
 } from '../simulation/runtimeCheckpoint'
 
 const RUN_TICKS = 8
+const DIAGNOSTIC_PREVIEW_TICKS = 64
 
 function appendTimeline(
   timeline: readonly DocumentRuntimeSnapshot[],
@@ -54,7 +57,6 @@ function runtimeState(
 
 interface SequentialCircuitPanelProps {
   document: CircuitDocument
-  /** Definições para expandir instâncias `custom-chip` antes de simular. */
   customChips?: readonly CustomChipLibraryEntry[]
   requestedClockPeriods?: Readonly<Record<string, number>>
   requestedRuntimeState?: DocumentRuntimeState
@@ -74,7 +76,7 @@ interface SequentialCircuitPanelProps {
   onRuntimeStateApplyFailed?: () => void
 }
 
-export function SequentialCircuitPanel({ document, customChips, requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
+export function SequentialCircuitPanel({ document, customChips = [], requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
@@ -82,6 +84,7 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
   const [inputs, setInputs] = useState<Record<string, boolean>>({})
   const [clockPeriods, setClockPeriods] = useState<Record<string, number>>({})
   const [timeline, setTimeline] = useState<DocumentRuntimeSnapshot[]>([])
+  const [diagnosticPreview, setDiagnosticPreview] = useState<DocumentRuntimeDiagnosticPreview | null>(null)
   const [error, setError] = useState('')
   const [persistenceStatus, setPersistenceStatus] = useState('inicializando')
   const inputIds = useMemo(() => documentInputIds(document), [document])
@@ -127,11 +130,12 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
       const nextInputs = Object.fromEntries(
         inputIds.map((id) => [id, saved?.inputs[id] ?? document.nodes.find((node) => node.id === id)?.options?.initial ?? false]),
       )
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       const nextTimeline = restored && saved?.timeline.length ? saved.timeline : [snapshot]
       setInputs(nextInputs)
       setClockPeriods(nextClockPeriods)
       setTimeline(nextTimeline)
+      setDiagnosticPreview(null)
       setError('')
       setPersistenceStatus(restored ? 'checkpoint restaurado' : storage ? 'pronto para salvar localmente' : 'somente memória')
       if (overrideClockPeriods) persist(simulator, nextInputs, nextClockPeriods, nextTimeline)
@@ -170,15 +174,35 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
     return simulatorRef.current
   }
 
+  function diagnosePreview(): void {
+    const simulator = ensureSimulator()
+    if (!simulator) return
+    try {
+      const preview = diagnoseDocumentRuntimePreview(document, {
+        clockPeriods,
+        customChips,
+        inputs,
+        simulatorState: simulator.exportState(),
+        maxTicks: DIAGNOSTIC_PREVIEW_TICKS,
+      })
+      setDiagnosticPreview(preview)
+      setError('')
+    } catch (cause) {
+      setDiagnosticPreview(null)
+      setError(cause instanceof Error ? cause.message : 'Não foi possível diagnosticar a simulação.')
+    }
+  }
+
   function step(): void {
     const simulator = ensureSimulator()
     if (!simulator) return
     try {
       for (const [id, value] of Object.entries(inputs)) simulator.setInput(id, value)
       simulator.tick()
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       const nextTimeline = appendTimeline(timeline, [snapshot])
       setTimeline(nextTimeline)
+      setDiagnosticPreview(null)
       persist(simulator, inputs, clockPeriods, nextTimeline)
       onRuntimeStateChange?.(runtimeState(simulator, inputs, clockPeriods, snapshot, nextTimeline))
       onSnapshot?.(snapshot)
@@ -196,10 +220,11 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
       const next: DocumentRuntimeSnapshot[] = []
       for (let index = 0; index < RUN_TICKS; index += 1) {
         simulator.tick()
-        next.push(snapshotDocumentRuntime(simulator))
+        next.push(snapshotDocumentRuntime(simulator, document, customChips))
       }
       const nextTimeline = appendTimeline(timeline, next)
       setTimeline(nextTimeline)
+      setDiagnosticPreview(null)
       persist(simulator, inputs, clockPeriods, nextTimeline)
       onRuntimeStateChange?.(runtimeState(simulator, inputs, clockPeriods, next[next.length - 1], nextTimeline))
       onSnapshot?.(next[next.length - 1])
@@ -219,11 +244,12 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
     try {
       const simulator = createDocumentRuntime(document, { clockPeriods: state.clockPeriods, customChips })
       simulator.restoreState(state.simulator)
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       simulatorRef.current = simulator
       setInputs({ ...state.inputs })
       setClockPeriods({ ...state.clockPeriods })
       setTimeline(state.timeline.length ? state.timeline.slice(-RUNTIME_CHECKPOINT_TIMELINE_LIMIT) : [snapshot])
+      setDiagnosticPreview(null)
       persist(simulator, state.inputs, state.clockPeriods, state.timeline)
       setPersistenceStatus('estado remoto aplicado')
       setError('')
@@ -242,10 +268,11 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
     try {
       simulator.setInput(id, value)
       const nextInputs = { ...inputs, [id]: value }
-      const snapshot = snapshotDocumentRuntime(simulator)
+      const snapshot = snapshotDocumentRuntime(simulator, document, customChips)
       const nextTimeline = timeline.length ? [...timeline.slice(0, -1), snapshot] : [snapshot]
       setInputs(nextInputs)
       setTimeline(nextTimeline)
+      setDiagnosticPreview(null)
       persist(simulator, nextInputs, clockPeriods, nextTimeline)
       onRuntimeStateChange?.(runtimeState(simulator, nextInputs, clockPeriods, snapshot, nextTimeline))
       onSnapshot?.(snapshot)
@@ -257,6 +284,7 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
   function changeClockPeriod(id: string, period: number): void {
     const nextClockPeriods = { ...clockPeriods, [id]: Math.max(1, Math.min(64, Math.floor(period))) }
     setClockPeriods(nextClockPeriods)
+    setDiagnosticPreview(null)
     initializeRuntime(true, nextClockPeriods)
     onClockPeriodsChange?.(nextClockPeriods)
   }
@@ -278,6 +306,7 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
           {runtimeMetrics && runtimeMetrics.events.length > 0 && <details className="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><summary className="cursor-pointer">histórico local ({runtimeMetrics.events.length})</summary><div className="mt-1 max-h-24 overflow-auto space-y-0.5">{[...runtimeMetrics.events].reverse().map((event) => <div key={event.id}><span className="font-mono">{new Date(event.at).toLocaleTimeString('pt-BR')}</span> · {event.message}</div>)}</div></details>}
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" className="key text-xs" onClick={diagnosePreview} disabled={Boolean(error)}>Diagnosticar preview</button>
           <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error)}>Step · 1 tique</button>
           <button type="button" className="key text-xs" onClick={run} disabled={Boolean(error)}>Run · {RUN_TICKS} tiques</button>
           <button type="button" className="key text-xs" onClick={() => initializeRuntime(true)}>Reset</button>
@@ -295,6 +324,21 @@ export function SequentialCircuitPanel({ document, customChips, requestedClockPe
               </select>
             </label>
           ))}
+        </div>
+      )}
+
+      {diagnosticPreview && (
+        <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100" role="status" aria-live="polite">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <strong>Preview diagnóstica isolada</strong>
+            <span className="font-mono">{diagnosticPreview.diagnostic.ticksExecuted} tique{diagnosticPreview.diagnostic.ticksExecuted === 1 ? '' : 's'} executado{diagnosticPreview.diagnostic.ticksExecuted === 1 ? '' : 's'}</span>
+          </div>
+          <p className="mt-1">
+            {diagnosticPreview.diagnostic.status === 'stabilized' && 'Circuito estabilizado dentro do limite.'}
+            {diagnosticPreview.diagnostic.status === 'budget-exhausted' && `Budget de ${DIAGNOSTIC_PREVIEW_TICKS} tiques esgotado sem estabilização.`}
+            {diagnosticPreview.diagnostic.status === 'cycle-detected' && `Ciclo detectado: início no tique ${diagnosticPreview.diagnostic.cycleStartTick ?? 'desconhecido'}, período ${diagnosticPreview.diagnostic.cyclePeriod ?? 'desconhecido'}.`}
+            {' '}A cópia terminou no tique {diagnosticPreview.snapshot.tick}; o runtime ativo não foi alterado.
+          </p>
         </div>
       )}
 

@@ -34,6 +34,24 @@ function customChipLibrary(): CustomChipLibraryEntry[] {
   return [{ id: 9, definition: buildCustomChipDefinition(definitionDocument, 'AND interno') }]
 }
 
+function busDocument(): CircuitDocument {
+  return {
+    ...createCircuitDocument('Barramento particionado'),
+    nodes: [
+      { id: 'bus', type: 'input', position: { x: 0, y: 0 }, label: 'BUS', options: { width: 8 } },
+      { id: 'split', type: 'splitter', position: { x: 160, y: 0 }, options: { width: 8, widths: [3, 5] } },
+      { id: 'combine', type: 'combiner', position: { x: 360, y: 0 }, options: { width: 8, widths: [3, 5] } },
+      { id: 'out', type: 'output', position: { x: 540, y: 0 }, label: 'RESULT', options: { width: 8 } },
+    ],
+    connections: [
+      { source: { node: 'bus' }, target: { node: 'split', port: 0 } },
+      { source: { node: 'split', port: 0 }, target: { node: 'combine', port: 0 } },
+      { source: { node: 'split', port: 1 }, target: { node: 'combine', port: 1 } },
+      { source: { node: 'combine' }, target: { node: 'out', port: 0 } },
+    ],
+  }
+}
+
 function customChipDocument(): CircuitDocument {
   return {
     ...createCircuitDocument('AND instanciado'),
@@ -148,6 +166,25 @@ describe('exportCircuit', () => {
     expect(vhdl).toContain('signal rx : std_logic;')
     expect(vhdl).toContain('rx <= tx;')
     expect(vhdl).toContain('Y <= rx;')
+  })
+
+  it('exporta Splitter e Combiner vetoriais em Verilog e VHDL', () => {
+    const verilog = exportVerilog(busDocument())
+    const vhdl = exportVhdl(busDocument())
+
+    expect(verilog).toContain('wire [2:0] split_out1;')
+    expect(verilog).toContain('wire [4:0] split_out2;')
+    expect(verilog).toContain('assign split_out1 = BUS[7:5];')
+    expect(verilog).toContain('assign split_out2 = BUS[4:0];')
+    expect(verilog).toContain('assign combine = {split_out1, split_out2};')
+    expect(verilog).toContain('assign RESULT = combine;')
+
+    expect(vhdl).toContain('signal split_out1 : std_logic_vector(2 downto 0);')
+    expect(vhdl).toContain('signal split_out2 : std_logic_vector(4 downto 0);')
+    expect(vhdl).toContain('split_out1 <= BUS(7 downto 5);')
+    expect(vhdl).toContain('split_out2 <= BUS(4 downto 0);')
+    expect(vhdl).toContain('combine <= split_out1 & split_out2;')
+    expect(vhdl).toContain('RESULT <= combine;')
   })
 
   it('elabora instâncias customizadas em Verilog e VHDL sem expor portas internas', () => {

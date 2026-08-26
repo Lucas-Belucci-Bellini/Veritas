@@ -15,6 +15,101 @@ describe('workspace sequencial', () => {
     expect(getSequentialDemo('feedback-counter').controlMode).toBe('manual-clock')
   })
 
+  it('expõe demos JK/SR com controles e watches observáveis', () => {
+    expect(getSequentialDemo('jk-clock')).toMatchObject({
+      controlMode: 'auto-clock',
+      controls: ['j', 'k'],
+      initialInputs: { j: false, k: false },
+      watch: expect.arrayContaining([
+        { nodeId: 'ff', label: 'Q' },
+        { nodeId: 'ff', label: 'Q̄', port: 1 },
+      ]),
+    })
+    expect(getSequentialDemo('sr-clock')).toMatchObject({
+      controlMode: 'auto-clock',
+      controls: ['s', 'r'],
+      initialInputs: { s: false, r: false },
+    })
+  })
+
+  it('executa hold, set, reset e toggle na demo JK', () => {
+    const simulator = createSequentialSimulator('jk-clock')
+
+    simulator.setInput('j', true)
+    simulator.setInput('k', false)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+
+    simulator.setInput('j', false)
+    simulator.setInput('k', true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(false)
+
+    simulator.setInput('j', true)
+    simulator.setInput('k', true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(false)
+  })
+
+  it('executa set, hold e reset na demo SR', () => {
+    const simulator = createSequentialSimulator('sr-clock')
+
+    simulator.setInput('s', true)
+    simulator.setInput('r', false)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+
+    simulator.setInput('s', false)
+    simulator.setInput('r', false)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+
+    simulator.setInput('s', false)
+    simulator.setInput('r', true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(false)
+  })
+
+  it('expõe e executa o registrador paralelo de 4 bits', () => {
+    const simulator = createSequentialSimulator('register-4bit')
+    const demo = getSequentialDemo('register-4bit')
+
+    expect(demo.controls).toEqual(['d0', 'd1', 'd2', 'd3'])
+    expect(demo.watch.map((watch) => watch.label)).toEqual(['D0', 'D1', 'D2', 'D3', 'CLK', 'Q0', 'Q1', 'Q2', 'Q3'])
+
+    simulator.setInput('d0', true)
+    simulator.setInput('d1', false)
+    simulator.setInput('d2', true)
+    simulator.setInput('d3', true)
+    simulator.tick(2)
+    expect(['ff0', 'ff1', 'ff2', 'ff3'].map((id) => simulator.read(id))).toEqual([true, false, true, true])
+
+    simulator.setInput('d0', false)
+    simulator.setInput('d1', true)
+    simulator.setInput('d2', false)
+    simulator.setInput('d3', false)
+    simulator.tick()
+    expect(['ff0', 'ff1', 'ff2', 'ff3'].map((id) => simulator.read(id))).toEqual([true, false, true, true])
+    simulator.tick()
+    expect(['ff0', 'ff1', 'ff2', 'ff3'].map((id) => simulator.read(id))).toEqual([false, true, false, false])
+  })
+
+  it('conta de 0000 a 1111 e reinicia no contador síncrono 4-bit', () => {
+    const simulator = createSequentialSimulator('counter-4bit')
+    const demo = getSequentialDemo('counter-4bit')
+    expect(demo.controlMode).toBe('manual-clock')
+    expect(demo.clockSettleTicks).toBe(2)
+    const readCount = () => ['ff3', 'ff2', 'ff1', 'ff0'].map((id) => (simulator.read(id) ? '1' : '0')).join('')
+
+    expect(readCount()).toBe('0000')
+    for (const expected of ['0001', '0010', '0011', '0100', '0101', '0110', '0111', '1000', '1001', '1010', '1011', '1100', '1101', '1110', '1111', '0000']) {
+      pulseClock(simulator, 'clk', demo.clockSettleTicks)
+      expect(readCount()).toBe(expected)
+    }
+  })
+
   it('captura D na borda de subida do clock automático', () => {
     const simulator = createSequentialSimulator('dff-clock')
     simulator.setInput('d', true)

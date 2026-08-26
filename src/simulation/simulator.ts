@@ -26,6 +26,8 @@ interface NodeState {
 export interface SimulatorOptions {
   /** Teto de tiques em `settle`, para não rodar para sempre. */
   maxSettleTicks?: number
+  /** Teto acumulado de tiques deste runtime, incluindo chamadas anteriores. */
+  maxTotalTicks?: number
 }
 
 export interface SimulatorNodeState {
@@ -44,7 +46,19 @@ export interface SimulatorState {
   nodes: Record<string, SimulatorNodeState>
 }
 
+export type SettleDiagnosticStatus = 'stabilized' | 'cycle-detected' | 'budget-exhausted'
+
+export interface SettleDiagnostic {
+  status: SettleDiagnosticStatus
+  ticksExecuted: number
+  cycleStartTick?: number
+  cyclePeriod?: number
+}
+
 export const DEFAULT_MAX_SETTLE_TICKS = 200
+export const MAX_SETTLE_TICKS = 10_000
+export const DEFAULT_MAX_TOTAL_TICKS = 100_000
+export const MAX_TOTAL_TICKS = 1_000_000
 
 /**
  * Simulador de circuitos por tiques.
@@ -59,10 +73,12 @@ export class Simulator {
   private readonly nodes = new Map<string, NodeState>()
   private readonly order: string[] = []
   private readonly maxSettleTicks: number
+  private readonly maxTotalTicks: number
   private ticks = 0
 
   constructor(netlist: Netlist, options: SimulatorOptions = {}) {
-    this.maxSettleTicks = options.maxSettleTicks ?? DEFAULT_MAX_SETTLE_TICKS
+    this.maxSettleTicks = normalizeSettleBudget(options.maxSettleTicks ?? DEFAULT_MAX_SETTLE_TICKS, false)
+    this.maxTotalTicks = normalizeTotalTickBudget(options.maxTotalTicks ?? DEFAULT_MAX_TOTAL_TICKS)
 
     for (const spec of netlist.components) {
       if (this.nodes.has(spec.id)) {
@@ -82,7 +98,7 @@ export class Simulator {
           )
         }
         const port = input.port ?? 0
-        if (port >= outputCount(target.spec.type)) {
+        if (port >= outputCount(target.spec.type, target.spec.options)) {
           throw new Error(
             `"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`,
           )
@@ -144,6 +160,10 @@ export class Simulator {
       throw new Error('O estado do simulador não corresponde ao netlist atual.')
     }
 
+    if (state.tickCount > this.maxTotalTicks) {
+      throw new RangeError(`O estado excede o orçamento total de ${this.maxTotalTicks} tiques do simulador.`)
+    }
+
     for (const [id, node] of this.nodes) {
       const saved = state.nodes[id]
       if (!saved || saved.outputs.length !== node.outputs.length || saved.next.length !== node.next.length) {
@@ -165,7 +185,11 @@ export class Simulator {
   }
 
   tick(count = 1): void {
-    for (let index = 0; index < count; index += 1) {
+    const requested = normalizeTickCount(count)
+    if (this.ticks + requested > this.maxTotalTicks) {
+      throw new RangeError(`O simulador excederia o orçamento total de ${this.maxTotalTicks} tiques.`)
+    }
+    for (let index = 0; index < requested; index += 1) {
       this.evaluate()
       this.propagate()
       this.ticks += 1
@@ -179,8 +203,53 @@ export class Simulator {
    * tantos tiques quanto for a profundidade. Um circuito com clock nunca
    * estabiliza — nesse caso devolve `false` ao bater no teto.
    */
+  diagnoseSettle(maxTicks = this.maxSettleTicks): SettleDiagnostic {
+    const budget = normalizeSettleBudget(maxTicks, true)
+    const seen = new Map<string, number>()
+    let ticksExecuted = 0
+
+    for (let index = 0; index < budget; index += 1) {
+      if (this.ticks >= this.maxTotalTicks) {
+        return { status: 'budget-exhausted', ticksExecuted }
+      }
+
+      const before = this.serializeRuntime()
+      const previousTick = seen.get(before)
+      if (previousTick !== undefined) {
+        return {
+          status: 'cycle-detected',
+          ticksExecuted,
+          cycleStartTick: previousTick,
+          cyclePeriod: this.ticks - previousTick,
+        }
+      }
+      seen.set(before, this.ticks)
+
+      this.tick()
+      ticksExecuted += 1
+      const after = this.serializeRuntime()
+      if (after === before) {
+        return { status: 'stabilized', ticksExecuted }
+      }
+
+      const repeatedTick = seen.get(after)
+      if (repeatedTick !== undefined) {
+        return {
+          status: 'cycle-detected',
+          ticksExecuted,
+          cycleStartTick: repeatedTick,
+          cyclePeriod: this.ticks - repeatedTick,
+        }
+      }
+    }
+
+    return { status: 'budget-exhausted', ticksExecuted }
+  }
+
   settle(maxTicks = this.maxSettleTicks): boolean {
-    for (let index = 0; index < maxTicks; index += 1) {
+    const budget = normalizeSettleBudget(maxTicks, true)
+    for (let index = 0; index < budget; index += 1) {
+      if (this.ticks >= this.maxTotalTicks) return false
       const before = this.serialize()
       this.tick()
       if (this.serialize() === before) return true
@@ -268,26 +337,42 @@ export class Simulator {
       }
 
       case 'dff':
-      case 'tff': {
-        const data = values[0] ?? false
-        const clock = values[1] ?? false
+      case 'tff':
+      case 'jk':
+      case 'sr': {
+        const clock = type === 'dff' || type === 'tff' ? values[1] ?? false : values[2] ?? false
         const rising = clock && !node.lastClock
         node.nextLastClock = clock
 
         const current = node.outputs[0]
-        // Fora da borda de subida o flip-flop ignora a entrada e segura o valor.
-        const stored = !rising
-          ? current
-          : type === 'dff'
-            ? data
-            : data
-              ? !current
-              : current
+        // Fora da borda de subida o componente ignora as entradas e segura o valor.
+        let stored = current
+        if (rising) {
+          if (type === 'dff') {
+            stored = values[0] ?? false
+          } else if (type === 'tff') {
+            stored = (values[0] ?? false) ? !current : current
+          } else if (type === 'jk') {
+            const j = values[0] ?? false
+            const k = values[1] ?? false
+            stored = j && k ? !current : j ? true : k ? false : current
+          } else {
+            const set = values[0] ?? false
+            const reset = values[1] ?? false
+            // S=R=1 é a condição proibida do latch SR; em simulação
+            // determinística ela preserva o estado anterior e mantém Q̄ complementar.
+            stored = set && reset ? current : set ? true : reset ? false : current
+          }
+        }
 
         node.next[0] = stored
         node.next[1] = !stored
         return
       }
+
+      case 'splitter':
+      case 'combiner':
+        throw new Error(`O componente "${node.spec.id}" exige o runtime vetorial de barramentos.`)
 
       case 'delay': {
         const incoming = values[0] ?? false
@@ -327,14 +412,56 @@ export class Simulator {
     }
     return result
   }
+
+  private serializeRuntime(): string {
+    let result = ''
+    for (const id of this.order) {
+      const node = this.nodes.get(id)!
+      result += [
+        node.outputs,
+        node.next,
+        node.lastClock,
+        node.nextLastClock,
+        node.queue,
+        node.nextQueue,
+        node.counter,
+        node.nextCounter,
+      ].map((value) => typeof value === 'boolean' ? (value ? '1' : '0') : Array.isArray(value) ? value.map((item) => (item ? '1' : '0')).join('') : String(value)).join(':')
+      result += '|'
+    }
+    return result
+  }
 }
 
 function isBooleanArray(values: readonly unknown[]): values is boolean[] {
   return values.every((value) => typeof value === 'boolean')
 }
 
+function normalizeTickCount(value: number): number {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError('A quantidade de tiques deve ser um inteiro finito não negativo.')
+  }
+  return value
+}
+
+function normalizeTotalTickBudget(value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_TOTAL_TICKS) {
+    throw new RangeError(`O orçamento total deve ser um inteiro entre 1 e ${MAX_TOTAL_TICKS}.`)
+  }
+  return value
+}
+
+function normalizeSettleBudget(value: number, allowZero: boolean): number {
+  const minimum = allowZero ? 0 : 1
+  if (!Number.isInteger(value) || value < minimum || value > MAX_SETTLE_TICKS) {
+    const lowerBound = allowZero ? '0' : '1'
+    throw new RangeError(`O orçamento de settle deve ser um inteiro entre ${lowerBound} e ${MAX_SETTLE_TICKS}.`)
+  }
+  return value
+}
+
 function createState(spec: ComponentSpec): NodeState {
-  const size = outputCount(spec.type)
+  const size = outputCount(spec.type, spec.options)
   const initial = spec.options?.initial ?? false
   const value = spec.type === 'constant' ? (spec.options?.value ?? false) : initial
 

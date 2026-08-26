@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.9.0-rc.18",
   "type": "module",
-  "description": "Calculadora de tabelas verdade e simulador de circuitos logicos, 100% no navegador.",
+  "description": "Calculadora de tabelas verdade e simulador de circuitos logicos, no navegador e em app desktop local.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -21,6 +21,7 @@
     "test:rust": "cargo test --manifest-path engine-rs/Cargo.toml --offline",
     "bench:rust": "cargo bench --manifest-path engine-rs/Cargo.toml --offline --bench throughput",
     "bench:compare": "node scripts/engine-comparison-benchmark.mjs",
+    "bench:circuit-scale": "node scripts/logic-scale-benchmark.mjs",
     "beta:rust": "node scripts/rust-engine-acceptance.mjs",
     "beta:wasm": "node scripts/wasm-readiness.mjs",
     "beta:wasm:parity": "node scripts/wasm-netlist-parity.mjs",
@@ -40,7 +41,14 @@
     "beta:readiness": "node scripts/beta-readiness.mjs",
     "release:guard": "node scripts/release-promotion-guard.mjs",
     "beta:evidence": "node scripts/aggregate-beta-evidence.mjs",
-    "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict"
+    "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "desktop:build:linux": "tauri build --bundles deb,appimage",
+    "desktop:build:windows": "tauri build --bundles nsis",
+    "desktop:build:macos": "tauri build --bundles app,dmg",
+    "desktop:metrics": "node scripts/desktop-metrics.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
@@ -54,6 +62,7 @@
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

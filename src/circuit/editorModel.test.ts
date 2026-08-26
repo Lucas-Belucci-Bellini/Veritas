@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { toBinary } from '../bus'
 import {
   CircuitValidationError,
   createCircuitDocument,
   EDITOR_COMPONENT_TYPES,
   editorInputCount,
   evaluateCircuit,
+  evaluateCircuitVectors,
   toNetlist,
   validateCircuit,
   type CircuitDocument,
@@ -179,6 +181,43 @@ describe('editorModel', () => {
     ]))
   })
 
+  it('aceita JK e SR com portas J/S, K/R, CLK e saídas complementares', () => {
+    for (const [type, first, second] of [
+      ['jk', 'j', 'k'],
+      ['sr', 's', 'r'],
+    ] as const) {
+      const document: CircuitDocument = {
+        ...createCircuitDocument(`${type.toUpperCase()} de teste`),
+        nodes: [
+          { id: first, type: 'input', position: { x: 0, y: 0 } },
+          { id: second, type: 'input', position: { x: 0, y: 100 } },
+          { id: 'clk', type: 'input', position: { x: 0, y: 200 } },
+          { id: 'ff', type, position: { x: 180, y: 100 } },
+          { id: 'q', type: 'output', position: { x: 360, y: 80 } },
+          { id: 'nq', type: 'output', position: { x: 360, y: 120 } },
+        ],
+        connections: [
+          { source: { node: first }, target: { node: 'ff', port: 0 } },
+          { source: { node: second }, target: { node: 'ff', port: 1 } },
+          { source: { node: 'clk' }, target: { node: 'ff', port: 2 } },
+          { source: { node: 'ff', port: 0 }, target: { node: 'q', port: 0 } },
+          { source: { node: 'ff', port: 1 }, target: { node: 'nq', port: 0 } },
+        ],
+      }
+
+      expect(EDITOR_COMPONENT_TYPES).toContain(type)
+      expect(editorInputCount(type)).toBe(3)
+      expect(validateCircuit(document)).toEqual([])
+      expect(toNetlist(document).components).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'ff',
+          type,
+          inputs: [{ node: first }, { node: second }, { node: 'clk' }],
+        }),
+      ]))
+    }
+  })
+
   it('permite feedback quando o ciclo passa por um componente com estado', () => {
     const document: CircuitDocument = {
       ...createCircuitDocument('Contador de teste'),
@@ -199,6 +238,50 @@ describe('editorModel', () => {
       { node: 'ff', port: 1 },
       { node: 'clk' },
     ])
+  })
+
+  it('avalia Splitter e Combiner preservando a ordem MSB → LSB', () => {
+    const document: CircuitDocument = {
+      ...createCircuitDocument('Splitter de teste'),
+      nodes: [
+        { id: 'bus', type: 'input', position: { x: 0, y: 0 }, options: { width: 8 } },
+        { id: 'split', type: 'splitter', position: { x: 180, y: 0 }, options: { width: 8, widths: [3, 5] } },
+        { id: 'combine', type: 'combiner', position: { x: 360, y: 0 }, options: { width: 8, widths: [3, 5] } },
+        { id: 'out', type: 'output', position: { x: 540, y: 0 }, options: { width: 8 } },
+      ],
+      connections: [
+        { source: { node: 'bus' }, target: { node: 'split', port: 0 } },
+        { source: { node: 'split', port: 0 }, target: { node: 'combine', port: 0 } },
+        { source: { node: 'split', port: 1 }, target: { node: 'combine', port: 1 } },
+        { source: { node: 'combine' }, target: { node: 'out', port: 0 } },
+      ],
+    }
+
+    expect(validateCircuit(document, { allowBuses: true })).toEqual([])
+    expect(toNetlist(document, { allowBuses: true }).components).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'split', type: 'splitter', options: { width: 8, widths: [3, 5] } }),
+      expect.objectContaining({ id: 'combine', type: 'combiner', options: { width: 8, widths: [3, 5] } }),
+    ]))
+    const evaluation = evaluateCircuitVectors(document, { bus: '0b10100101' })
+    const splitPorts = evaluation.ports?.split
+    expect(splitPorts).toEqual(expect.any(Array))
+    expect((splitPorts as Array<{ bits: readonly boolean[]; width: number }>).map((part) => toBinary(part))).toEqual(['101', '00101'])
+    expect(toBinary(evaluation.outputs.out)).toBe('10100101')
+  })
+
+  it('rejeita partições de barramento que não fecham a largura declarada', () => {
+    const document: CircuitDocument = {
+      ...createCircuitDocument('Splitter inválido'),
+      nodes: [
+        { id: 'bus', type: 'input', position: { x: 0, y: 0 }, options: { width: 8 } },
+        { id: 'split', type: 'splitter', position: { x: 180, y: 0 }, options: { width: 8, widths: [3, 4] } },
+      ],
+      connections: [{ source: { node: 'bus' }, target: { node: 'split', port: 0 } }],
+    }
+
+    expect(validateCircuit(document, { allowBuses: true })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'width-mismatch', nodeId: 'split' }),
+    ]))
   })
 
   it('rejeita width inválido, largura ainda não suportada e conexão incompatível', () => {

@@ -41,7 +41,7 @@ describe('feedback de validação do editor', () => {
     expect(summary).toEqual({
       valid: false,
       title: '2 problemas para corrigir',
-      message: 'Larguras incompatíveis: Ajuste os componentes conectados para usar a mesma largura de sinal.',
+      message: 'Larguras incompatíveis: Ajuste a largura da conexão ou faça a partição/concatenação com Splitter e Combiner; as portas conectadas precisam coincidir.',
     })
   })
 

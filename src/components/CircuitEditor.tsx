@@ -57,7 +57,6 @@ import { useCircuitCollaboration } from '../hooks/useCircuitCollaboration'
 import type { CircuitBroadcast } from '../realtime/circuitCollaboration'
 import { AiMetricsPanel } from './AiMetricsPanel'
 import { SequentialCircuitPanel } from './SequentialCircuitPanel'
-import { DlsImportPanel } from './DlsImportPanel'
 import type { DocumentRuntimeSnapshot, DocumentRuntimeState } from '../simulation/documentRuntime'
 import { runtimeFreshness } from '../realtime/runtimeFreshness'
 import { EMPTY_RUNTIME_METRICS, recordRuntimeMetric, type RuntimeMetricEvent, type RuntimeMetrics } from '../realtime/runtimeMetrics'
@@ -66,19 +65,22 @@ import { createCircuitRoom, listCircuitRooms, type CircuitRoom } from '../realti
 import { buildCircuitIssueGuidance, summarizeCircuitIssues } from '../circuit/validationFeedback'
 
 interface EditorNodeData extends Record<string, unknown> {
-  kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential' | 'wireless' | 'custom-chip'
+  kind: 'input' | 'constant' | 'gate' | 'output' | 'sequential' | 'wireless' | 'bus' | 'custom-chip'
   componentType: EditorComponentType
   label: string
   inputs: number
   outputs: number
   inputLabels?: string[]
   outputLabels?: string[]
+  inputWidths?: number[]
+  outputWidths?: number[]
   width: number
   op?: GateOp
   value?: boolean
   busValue?: string
   period?: number
   ticks?: number
+  widths?: number[]
   initial?: boolean
   channel?: string
   customChipId?: number
@@ -102,9 +104,13 @@ const PALETTE: readonly { type: EditorComponentType; label: string; description:
   { type: 'clock', label: 'Clock', description: 'Relógio sequencial' },
   { type: 'dff', label: 'DFF', description: 'Flip-flop D · D/CLK → Q' },
   { type: 'tff', label: 'TFF', description: 'Flip-flop T · T/CLK → Q' },
+  { type: 'jk', label: 'JK', description: 'Flip-flop JK · J/K/CLK → Q' },
+  { type: 'sr', label: 'SR', description: 'Flip-flop SR · S/R/CLK → Q' },
   { type: 'delay', label: 'Delay', description: 'Atraso de N tiques' },
   { type: 'transmitter', label: 'Transmissor', description: 'Publica sinal em um canal wireless' },
   { type: 'receiver', label: 'Receptor', description: 'Lê sinal de um canal wireless' },
+  { type: 'splitter', label: 'Splitter', description: 'Divide um barramento em partes' },
+  { type: 'combiner', label: 'Combiner', description: 'Concatena partes em um barramento' },
 ]
 
 const NODE_LABELS: Record<EditorComponentType, string> = {
@@ -121,9 +127,13 @@ const NODE_LABELS: Record<EditorComponentType, string> = {
   clock: 'Clock',
   dff: 'DFF',
   tff: 'TFF',
+  jk: 'JK',
+  sr: 'SR',
   delay: 'Delay',
   transmitter: 'Transmissor',
   receiver: 'Receptor',
+  splitter: 'Splitter',
+  combiner: 'Combiner',
   'custom-chip': 'Chip customizado',
 }
 
@@ -252,7 +262,7 @@ export function CircuitEditor() {
 
   const hasBuses = useMemo(() => document.nodes.some((node) => (node.options?.width ?? 1) > 1), [document])
   const hasSequential = useMemo(
-    () => document.nodes.some((node) => node.type === 'clock' || node.type === 'dff' || node.type === 'tff' || node.type === 'delay'),
+    () => document.nodes.some((node) => node.type === 'clock' || node.type === 'dff' || node.type === 'tff' || node.type === 'jk' || node.type === 'sr' || node.type === 'delay'),
     [document],
   )
   const issues = useMemo(() => validateCircuit(document, { allowBuses: true, customChips: customChipEntries }), [customChipEntries, document])
@@ -278,6 +288,30 @@ export function CircuitEditor() {
     () => nodes.find((node) => node.id === selectedNodeId && (node.data.componentType === 'transmitter' || node.data.componentType === 'receiver')),
     [nodes, selectedNodeId],
   )
+  const selectedBusNode = useMemo(
+    () => nodes.find((node) => node.id === selectedNodeId && (node.data.componentType === 'splitter' || node.data.componentType === 'combiner')),
+    [nodes, selectedNodeId],
+  )
+
+  const updateBusWidths = (rawValue: string) => {
+    if (!selectedBusNode) return
+    const widths = rawValue.split(/[+,;\s]+/).filter(Boolean).map(Number)
+    if (widths.length === 0 || widths.some((width) => !Number.isInteger(width) || width < 1 || width > 64)) {
+      setNotice('Informe partições inteiras entre 1 e 64 bits, separadas por +.')
+      return
+    }
+    const total = widths.reduce((sum, width) => sum + width, 0)
+    if (selectedBusNode.data.componentType === 'splitter' && total !== selectedBusNode.data.width) {
+      setNotice(`O Splitter precisa repartir exatamente ${selectedBusNode.data.width} bits.`)
+      return
+    }
+    setNodes((current) => current.map((node) => node.id === selectedBusNode.id
+      ? { ...node, data: { ...node.data, widths, width: selectedBusNode.data.componentType === 'combiner' ? total : node.data.width } }
+      : node))
+    setSelectedRow(null)
+    setSelectedVectorRow(null)
+    setNotice(`Partições de ${selectedBusNode.data.label} atualizadas para ${widths.join(' + ')} bits.`)
+  }
 
   useEffect(() => {
     if (!user || !cloudProjectId) {
@@ -939,7 +973,7 @@ export function CircuitEditor() {
             Nome do chip
             <input id="custom-chip-name" value={customChipName} onChange={(event) => setCustomChipName(event.target.value)} placeholder={projectName || 'Meu chip'} maxLength={200} className="w-28 rounded-lg border border-slate-200 bg-transparent px-1.5 py-1 text-xs dark:border-slate-700" />
           </label>
-          <button type="button" className="key text-xs" onClick={() => void saveAsCustomChip()} disabled={readOnlyCollaboration || hasSequential || issues.length > 0 || !customChips.ready || Boolean(customChips.unavailable)} title="Salvar este circuito na biblioteca local de chips; ele pode conter outros chips">
+          <button type="button" className="key text-xs" onClick={() => void saveAsCustomChip()} disabled={readOnlyCollaboration || hasSequential || issues.length > 0 || !customChips.ready || Boolean(customChips.unavailable)} title="Salvar este circuito combinacional, inclusive com chips compostos, na biblioteca local de chips">
             Salvar como chip
           </button>
           <button type="button" className="key text-xs" onClick={exportLocal}>
@@ -974,7 +1008,7 @@ export function CircuitEditor() {
 
       {showGuide && (
                   <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 dark:border-brand-900/70 dark:bg-brand-950/40 dark:text-brand-100">
-            <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, use Transmissor/Receptor com o mesmo canal para compartilhar um sinal sem fio pelo circuito. Clock/DFF/TFF/Delay criam circuitos com estado; salve o desenho no navegador. A tabela verdade permanece exclusiva para circuitos combinacionais.
+            <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, use Transmissor/Receptor com o mesmo canal para compartilhar um sinal sem fio pelo circuito. Clock/DFF/TFF/JK/SR/Delay criam circuitos com estado; salve o desenho no navegador. A tabela verdade permanece exclusiva para circuitos combinacionais.
 
         </div>
       )}
@@ -1047,6 +1081,31 @@ export function CircuitEditor() {
               </p>
             </section>
           )}
+          {selectedBusNode && (
+            <section className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/70 dark:bg-amber-950/30" aria-labelledby="bus-width-editor-title">
+              <h3 id="bus-width-editor-title" className="text-xs font-semibold tracking-wide text-amber-800 uppercase dark:text-amber-200">
+                Editar partições do barramento
+              </h3>
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+                {selectedBusNode.data.label} · {selectedBusNode.data.width} bits
+              </p>
+              <label className="mt-2 block text-xs font-medium text-amber-900 dark:text-amber-100" htmlFor="selected-bus-widths">
+                Partes (MSB → LSB)
+              </label>
+              <input
+                id="selected-bus-widths"
+                key={`${selectedBusNode.id}:${(selectedBusNode.data.widths ?? []).join('-')}`}
+                defaultValue={(selectedBusNode.data.widths ?? []).join(' + ')}
+                onBlur={(event) => updateBusWidths(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter') updateBusWidths(event.currentTarget.value) }}
+                disabled={readOnlyCollaboration}
+                className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-xs text-slate-900 dark:border-amber-800 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+                Separe por +. O Splitter deve fechar exatamente a largura de entrada; o Combiner atualiza sua saída.
+              </p>
+            </section>
+          )}
           <section className="mt-4 rounded-xl border border-slate-200 p-3 dark:border-slate-800" aria-labelledby="custom-chip-library-title">
             <div className="flex items-center justify-between gap-2">
               <h3 id="custom-chip-library-title" className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
@@ -1075,10 +1134,6 @@ export function CircuitEditor() {
                 ))}
               </ul>
             )}
-            <DlsImportPanel
-              disabled={readOnlyCollaboration || !customChips.ready || Boolean(customChips.unavailable)}
-              onImported={customChips.refresh}
-            />
           </section>
         </aside>
 
@@ -1366,13 +1421,47 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
     return (
       <div className="relative flex min-h-16 w-36 flex-col items-center justify-center rounded-lg border-2 border-violet-300 bg-violet-50 px-3 py-2 text-center shadow-sm dark:border-violet-700 dark:bg-violet-950/30" title={data.label}>
         {Array.from({ length: inputCount }, (_, index) => (
-          <Handle key={`input-${index}`} type="target" position={Position.Left} id={`in-${index}`} style={{ top: `${((index + 1) / (inputCount + 1)) * 100}%` }} className={dot} />
+          <Handle key={`input-${index}`} type="target" position={Position.Left} id={`in-${index}`} aria-label={`${data.label} entrada ${index + 1} · ${formatBits(data.inputWidths?.[index] ?? 1)}`}
+ style={{ top: `${((index + 1) / (inputCount + 1)) * 100}%` }} className={dot} />
         ))}
         <span className="max-w-full truncate font-mono text-xs font-black text-violet-800 dark:text-violet-200">{data.label}</span>
-        <span className="text-[10px] text-violet-700 dark:text-violet-300">{inputCount} entrada{inputCount === 1 ? '' : 's'} · {outputCount} saída{outputCount === 1 ? '' : 's'}</span>
+        <span className="text-[10px] text-violet-700 dark:text-violet-300">
+          {inputCount} entrada{inputCount === 1 ? '' : 's'} · {outputCount} saída{outputCount === 1 ? '' : 's'}
+        </span>
+        {(data.inputWidths?.some((width) => width > 1) || data.outputWidths?.some((width) => width > 1)) && (
+          <span className="max-w-full truncate text-[10px] text-violet-700 dark:text-violet-300" title={`IN ${data.inputWidths?.join(' + ') ?? '1'} · OUT ${data.outputWidths?.join(' + ') ?? '1'} bits`}>
+            IN {formatWidthSummary(data.inputWidths)} · OUT {formatWidthSummary(data.outputWidths)}
+          </span>
+        )}
         {Array.from({ length: outputCount }, (_, index) => (
-          <Handle key={`output-${index}`} type="source" position={Position.Right} id={`out-${index}`} style={{ top: `${((index + 1) / (outputCount + 1)) * 100}%` }} className={dot} />
+          <Handle key={`output-${index}`} type="source" position={Position.Right} id={`out-${index}`} aria-label={`${data.label} saída ${index + 1} · ${formatBits(data.outputWidths?.[index] ?? 1)}`}
+ style={{ top: `${((index + 1) / (outputCount + 1)) * 100}%` }} className={dot} />
         ))}
+      </div>
+    )
+  }
+
+  if (data.kind === 'bus') {
+    const widths = data.widths ?? []
+    const isSplitter = data.componentType === 'splitter'
+    return (
+      <div className="relative flex min-h-16 w-40 flex-col items-center justify-center rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-center shadow-sm dark:border-amber-700 dark:bg-amber-950/30" title={`${data.label} · ${widths.join(' + ')} bits`}>
+        {isSplitter ? (
+          <Handle type="target" position={Position.Left} id="in-0" className={dot} />
+        ) : (
+          widths.map((width, index) => (
+            <Handle key={`input-${index}`} type="target" position={Position.Left} id={`in-${index}`} aria-label={`${data.label} entrada ${index + 1} · ${width} bits`} style={{ top: `${((index + 1) / (widths.length + 1)) * 100}%` }} className={dot} />
+          ))
+        )}
+        <span className="font-mono text-xs font-black text-amber-800 dark:text-amber-200">{data.label}</span>
+        <span className="text-[10px] text-amber-700 dark:text-amber-300">{isSplitter ? `${data.width} bits → ${widths.join(' + ')}` : `${widths.join(' + ')} → ${data.width} bits`}</span>
+        {isSplitter ? (
+          widths.map((width, index) => (
+            <Handle key={`output-${index}`} type="source" position={Position.Right} id={`out-${index}`} aria-label={`${data.label} saída ${index + 1} · ${width} bits`} style={{ top: `${((index + 1) / (widths.length + 1)) * 100}%` }} className={dot} />
+          ))
+        ) : (
+          <Handle type="source" position={Position.Right} id="out-0" className={dot} />
+        )}
       </div>
     )
   }
@@ -1391,10 +1480,17 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
   }
 
   if (data.kind === 'sequential') {
-    const isFlipFlop = data.componentType === 'dff' || data.componentType === 'tff'
+    const isFlipFlop = data.componentType === 'dff' || data.componentType === 'tff' || data.componentType === 'jk' || data.componentType === 'sr'
     const outputClass = `!h-1.5 !w-1.5 !border-0 ${lit ? '!bg-amber-500' : '!bg-slate-400 dark:!bg-slate-500'}`
     return (
       <div className="relative flex h-16 w-24 flex-col items-center justify-center rounded-lg border-2 border-brand-300 bg-white px-2 text-center shadow-sm dark:border-brand-700 dark:bg-slate-900" title={data.label}>
+        {data.inputs === 3 && (
+          <>
+            <Handle type="target" position={Position.Left} id="a" style={{ top: 14 }} className={dot} />
+            <Handle type="target" position={Position.Left} id="b" style={{ top: 32 }} className={dot} />
+            <Handle type="target" position={Position.Left} id="c" style={{ top: 50 }} className={dot} />
+          </>
+        )}
         {data.inputs === 2 && (
           <>
             <Handle type="target" position={Position.Left} id="a" style={{ top: 22 }} className={dot} />
@@ -1456,12 +1552,13 @@ function buildNodeOptions(data: EditorNodeData): CircuitNode['options'] {
   if (data.componentType === 'constant') options.value = data.value ?? false
   if (data.componentType === 'clock') options.period = Math.max(1, Math.floor(data.period ?? 1))
   if (data.componentType === 'delay') options.ticks = Math.max(1, Math.floor(data.ticks ?? 1))
-  if (data.componentType === 'input' || data.componentType === 'clock' || data.componentType === 'dff' || data.componentType === 'tff') {
+  if (data.componentType === 'input' || data.componentType === 'clock' || data.componentType === 'dff' || data.componentType === 'tff' || data.componentType === 'jk' || data.componentType === 'sr') {
     options.initial = data.initial ?? false
   }
   if (data.componentType === 'transmitter' || data.componentType === 'receiver') options.channel = normalizeWirelessChannel(data.channel ?? '')
   if (data.componentType === 'custom-chip' && data.customChipId !== undefined) options.customChipId = data.customChipId
-  if (data.width !== 1) options.width = data.width
+  if ((data.componentType === 'splitter' || data.componentType === 'combiner') && data.widths?.length) options.widths = data.widths
+  if (data.width !== 1 || data.componentType === 'splitter' || data.componentType === 'combiner') options.width = data.width
   return Object.keys(options).length > 0 ? options : undefined
 }
 
@@ -1492,15 +1589,20 @@ function toDocument(nodes: EditorFlowNode[], edges: Edge[]): CircuitDocument {
 }
 
 function createNode(type: EditorComponentType, index: number, id = `${type}-${index + 1}`, width = 1): EditorFlowNode {
+  const busNode = type === 'splitter' || type === 'combiner'
+  const nodeWidth = busNode && width === 1 ? 2 : width
+  const busWidths = busNode ? defaultBusParts(nodeWidth) : undefined
   const kind = type === 'input' || type === 'constant'
     ? type
     : type === 'output'
       ? 'output'
-      : type === 'clock' || type === 'dff' || type === 'tff' || type === 'delay'
+      : type === 'clock' || type === 'dff' || type === 'tff' || type === 'jk' || type === 'sr' || type === 'delay'
         ? 'sequential'
         : type === 'transmitter' || type === 'receiver'
           ? 'wireless'
-          : 'gate'
+          : busNode
+            ? 'bus'
+            : 'gate'
   const defaultValue = type === 'constant'
   const label = type === 'input' ? `I${index + 1}` : type === 'output' ? `O${index + 1}` : NODE_LABELS[type]
 
@@ -1512,9 +1614,10 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       kind,
       componentType: type,
       label,
-      inputs: editorInputCount(type),
-      outputs: type === 'dff' || type === 'tff' ? 2 : 1,
-      width,
+      inputs: type === 'splitter' ? 1 : type === 'combiner' ? busWidths!.length : editorInputCount(type),
+      outputs: type === 'dff' || type === 'tff' || type === 'jk' || type === 'sr' ? 2 : type === 'splitter' ? busWidths!.length : 1,
+      widths: busWidths,
+      width: nodeWidth,
       op: type === 'not' ? 'not' : type === 'and' || type === 'nand' || type === 'or' || type === 'nor' || type === 'xor' || type === 'xnor' ? type : undefined,
       value: defaultValue,
       initial: false,
@@ -1538,12 +1641,29 @@ function createCustomChipNode(entry: CustomChipLibraryEntry, index: number, id: 
       outputs: entry.definition.outputs.length,
       inputLabels: entry.definition.inputs.map((port) => port.name),
       outputLabels: entry.definition.outputs.map((port) => port.name),
-      width: 1,
+      inputWidths: entry.definition.inputs.map((port) => port.width),
+      outputWidths: entry.definition.outputs.map((port) => port.width),
+      width: Math.max(1, ...entry.definition.inputs.map((port) => port.width), ...entry.definition.outputs.map((port) => port.width)),
       customChipId: entry.id,
       value: false,
       initial: false,
     },
   }
+}
+
+function formatBits(width: number): string {
+  return `${width} bit${width === 1 ? '' : 's'}`
+}
+
+function formatWidthSummary(widths?: readonly number[]): string {
+  const values = widths?.length ? widths : [1]
+  return `${values.join(' + ')} ${values.length === 1 && values[0] === 1 ? 'bit' : 'bits'}`
+}
+
+function defaultBusParts(width: number): number[] {
+  const first = Math.max(1, Math.ceil(width / 2))
+  const second = width - first
+  return second > 0 ? [first, second] : [1]
 }
 
 function createDemoNodes(): EditorFlowNode[] {
@@ -1603,16 +1723,29 @@ function fromDocument(document: CircuitDocument, customChips: readonly CustomChi
           ...node.data,
           label: source.label ?? node.data.label,
           width: source.options?.width ?? 1,
+          widths: source.options?.widths ?? node.data.widths,
           channel: source.options?.channel ?? '',
           value: source.options?.value ?? source.options?.initial ?? node.data.value,
           initial: source.options?.initial ?? false,
           period: source.options?.period ?? 1,
           ticks: source.options?.ticks ?? 1,
           customChipId: source.options?.customChipId,
-          inputs: source.type === 'custom-chip' ? (entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0) : node.data.inputs,
-          outputs: source.type === 'custom-chip' ? (entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0) : node.data.outputs,
+          inputs: source.type === 'custom-chip'
+            ? (entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0)
+            : source.type === 'splitter'
+              ? 1
+              : source.type === 'combiner'
+                ? (source.options?.widths?.length ?? 0)
+                : node.data.inputs,
+          outputs: source.type === 'custom-chip'
+            ? (entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0)
+            : source.type === 'splitter'
+              ? (source.options?.widths?.length ?? 0)
+              : node.data.outputs,
           inputLabels: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.map((port) => port.name) : node.data.inputLabels,
           outputLabels: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.map((port) => port.name) : node.data.outputLabels,
+          inputWidths: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.inputs.map((port) => port.width) : node.data.inputWidths,
+          outputWidths: source.type === 'custom-chip' ? entries.get(source.options?.customChipId ?? NaN)?.definition.outputs.map((port) => port.width) : node.data.outputWidths,
         },
       }
     }),
@@ -1621,12 +1754,14 @@ function fromDocument(document: CircuitDocument, customChips: readonly CustomChi
       const targetNode = normalized.nodes.find((node) => node.id === connection.target.node)
       const sourcePort = connection.source.port ?? 0
       const targetPort = connection.target.port
-      const sourceHandle = sourceNode?.type === 'custom-chip'
+      const sourceHandle = sourceNode?.type === 'custom-chip' || sourceNode?.type === 'splitter'
         ? `out-${sourcePort}`
-        : sourceNode?.type === 'dff' || sourceNode?.type === 'tff'
+        : sourceNode?.type === 'dff' || sourceNode?.type === 'tff' || sourceNode?.type === 'jk' || sourceNode?.type === 'sr'
           ? sourcePort === 1 ? 'qbar' : 'q'
           : undefined
-      const targetHandle = targetNode?.type === 'custom-chip' ? `in-${targetPort}` : targetPort === 1 ? 'b' : 'a'
+      const targetHandle = targetNode?.type === 'custom-chip' || targetNode?.type === 'combiner'
+        ? `in-${targetPort}`
+        : targetPort === 2 ? 'c' : targetPort === 1 ? 'b' : 'a'
       return {
         id: `${connection.source.node}->${connection.target.node}:${sourcePort}:${targetPort}`,
         source: connection.source.node,
@@ -1656,6 +1791,7 @@ function loadProject(
 
 function portFromHandle(handle: string | null | undefined, nativeHandle: string): { port?: number } {
   if (handle === nativeHandle) return { port: 1 }
+  if (handle === 'c') return { port: 2 }
   const match = /^(?:in|out)-(\d+)$/.exec(handle ?? '')
   if (match) return { port: Number(match[1]) }
   return {}
@@ -1672,15 +1808,19 @@ function runtimeIsLit(snapshot: DocumentRuntimeSnapshot, nodeId: string, port = 
 }
 
 function evaluationIsLit(evaluation: CircuitEvaluation | CircuitVectorEvaluation, nodeId: string): boolean {
-  const value = evaluation.values[nodeId]
+  const value = 'ports' in evaluation ? evaluation.ports?.[nodeId] ?? evaluation.values[nodeId] : evaluation.values[nodeId]
   if (!value) return false
-  return 'bits' in value ? value.bits.some(Boolean) : value[0] === true
+  if (Array.isArray(value)) return value.some((part) => typeof part === 'boolean' ? part : part.bits.some(Boolean))
+  if ('bits' in value) return value.bits.some(Boolean)
+  return false
 }
 
 function evaluationBinary(evaluation: CircuitEvaluation | CircuitVectorEvaluation, nodeId: string): string {
-  const value = evaluation.values[nodeId]
+  const value = 'ports' in evaluation ? evaluation.ports?.[nodeId] ?? evaluation.values[nodeId] : evaluation.values[nodeId]
   if (!value) return ''
-  return 'bits' in value ? toBinary(value) : value[0] ? '1' : '0'
+  if (Array.isArray(value)) return value.map((part) => typeof part === 'boolean' ? (part ? '1' : '0') : toBinary(part)).join(' | ')
+  if ('bits' in value) return toBinary(value)
+  return value[0] ? '1' : '0'
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {

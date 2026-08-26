@@ -813,3 +813,227 @@ A verificação que vale é o cruzamento. O `catalog.json` foi gerado pelo outro
 `buildCustomChipDefinition` ordenava as portas de um chip por ID; a elaboração as ordenava pela ordem do documento. Onde as duas discordavam, o sinal ligado na porta *k* de uma instância chegava em outro pino — sem erro, sem aviso, só o valor errado. Discordar era fácil: os IDs do editor são `input-1`, `input-2`, …, numerados pelo total de nós, e `"input-11"` vem *antes* de `"input-2"` na ordenação textual. Bastava acrescentar um pino depois do nono componente.
 
 Está corrigido em `orderCustomChipPins`, fonte única dessa ordem para a validação, a interface e a elaboração. O teste de hierarquia só detectou o defeito depois de quebrar a simetria entre os níveis: com a mesma permutação nos dois, a troca se cancelava e o teste passava por cima do problema.
+## Release 0.10.1 — barramentos visuais particionáveis — 2026-08-25
+
+A fundação multi-bit existente agora atravessa a construção visual com dois componentes explícitos: `splitter` e `combiner`. O Splitter recebe um barramento, aplica partições declaradas em `options.widths` na ordem MSB → LSB e expõe uma saída por parte. O Combiner recebe essas partes, valida a soma das larguras e expõe um barramento recombinado. Ambos reutilizam `splitBus` e `combineBus`, sem duplicar a álgebra de `BitVector`.
+
+A validação do documento verifica larguras inteiras entre 1 e 64 bits, soma exata das partições, cardinalidade das portas e compatibilidade de cada conexão. O fluxo escalar permanece protegido: Splitter e Combiner só são aceitos pela avaliação vetorial. O runtime temporal continua explicitamente escalar nesta release, preservando a fronteira documentada para uma futura extensão sequencial multi-bit.
+
+No editor, os componentes aparecem na paleta, criam handles dinâmicos, podem ter suas partições editadas no painel lateral e preservam `width`/`widths` ao salvar e reabrir projetos `.veritas`. A avaliação vetorial mantém `values` compatível com consumidores existentes e expõe `ports` para que o canvas e integrações possam observar todas as saídas de um Splitter.
+
+Critérios verificados nesta fatia: round-trip 8 bits com partição `3 + 5`, preservação MSB → LSB, rejeição de partições que não fecham a largura, typecheck, lint e regressões focadas. A validação completa de release e o smoke visual serão executados antes da consolidação do próximo marco.
+
+
+## Release 0.10.2 — chips multi-bit combinacionais importados — 2026-08-25
+
+A Release 0.10.2 fecha a primeira ponte controlada entre o catálogo real do DLS e o Digital Logic Sim próprio do Veritas. O importador não envia os JSONs de origem para o navegador, não executa código ou dados como programa e não tenta inferir dependências ausentes. Em vez disso, mantém uma allowlist explícita de perfis combinacionais que possuem uma materialização canônica conhecida.
+
+| Perfil DLS suportado | Materialização Veritas | Portas preservadas |
+| --- | --- | --- |
+| `4-ADD` | Ripple-carry estrutural com `1-ADD`, dois Splitters e um Combiner | Entrada `4 + 4 + 1` bits; saída `4 + 1` bits |
+| `AND-8 Bits`, `8x2-AND` | Splitter → oito portas AND → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+| `NAND-8Bits` | Splitter → oito portas NAND → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+| `OR-8 Bits`, `8x2-OR` | Splitter → oito portas OR → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+| `XOR - 8 BIT`, `8x2-XOR` | Splitter → oito portas XOR → Combiner | Duas entradas de 8 bits; uma saída de 8 bits |
+
+O adaptador `src/chips/catalogVector.ts` valida nomes, portas, larguras, tipos e componentes conhecidos antes de construir um `CircuitDocument`. Para `4-ADD`, a avaliação foi conferida em todas as 512 combinações de dois operandos de 4 bits e carry de entrada; a soma baixa e o carry de saída coincidem com a aritmética ripple-carry. O chip resultante passa pelo mesmo caminho de `buildCustomChipDefinition()`, pode ser salvo na biblioteca local IndexedDB, instanciado em outro documento e exportado para Verilog/VHDL.
+
+A biblioteca visual distingue o modelo escalar do modelo multi-bit pronto para o canvas. Após a importação, o card local de `4-ADD` fica disponível sem conta ou rede, e o nó mostra `IN 4 + 4 + 1 · OUT 4 + 1 bits`. As alças anunciam individualmente 4, 4, 1, 4 e 1 bits, enquanto chips sequenciais, memória, tri-state, conversores e dependências fora da allowlist permanecem bloqueados.
+
+Critérios verificados nesta release: 70 arquivos e 489 testes Vitest; typecheck, lint, build do frontend/lib/MCP stdio/MCP HTTP/plugin; MCP 16 PASS, MCP HTTP 18 PASS, acessibilidade 5 PASS, WASM isolation 5 PASS, Rust 2 PASS e HDL 3 PASS.
+ O smoke local confirmou catálogo → biblioteca local → peça `4-ADD` no canvas, com portas heterogêneas e sem erro de largura. O beta readiness continua bloqueado por credenciais/evidências Supabase externas, e `validate:plugin` não pôde rodar porque o executável `claude` não está instalado no sandbox; nenhum bloqueio altera o modo local-first.
+
+A próxima fatia deve ampliar o contrato de importação apenas para novos perfis combinacionais que possam ser validados por fixtures reais e, em separado, definir o runtime temporal vetorial antes de considerar chips DLS como `8-DELAY`, registradores ou memória. A `main` permanece sem alterações; o trabalho está na branch `feature/chip-hierarchy-v1`, com o incremento funcional no commit `d5b86ae`.
+
+
+## Release 0.10.3 — comparador multi-bit EQUAL-4 — 2026-08-25
+
+A Release 0.10.3 amplia a allowlist estrutural do catálogo DLS com o perfil real `EQUAL-4`. O chip possui dois pinos de entrada de 4 bits, uma saída escalar e nove subcomponentes: dois conversores `4-1BIT`, quatro `XNOR` e três `AND`. O adaptador não executa o JSON de origem; valida a assinatura, mapeia a estrutura para o `CircuitDocument` canônico e mantém o circuito inteiramente local.
+
+| Parte do fixture | Materialização Veritas |
+| --- | --- |
+| Dois `4-1BIT` | Dois Splitters de 4 bits, na ordem MSB → LSB |
+| Quatro `XNOR` | Uma comparação bit a bit por posição |
+| Três `AND` | Redução das quatro comparações para uma saída |
+| `OUT` escalar | `1` somente quando os dois barramentos são iguais |
+
+O DLS usa `IN` nos dois pinos de entrada. Ao construir o chip customizado, `buildCustomChipDefinition()` preserva a ordem por ID e aplica a reserva determinística `IN`/`IN_2`, ambas com largura 4, evitando colisão silenciosa de portas. A biblioteca local e o canvas mostram `IN 4 + 4 · OUT 1 bit`; o modelo pode ser reutilizado e exportado para Verilog/VHDL.
+
+Critérios verificados: fixture real e entrada do catálogo gerado, quatro casos de igualdade/diferença, validação com `allowBuses`, portas duplicadas normalizadas, exportação HDL, integração catálogo → IndexedDB → canvas e zero alertas de interface. A suíte completa passou com 70 arquivos e 497 testes; typecheck, lint, builds e gates permanecem parte da validação final da release.
+
+O próximo incremento deve seguir a mesma regra: novos comparadores ou operadores multi-bit somente com fixture real e semântica verificável. Perfis sequenciais, memória, tri-state e `8-DELAY` continuam fora até a existência de runtime temporal vetorial; a fronteira entre combinacional e temporal não será atravessada por inferência.
+
+
+## Release 0.10.4 — somador multi-bit 8-ADD — 2026-08-25
+
+A Release 0.10.4 amplia a allowlist estrutural do catálogo DLS com o perfil real `8-ADD`. O fixture possui três entradas na ordem pública `CARRY` (1 bit), `IN` (8 bits), `IN` (8 bits), duas saídas `OUT` (8 bits) e `CARRY` (1 bit), além de oito subchips `1-ADD`, dois `8-1BIT` e um `1-8BIT`.
+
+| Parte do fixture | Materialização Veritas |
+| --- | --- |
+| Dois `8-1BIT` | Dois Splitters de 8 bits, preservando a ordem MSB → LSB |
+| Oito `1-ADD` | Oito estágios ripple-carry com XOR, AND e OR escalares |
+| Um `1-8BIT` | Um Combiner para o resultado de 8 bits |
+| `CARRY` inicial/final | Entrada e saída escalares mantidas em portas próprias |
+
+O adaptador usa IDs públicos `input-0-carry`, `input-1-a` e `input-2-b` para que a ordem do DLS não seja perdida durante a construção do chip customizado. Quando os dois pinos de origem chamados `IN` são convertidos em uma definição local, a regra determinística de nomes gera `IN` e `IN_2`, ambas com largura 8. A avaliação cobre limites sem carry, overflow, carry de entrada e soma entre metades do barramento.
+
+Critérios verificados: fixture real e entrada do catálogo gerado, validação com `allowBuses`, 16 XOR, 16 AND, 8 OR, dois Splitters, um Combiner, cinco casos aritméticos, normalização de portas, integração catálogo → IndexedDB → canvas e cinco alças dimensionadas no DOM. A suíte completa passou com 70 arquivos e 505 testes; os gates MCP, HTTP, acessibilidade, WASM, Rust e HDL também passaram.
+
+O próximo incremento permanece restrito a perfis combinacionais reais. O runtime temporal vetorial continua sendo uma frente separada antes de considerar `8-DELAY`, registradores, contadores ou memória.
+
+
+## Release 0.10.5 — máscara multi-bit 8-1AND — 2026-08-25
+
+A Release 0.10.5 adiciona à allowlist o fixture real `8-1AND` do DLS. Sua assinatura possui duas entradas chamadas `IN`: a primeira é uma máscara escalar de 1 bit e a segunda é um barramento de 8 bits. A saída `OUT` é um barramento de 8 bits. A estrutura de origem contém um `8-1BIT`, oito portas `AND` e um `1-8BIT`.
+
+| Parte do fixture | Materialização Veritas |
+| --- | --- |
+| `8-1BIT` | Um Splitter de 8 bits, em MSB → LSB |
+| Oito `AND` | Uma porta AND escalar por bit, compartilhando a máscara |
+| `1-8BIT` | Um Combiner de 8 bits |
+| Entradas duplicadas `IN` | `IN` de 1 bit e `IN_2` de 8 bits na definição local |
+
+O adaptador só aceita a assinatura conhecida (`2` entradas, `1` saída, `8` AND, `1` Splitter e `1` Combiner). A avaliação exaustiva cobre os 256 valores do barramento em dois estados da máscara: com `0`, a saída é sempre zero; com `1`, a saída é idêntica à entrada. O circuito passa por `validateCircuit(..., { allowBuses: true })` e permanece compatível com a persistência local e as exportações HDL.
+
+Critérios verificados: card publicado na biblioteca, importação para IndexedDB, peça no canvas, três alças com larguras 1/8/8 bits, zero alertas no DOM, 31 testes focados e suíte completa com 70 arquivos e 510 testes. O próximo passo continua sendo outro perfil combinacional real; chips temporais e memória aguardam um runtime vetorial temporal específico.
+
+
+## Release 0.10.6 — operadores binários de barramento 8x2 — 2026-08-25
+
+A Release 0.10.6 adiciona três fixtures combinacionais reais do DLS: `8x2-AND`, `8x2-OR` e `8x2-XOR`. Cada um recebe dois barramentos de 8 bits chamados `IN` e produz um barramento `OUT` de 8 bits. As portas duplicadas são preservadas na origem e normalizadas para `IN` e `IN_2` somente na definição de chip customizado local.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| Dois `8-1BIT` | Dois Splitters, um por entrada de 8 bits |
+| Oito operadores escalares | Oito AND, OR ou XOR, conforme o fixture real |
+| Um `1-8BIT` | Um Combiner de 8 bits |
+
+O adaptador só materializa os nomes e as assinaturas conhecidas. Para prova de semântica, as entradas `0xAA` e `0xCC` produzem `0x88` no AND, `0xEE` no OR e `0x66` no XOR. Cada documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser convertido em chip customizado local e permanece exportável para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 34 testes focados, suíte completa, builds, gates MCP/HTTP, acessibilidade, isolamento WASM, Rust, HDL e smoke no navegador. O smoke confirmou `8x2-AND` na biblioteca local e no canvas com três alças de 8 bits e zero alertas inesperados. A expansão não inclui tri-state, memória, conversores ou chips temporais; `8-DELAY` continua bloqueado até o runtime temporal vetorial existir.
+
+
+## Release 0.10.7 — AND-3 vetorial DLS — 2026-08-25
+
+A Release 0.10.7 adiciona à allowlist o fixture combinacional real `AND-3 8 bits`. A interface publicada pelo catálogo possui três entradas `IN` de 8 bits e uma saída `OUT` de 8 bits. O circuito de origem contém três `8-1BIT`, dezesseis `AND` escalares e um `1-8BIT`.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| Três `8-1BIT` | Três Splitters de 8 bits, em MSB → LSB |
+| Dezesseis `AND` | Dois estágios de redução por bit: `IN_1 AND IN_2`, seguido de `resultado AND IN_3` |
+| Um `1-8BIT` | Um Combiner de 8 bits |
+| Entradas duplicadas `IN` | `IN`, `IN_2` e `IN_3`, todas com 8 bits na definição local |
+
+A assinatura só é aceita quando coincide com o fixture conhecido: três entradas, uma saída, largura vetorial 8, três `8-1BIT`, dezesseis `AND` e um `1-8BIT`. O documento resultante passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 41 testes focados e 520 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 8 bits · OUT 8 bits` e quatro alças de 8 bits. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release não transforma o importador em um executor genérico de N entradas. A generalização do construtor foi limitada à redução estrutural comprovada por este fixture. Chips temporais, memória, tri-state, dependências não mapeadas e outros bancos de portas continuam bloqueados até possuírem contrato e provas próprios.
+
+
+## Release 0.10.8 — Full Adder vetorial DLS — 2026-08-25
+
+A Release 0.10.8 adiciona à allowlist o fixture combinacional real `Full Adder - 8 Bits`. Sua interface publicada possui três entradas vetoriais de 8 bits — `Carry IN`, `IN A` e `IN B` — e duas saídas vetoriais de 8 bits — `BIT-8 Bits` e `Carry Out-8Bits`. A estrutura do fixture contém dois `AND-8 Bits`, dois `XOR - 8 BIT` e um `OR-8 Bits`, combinados para operar oito posições em paralelo.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `Carry IN`, `IN A`, `IN B` | Três Splitters de 8 bits, preservando a ordem MSB → LSB |
+| Dois `XOR - 8 BIT` | XOR de `A` com `B`, seguido de XOR com o carry, para a saída de soma |
+| Dois `AND-8 Bits` e um `OR-8 Bits` | `(A AND B) OR ((A XOR B) AND Carry)`, para a saída de carry |
+| `BIT-8 Bits` e `Carry Out-8Bits` | Dois Combiners de 8 bits e duas saídas vetoriais |
+
+O adaptador só aceita a assinatura conhecida: três entradas, duas saídas, largura 8 em todos os pinos, dois `AND-8 Bits`, dois `XOR - 8 BIT` e um `OR-8 Bits`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 49 testes focados e 528 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 8 bits · OUT 8 + 8 bits` e cinco alças de 8 bits. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release trata o full adder como composição combinacional paralela por bit. Ela não adiciona carry ripple entre posições nem transforma o importador em executor genérico de subchips DLS. Perfis temporais, memória, tri-state e dependências não mapeadas continuam bloqueados até possuírem contratos e provas próprios.
+
+
+## Release 0.10.9 — alias ripple-carry `(8 Bits) 8-bit Adder` — 2026-08-25
+
+A Release 0.10.9 adiciona à allowlist o alias combinacional real `(8 Bits) 8-bit Adder`. Sua interface publicada possui duas entradas de 8 bits (`IN A 1-8` e `IN B 1-8`), uma entrada escalar de carry (`Carry IN`), uma saída de soma de 8 bits (`OUT`) e uma saída escalar de carry (`Carry OUT`). O fixture contém dois `8-1BIT`, um subchip `8-bit Adder` e um `1-8BIT`.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `IN A 1-8` e `IN B 1-8` | Dois Splitters de 8 bits, em MSB → LSB |
+| `8-bit Adder` | Oito estágios ripple-carry com 16 XOR, 16 AND e 8 OR |
+| `1-8BIT` | Um Combiner para a saída `OUT` de 8 bits |
+| `Carry IN` e `Carry OUT` | Entrada e saída escalares preservadas na definição local |
+
+O adaptador só aceita a assinatura conhecida: três entradas, duas saídas, larguras `[1, 8]`, dois `8-1BIT`, um `8-bit Adder` e um `1-8BIT`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 57 testes focados e 536 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 8 + 8 + 1 bits · OUT 8 + 1 bits` e cinco alças com larguras 8/8/1 → 8/1. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release confirma um alias de somador já compatível com a topologia ripple-carry do `8-ADD`; não importa o `8-bit Adder` escalar de 17 entradas, não adiciona um novo runtime temporal e não libera memória, tri-state ou dependências não mapeadas por inferência.
+
+
+## Release 0.11.0 — bancos base reais de barramento de 8 bits — 2026-08-25
+
+A Release 0.11.0 fecha a prova de quatro fixtures combinacionais reais do catálogo DLS que já compõem a família vetorial inicial: `AND-8 Bits`, `NAND-8Bits`, `OR-8 Bits` e `XOR - 8 BIT`. Todos possuem duas entradas `IN` de 8 bits, uma saída `OUT` de 8 bits, largura `[8]` e decomposição verificável.
+
+| Fixture real | Assinatura estrutural observada | Materialização local |
+| --- | --- | --- |
+| `AND-8 Bits` | 2× `8-1BIT`, 8× `AND`, 1× `1-8BIT` | 2 Splitters, 8 AND e 1 Combiner |
+| `NAND-8Bits` | 2× `8-1BIT`, 8× `AND`, 8× `NOT`, 1× `1-8BIT` | 2 Splitters, 8 NAND equivalentes e 1 Combiner |
+| `OR-8 Bits` | 1× `NAND-8Bits`, 2× `NOT-8 Bits` | 2 Splitters, 8 OR equivalentes e 1 Combiner |
+| `XOR - 8 BIT` | 3× `NAND-8Bits`, 2× `NOT-8 Bits` | 2 Splitters, 8 XOR equivalentes e 1 Combiner |
+
+O adaptador valida a assinatura exata na allowlist. Para OR e XOR, a estrutura publicada é hierárquica; o Veritas reconhece os subchips e materializa a função booleana equivalente em componentes locais, sem executar o JSON DLS nem inferir dependências ausentes. A prova usa `0xAA` e `0xCC`: AND produz `0x88`, NAND produz `0x77`, OR produz `0xEE` e XOR produz `0x66`.
+
+Os critérios de aceite foram atendidos com 62 testes focados e 541 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou `XOR - 8 BIT` como representante dos aliases hierárquicos: o card foi persistido localmente como ID 10 e inserido no canvas com `IN 8 + 8 bits · OUT 8 bits`, três alças de 8 bits e dois avisos esperados de entradas desconectadas.
+
+A release confirma contratos de operadores combinacionais de 8 bits; não amplia o catálogo para chips temporais, memória, tri-state ou dependências não mapeadas. O restante do catálogo continua disponível para consulta, mas não é executado automaticamente.
+
+
+## Release 0.11.1 — multiplexador vetorial real `1-8MUX` — 2026-08-25
+
+A Release 0.11.1 adiciona à allowlist o fixture combinacional real `1-8MUX`. Sua interface publicada possui três entradas na ordem DLS: uma seleção escalar de 1 bit e duas entradas `IN` de 8 bits, além de uma saída `OUT` de 8 bits. A estrutura observada contém duas instâncias `8-1AND`, uma `NOT` e uma `8x2-OR`.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| Entrada 1 de 1 bit | Seleção `select`, com fan-out para a NOT e as oito máscaras AND |
+| Entradas 2 e 3 de 8 bits | Dois Splitters, preservando a ordem MSB → LSB |
+| 2× `8-1AND` + `NOT` | `(select AND A)` e `((NOT select) AND B)` por posição |
+| `8x2-OR` | Oito OR escalares para combinar as duas máscaras |
+| `OUT` de 8 bits | Um Combiner e uma saída vetorial |
+
+O adaptador só aceita a assinatura conhecida: três entradas, uma saída, larguras `[1, 8]`, duas dependências `8-1AND`, uma `8x2-OR` e uma `NOT`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 70 testes focados e 549 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local, a instância no canvas, o resumo `IN 1 + 8 + 8 bits · OUT 8 bits` e quatro alças com larguras `1/8/8 → 8`. A instância isolada exibiu três erros de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release não libera os muxes `2-8MUX` e `4-8MUX`, porque seus fixtures usam buffers tri-state. O escopo permanece combinacional, local-first e allowlist-only; chips temporais, memória, tri-state e dependências não mapeadas continuam bloqueados.
+
+
+## Release 0.11.2 — inversor vetorial real `NOT-8 Bits` — 2026-08-25
+
+A Release 0.11.2 adiciona à allowlist o fixture combinacional real `NOT-8 Bits`. Sua interface publicada possui uma entrada `IN` de 8 bits e uma saída `OUT` de 8 bits. A estrutura observada contém uma instância `NAND-8Bits`, com a mesma entrada conectada às suas duas entradas.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `IN` de 8 bits | Um input vetorial e um Splitter com oito partes escalares |
+| `NAND-8Bits` hierárquico | Oito NOT escalares, representando `NOT(bit)` sem executar o JSON DLS |
+| `OUT` de 8 bits | Um Combiner e uma saída vetorial |
+
+O adaptador só aceita a assinatura conhecida: uma entrada, uma saída, largura `[8]` e exatamente uma dependência `NAND-8Bits`. O documento passa por `validateCircuit(..., { allowBuses: true })`, pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 78 testes focados e 557 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local como ID 12, a instância no canvas, o resumo `IN 8 bits · OUT 8 bits` e duas alças de 8 bits. A instância isolada exibiu um erro de entrada desconectada, como esperado; não houve alertas inesperados no DOM.
+
+Esta release confirma um inversor vetorial hierárquico de 8 bits; não amplia o catálogo para `NEGATE-8`, chips temporais, memória, tri-state ou dependências não mapeadas. O próximo contrato deve continuar sendo escolhido por assinatura real e semântica testável.
+
+
+## Release 0.11.3 — negação condicional vetorial real `NEGATE-8` — 2026-08-25
+
+A Release 0.11.3 adiciona à allowlist o fixture combinacional real `NEGATE-8`. Sua interface pública possui duas entradas na ordem DLS — `IN` de 8 bits e um controle escalar de 1 bit — e uma saída `OUT` de 8 bits. A estrutura observada contém um `8-1BIT`, um `1-8BIT` e oito XOR.
+
+| Estrutura do fixture | Materialização Veritas |
+| --- | --- |
+| `IN` de 8 bits | Um input vetorial e um Splitter com oito partes escalares |
+| Controle de 1 bit | Um input escalar conectado ao segundo terminal de cada XOR |
+| Oito XOR | Oito portas XOR independentes, uma por posição do barramento |
+| `OUT` de 8 bits | Um Combiner e uma saída vetorial |
+
+A semântica comprovada é `OUT = IN XOR CONTROL` por bit. Com controle `0`, o barramento passa sem alteração; com controle `1`, todos os bits são invertidos. O adaptador só aceita o nome, larguras, contagem e dependências reais conhecidas, passa por `validateCircuit(..., { allowBuses: true })` e pode ser salvo no IndexedDB, reutilizado como chip customizado e exportado para Verilog/VHDL.
+
+Os critérios de aceite foram atendidos com 86 testes focados e 565 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local como ID 13, a instância no canvas, o resumo `IN 8 + 1 bits · OUT 8 bits` e três alças de largura 8/1/8. A instância isolada exibiu dois problemas de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
+
+Esta release cobre somente a negação condicional combinacional `NEGATE-8`; não a interpreta como somador de complemento de dois. `NEGATE-8` é um contrato distinto de `NOT-8 Bits`, e chips temporais, memória, tri-state e dependências não mapeadas permanecem fora da allowlist.

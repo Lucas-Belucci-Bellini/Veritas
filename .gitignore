@@ -18,3 +18,6 @@ artifacts
 
 # Rust build artifacts
 engine-rs/target/
+src-tauri/target/
+src-tauri/gen/
+.tmp/

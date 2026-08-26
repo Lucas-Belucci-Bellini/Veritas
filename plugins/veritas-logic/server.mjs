@@ -20037,12 +20037,12 @@ function applyBinary(op, left, right) {
 	return BINARY_OPS[op](left, right);
 }
 /** Resolve a árvore para um conjunto de valores das variáveis. */
-function evaluate(node, assignment) {
+function evaluate$1(node, assignment) {
 	switch (node.kind) {
 		case "const": return node.value;
 		case "var": return assignment[node.name] ?? false;
-		case "not": return !evaluate(node.operand, assignment);
-		case "binary": return applyBinary(node.op, evaluate(node.left, assignment), evaluate(node.right, assignment));
+		case "not": return !evaluate$1(node.operand, assignment);
+		case "binary": return applyBinary(node.op, evaluate$1(node.left, assignment), evaluate$1(node.right, assignment));
 	}
 }
 function spanKey(node) {
@@ -20646,7 +20646,7 @@ function simplify(ast, notation = "math") {
 function truthColumn(ast, variables) {
 	const rows = 2 ** variables.length;
 	const column = new Array(rows);
-	for (let index = 0; index < rows; index += 1) column[index] = evaluate(ast, assignmentForRow(variables, index));
+	for (let index = 0; index < rows; index += 1) column[index] = evaluate$1(ast, assignmentForRow(variables, index));
 	return column;
 }
 function minimizeColumn(column, variables) {
@@ -20970,6 +20970,26 @@ function bitwiseNot(vector) {
 	assertVector(vector);
 	return bitVector(vector.width, vector.bits.map((bit) => !bit));
 }
+/** Divide um barramento MSB → LSB nos widths informados, também MSB → LSB. */
+function splitBus(vector, widths) {
+	assertVector(vector);
+	if (widths.length === 0 || widths.some((width) => !isValidWidth(width))) throw new BitVectorError("O splitter precisa de larguras positivas e inteiras.");
+	const total = widths.reduce((sum, width) => sum + width, 0);
+	if (total !== vector.width) throw new BitVectorError(`O splitter espera ${total} bits, mas recebeu ${vector.width}.`);
+	let offset = 0;
+	return widths.map((width) => {
+		const part = vector.bits.slice(offset, offset + width);
+		offset += width;
+		return bitVector(width, part);
+	});
+}
+/** Concatena partes MSB → LSB em um barramento único. */
+function combineBus(parts) {
+	if (parts.length === 0) throw new BitVectorError("O combiner precisa de pelo menos uma parte.");
+	parts.forEach(assertVector);
+	const bits = parts.flatMap((part) => [...part.bits]);
+	return bitVector(bits.length, bits);
+}
 function parseBusLiteral(literal, width) {
 	const cleaned = literal.trim().replace(/_/g, "");
 	if (!cleaned) throw new BitVectorError("Literal de barramento vazio.");
@@ -21032,7 +21052,8 @@ function group(value, size) {
 //#endregion
 //#region src/simulation/components.ts
 /** Quantas saídas cada tipo de componente tem. */
-function outputCount(type) {
+function outputCount(type, options) {
+	if (type === "splitter") return options?.widths?.length ?? 0;
 	return type === "dff" || type === "tff" ? 2 : 1;
 }
 var FOLDS = {
@@ -21285,6 +21306,8 @@ var EDITOR_COMPONENT_TYPES = [
 	"delay",
 	"transmitter",
 	"receiver",
+	"splitter",
+	"combiner",
 	"custom-chip"
 ];
 var CircuitValidationError = class extends Error {
@@ -21300,13 +21323,15 @@ function editorInputCount(type) {
 	switch (type) {
 		case "input":
 		case "constant":
-		case "clock": return 0;
+		case "clock":
+		case "receiver":
+		case "combiner":
+		case "custom-chip": return 0;
+		case "splitter": return 1;
 		case "not":
 		case "output":
 		case "delay":
 		case "transmitter": return 1;
-		case "receiver":
-		case "custom-chip": return 0;
 		case "and":
 		case "nand":
 		case "or":
@@ -21352,10 +21377,37 @@ function validateCircuit(document, options = {}) {
 			message: `A instância de chip "${node.id}" não encontrou a definição local solicitada.`
 		});
 		const width = circuitNodeWidth(node);
+		if (node.type === "splitter" || node.type === "combiner") {
+			const widths = node.options?.widths ?? [];
+			if (widths.length === 0 || widths.some((part) => !isValidCircuitWidth(part))) issues.push({
+				code: "invalid-width",
+				nodeId: node.id,
+				message: `O ${node.type === "splitter" ? "splitter" : "combiner"} "${node.id}" precisa declarar larguras de portas válidas.`
+			});
+			else {
+				const total = widths.reduce((sum, part) => sum + part, 0);
+				const expected = node.type === "splitter" ? width : total;
+				if (node.type === "combiner" && width !== total) issues.push({
+					code: "width-mismatch",
+					nodeId: node.id,
+					message: `O combiner "${node.id}" soma ${total} bits nas entradas, mas a saída declara ${width} bits.`
+				});
+				if (node.type === "splitter" && total !== expected) issues.push({
+					code: "width-mismatch",
+					nodeId: node.id,
+					message: `O splitter "${node.id}" precisa repartir ${width} bits, mas as saídas somam ${total}.`
+				});
+			}
+		}
 		if (!isValidCircuitWidth(width)) issues.push({
 			code: "invalid-width",
 			nodeId: node.id,
 			message: `A largura do componente "${node.id}" precisa ser um inteiro entre 1 e 64.`
+		});
+		else if ((node.type === "splitter" || node.type === "combiner") && !options.allowBuses) issues.push({
+			code: "unsupported-width",
+			nodeId: node.id,
+			message: `O componente "${node.id}" só pode ser usado no fluxo vetorial de barramentos.`
 		});
 		else if (width !== 1 && (!options.allowBuses || isStatefulEditorType(node.type))) issues.push({
 			code: "unsupported-width",
@@ -21469,18 +21521,22 @@ function validateCircuit(document, options = {}) {
 function nodeInputCount(node, customChips) {
 	if (node.type === "input" && node.options?.customChipBoundary === "internal") return 1;
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs.length ?? 0;
+	if (node.type === "splitter") return 1;
+	if (node.type === "combiner") return node.options?.widths?.length ?? 0;
 	return editorInputCount(node.type);
 }
 function nodeOutputCount(node, customChips) {
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs.length ?? 0;
-	return outputCount(node.type);
+	return outputCount(node.type, node.options);
 }
 function nodeInputWidth(node, port, customChips) {
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.inputs[port]?.width ?? 1;
+	if (node.type === "combiner") return node.options?.widths?.[port] ?? 1;
 	return circuitNodeWidth(node);
 }
 function nodeOutputWidth(node, port, customChips) {
 	if (node.type === "custom-chip") return customChips.get(node.options?.customChipId ?? NaN)?.definition.outputs[port]?.width ?? 1;
+	if (node.type === "splitter") return node.options?.widths?.[port] ?? 1;
 	return circuitNodeWidth(node);
 }
 function circuitNodeWidth(node) {
@@ -21626,6 +21682,7 @@ function evaluateVectorNetlist(netlist, inputs, options, depth = 0) {
 	for (const [id, value] of Object.entries(values)) publicValues[id] = Array.isArray(value) ? value[0] : value;
 	return {
 		values: publicValues,
+		ports: values,
 		outputs,
 		order
 	};
@@ -21670,6 +21727,8 @@ function evaluateVectorComponent(component, componentInputs, inputs, options) {
 		case "xor": return foldVectors(componentInputs, width, bitwiseXor);
 		case "xnor": return bitwiseNot(foldVectors(componentInputs, width, bitwiseXor));
 		case "not": return bitwiseNot(componentInputs[0] ?? bitVector(width, 0));
+		case "splitter": return splitBus(componentInputs[0] ?? bitVector(width, 0), component.options?.widths ?? []);
+		case "combiner": return combineBus(componentInputs);
 		default: throw new Error(`O componente "${component.id}" não é suportado no avaliador vetorial.`);
 	}
 }
@@ -21901,6 +21960,7 @@ function elaborate(document, context, prefix, stack) {
 	for (const node of nativeNodes) idMap.set(node.id, allocateId(context, `${prefix}${node.id}`));
 	const nodes = nativeNodes.map((node) => ({
 		...node,
+		type: prefix && node.type === "input" ? "output" : node.type,
 		id: idMap.get(node.id),
 		position: {
 			x: node.position.x,
@@ -21935,8 +21995,8 @@ function elaborate(document, context, prefix, stack) {
 			connections
 		},
 		boundary: {
-			inputs: normalized.nodes.filter((node) => node.type === "input").map((node) => idMap.get(node.id)),
-			outputs: normalized.nodes.filter((node) => node.type === "output").map((node) => idMap.get(node.id))
+			inputs: normalized.nodes.filter((node) => node.type === "input").sort((left, right) => left.id.localeCompare(right.id)).map((node) => idMap.get(node.id)),
+			outputs: normalized.nodes.filter((node) => node.type === "output").sort((left, right) => left.id.localeCompare(right.id)).map((node) => idMap.get(node.id))
 		}
 	};
 }
@@ -22005,10 +22065,11 @@ function exportVerilog(document, options = {}) {
 	const model = buildExportModel(normalized);
 	const moduleName = sanitizeIdentifier(normalized.name, "veritas_circuit");
 	const ports = [...model.inputs.map((node) => `${verilogDirection(node, "input", model)}`), ...model.outputs.map((node) => `${verilogDirection(node, "output", model)}`)];
-	const declarations = model.internalNodes.map((node) => `  wire${verilogWidth(node)} ${model.names.get(node.id)};`);
+	const declarations = model.internalNodes.flatMap((node) => node.type === "splitter" ? (node.options?.widths ?? []).map((width, index) => `  wire${verilogRange(width)} ${splitterOutputName(node, index, model)};`) : [`  wire${verilogWidth(node)} ${model.names.get(node.id)};`]);
 	const assignments = model.nodes.flatMap((node) => {
 		if (node.type === "output" && node.options?.customChipBoundary !== "internal") return [];
 		if (node.type === "input" && node.options?.customChipBoundary !== "internal") return [];
+		if (node.type === "splitter") return verilogSplitterAssignments(node, model);
 		return [`  assign ${model.names.get(node.id)} = ${verilogExpression(node, model)};`];
 	});
 	const outputAssignments = model.outputs.map((node) => `  assign ${model.names.get(node.id)} = ${sourceExpression(node, model)};`);
@@ -22031,10 +22092,11 @@ function exportVhdl(document, options = {}) {
 	const model = buildExportModel(normalized);
 	const entityName = sanitizeIdentifier(normalized.name, "veritas_circuit");
 	const ports = [...model.inputs.map((node) => `    ${model.names.get(node.id)} : in ${vhdlType(node)}`), ...model.outputs.map((node) => `    ${model.names.get(node.id)} : out ${vhdlType(node)}`)];
-	const declarations = model.internalNodes.map((node) => `  signal ${model.names.get(node.id)} : ${vhdlType(node)};`);
+	const declarations = model.internalNodes.flatMap((node) => node.type === "splitter" ? (node.options?.widths ?? []).map((width, index) => `  signal ${splitterOutputName(node, index, model)} : ${vhdlRangeType(width)};`) : [`  signal ${model.names.get(node.id)} : ${vhdlType(node)};`]);
 	const assignments = model.nodes.flatMap((node) => {
 		if (node.type === "output" && node.options?.customChipBoundary !== "internal") return [];
 		if (node.type === "input" && node.options?.customChipBoundary !== "internal") return [];
+		if (node.type === "splitter") return vhdlSplitterAssignments(node, model);
 		return [`  ${model.names.get(node.id)} <= ${vhdlExpression(node, model)};`];
 	});
 	const outputAssignments = model.outputs.map((node) => `  ${model.names.get(node.id)} <= ${sourceExpression(node, model)};`);
@@ -22104,13 +22166,14 @@ function buildExportModel(document) {
 function sourceExpression(node, model) {
 	const source = model.inputsByNode.get(node.id)?.get(0);
 	if (!source) throw new Error(`Saída ${node.id} sem origem.`);
-	return model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal");
+	return sourceSignalName(source, model);
 }
 function verilogExpression(node, model) {
 	if (node.type === "input" || node.type === "output") return sourceExpression(node, model);
 	if (node.type === "constant") return verilogLiteral(nodeWidth(node), node.options?.value ?? false);
-	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"))[0] ?? verilogLiteral(nodeWidth(node), false);
-	const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"));
+	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => sourceSignalName(source, model))[0] ?? verilogLiteral(nodeWidth(node), false);
+	const operands = operandsFor(node, model).map((source) => sourceSignalName(source, model));
+	if (node.type === "combiner") return `{${operands.join(", ")}}`;
 	if (node.type === "not") return `~${operands[0]}`;
 	const operator = node.type === "and" || node.type === "nand" ? " & " : node.type === "or" || node.type === "nor" ? " | " : " ^ ";
 	const expression = operands.join(operator);
@@ -22119,8 +22182,9 @@ function verilogExpression(node, model) {
 function vhdlExpression(node, model) {
 	if (node.type === "input" || node.type === "output") return sourceExpression(node, model);
 	if (node.type === "constant") return vhdlLiteral(nodeWidth(node), node.options?.value ?? false);
-	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"))[0] ?? vhdlLiteral(nodeWidth(node), false);
-	const operands = operandsFor(node, model).map((source) => model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal"));
+	if (node.type === "transmitter" || node.type === "receiver") return operandsFor(node, model).map((source) => sourceSignalName(source, model))[0] ?? vhdlLiteral(nodeWidth(node), false);
+	const operands = operandsFor(node, model).map((source) => sourceSignalName(source, model));
+	if (node.type === "combiner") return operands.join(" & ");
 	if (node.type === "not") return `not ${operands[0]}`;
 	const operator = node.type === "and" || node.type === "nand" ? " and " : node.type === "or" || node.type === "nor" ? " or " : " xor ";
 	const expression = operands.join(operator);
@@ -22130,11 +22194,15 @@ function verilogDirection(node, direction, model) {
 	return `${direction}${verilogWidth(node)} ${model.names.get(node.id)}`;
 }
 function verilogWidth(node) {
-	const width = nodeWidth(node);
+	return verilogRange(nodeWidth(node));
+}
+function verilogRange(width) {
 	return width === 1 ? "" : ` [${width - 1}:0]`;
 }
 function vhdlType(node) {
-	const width = nodeWidth(node);
+	return vhdlRangeType(nodeWidth(node));
+}
+function vhdlRangeType(width) {
 	return width === 1 ? "std_logic" : `std_logic_vector(${width - 1} downto 0)`;
 }
 function verilogLiteral(width, value) {
@@ -22148,8 +22216,44 @@ function nodeWidth(node) {
 }
 function operandsFor(node, model) {
 	const inputMap = model.inputsByNode.get(node.id);
-	const count = node.type === "receiver" ? 1 : editorInputCount(node.type);
+	const count = node.type === "receiver" || node.type === "splitter" ? 1 : node.type === "combiner" ? node.options?.widths?.length ?? 0 : editorInputCount(node.type);
 	return Array.from({ length: count }, (_, port) => inputMap?.get(port)).filter((source) => Boolean(source));
+}
+function sourceSignalName(source, model) {
+	const base = model.names.get(source.node) ?? sanitizeIdentifier(source.node, "signal");
+	if (model.nodes.find((node) => node.id === source.node)?.type === "splitter") return `${base}_out${(source.port ?? 0) + 1}`;
+	return source.port === void 0 || source.port === 0 ? base : `${base}_out${source.port + 1}`;
+}
+function splitterOutputName(node, index, model) {
+	return `${model.names.get(node.id) ?? sanitizeIdentifier(node.id, "splitter")}_out${index + 1}`;
+}
+function verilogSplitterAssignments(node, model) {
+	const source = model.inputsByNode.get(node.id)?.get(0);
+	if (!source) throw new Error(`Splitter ${node.id} sem origem.`);
+	const widths = node.options?.widths ?? [];
+	const sourceName = sourceSignalName(source, model);
+	let high = nodeWidth(node) - 1;
+	return widths.map((width, index) => {
+		const low = high - width + 1;
+		const range = nodeWidth(node) === 1 ? "" : `[${high}:${low}]`;
+		const assignment = `  assign ${splitterOutputName(node, index, model)} = ${sourceName}${range};`;
+		high = low - 1;
+		return assignment;
+	});
+}
+function vhdlSplitterAssignments(node, model) {
+	const source = model.inputsByNode.get(node.id)?.get(0);
+	if (!source) throw new Error(`Splitter ${node.id} sem origem.`);
+	const widths = node.options?.widths ?? [];
+	const sourceName = sourceSignalName(source, model);
+	let high = nodeWidth(node) - 1;
+	return widths.map((width, index) => {
+		const low = high - width + 1;
+		const range = nodeWidth(node) === 1 ? "" : `(${high} downto ${low})`;
+		const assignment = `  ${splitterOutputName(node, index, model)} <= ${sourceName}${range};`;
+		high = low - 1;
+		return assignment;
+	});
 }
 var NameAllocator = class {
 	used = /* @__PURE__ */ new Set();
@@ -22189,53 +22293,270 @@ function sanitizeIdentifier(value, fallback) {
 	])).has(prefixed.toLowerCase()) ? `v_${prefixed}` : prefixed;
 }
 //#endregion
-//#region src/circuit/customChip.ts
-var CUSTOM_CHIP_FORMAT = "veritas-custom-chip";
-var STATEFUL_TYPES = [
-	"clock",
-	"dff",
-	"tff",
-	"delay"
-];
+//#region src/circuit/portIdentity.ts
 /**
-* Cria uma definição serializável sem mutar o documento original.
-* A execução hierárquica e a instanciação no canvas ficam para CHIP-002.
+* Lê as portas públicas de um documento, em ordem canônica por nome.
+*
+* A ordem é alfabética, e não a de declaração, para que comparações entre dois
+* documentos sejam simétricas: trocar os lados encontra sempre a mesma linha ou
+* o mesmo tique.
 */
-function buildCustomChipDefinition(document, name = document.name) {
-	const normalizedDocument = normalizeCircuitDocument(document);
-	const normalizedName = name.trim() || normalizedDocument.name;
-	if (normalizedName.length === 0) throw new Error("O chip customizado precisa ter um nome não vazio.");
-	if (normalizedName.length > 200) throw new Error(`O nome do chip customizado pode ter no máximo 200 caracteres.`);
-	if (normalizedDocument.nodes.some((node) => node.type === "custom-chip")) throw new Error("Chips customizados desta versão não podem conter outras instâncias de chip.");
-	const issues = validateCircuit(normalizedDocument, { allowBuses: true });
-	if (issues.length > 0) throw new CircuitValidationError(issues);
-	if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) throw new Error("Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF ou delay.");
-	const inputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === "input"));
-	const outputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === "output"));
-	if (inputs.length === 0) throw new Error("O chip customizado precisa ter pelo menos uma entrada.");
-	if (outputs.length === 0) throw new Error("O chip customizado precisa ter pelo menos uma saída.");
-	return {
-		format: CUSTOM_CHIP_FORMAT,
-		version: 1,
-		name: normalizedName,
-		document: normalizedDocument,
-		inputs,
-		outputs
-	};
-}
-function buildPorts(nodes) {
-	const used = /* @__PURE__ */ new Map();
-	return [...nodes].sort((a, b) => a.id.localeCompare(b.id)).map((node) => {
-		const baseName = (node.label?.trim() || node.id).replace(/\s+/g, " ");
-		const key = baseName.toLocaleLowerCase("pt-BR");
-		const occurrence = (used.get(key) ?? 0) + 1;
-		used.set(key, occurrence);
-		return {
-			id: node.id,
-			name: occurrence === 1 ? baseName : `${baseName}_${occurrence}`,
+function collectCircuitPorts(document) {
+	const inputs = [];
+	const outputs = [];
+	const inputIds = /* @__PURE__ */ new Map();
+	const outputIds = /* @__PURE__ */ new Map();
+	const duplicates = [];
+	for (const node of document.nodes) {
+		if (node.type !== "input" && node.type !== "output") continue;
+		const name = circuitPortName(node);
+		const ids = node.type === "input" ? inputIds : outputIds;
+		if (ids.has(name)) {
+			duplicates.push({
+				name,
+				direction: node.type
+			});
+			continue;
+		}
+		ids.set(name, node.id);
+		const port = {
+			name,
 			width: node.options?.width ?? 1
 		};
+		if (node.type === "input") inputs.push(port);
+		else outputs.push(port);
+	}
+	inputs.sort(comparePorts);
+	outputs.sort(comparePorts);
+	return {
+		inputs,
+		outputs,
+		inputIds,
+		outputIds,
+		duplicates
+	};
+}
+/** Nome público de um nó: o rótulo, ou o ID quando não houver rótulo. */
+function circuitPortName(node) {
+	const label = node.label?.trim();
+	return label && label.length > 0 ? label : node.id;
+}
+/** Mensagem única para o caso de rótulo duplicado, usada por todas as ferramentas. */
+function duplicatePortMessage(duplicate, side) {
+	const kind = duplicate.direction === "input" ? "entrada" : "saída";
+	return `${side ? `O circuito ${side} tem` : "O circuito tem"} mais de uma ${kind} chamada "${duplicate.name}". A verificação usa o rótulo como identidade, então os nomes precisam ser únicos.`;
+}
+/** Comparação estável e independente de locale, para manter a ordem determinística. */
+function compareCircuitText(a, b) {
+	return a < b ? -1 : a > b ? 1 : 0;
+}
+function comparePorts(a, b) {
+	return compareCircuitText(a.name, b.name);
+}
+/**
+* Compara dois circuitos combinacionais por comportamento, não por estrutura.
+*
+* A identidade das portas é o rótulo visual (ou o ID, quando não houver
+* rótulo): dois circuitos escritos de formas diferentes são equivalentes se
+* concordarem em todas as combinações de entrada. Quando divergem, o relatório
+* devolve a primeira linha divergente na ordem canônica — o contraexemplo é o
+* produto mais útil da verificação, e é determinístico.
+*
+* A ordem canônica é alfabética por nome de porta, e não a ordem de declaração,
+* para que `compare(a, b)` e `compare(b, a)` encontrem sempre a mesma linha.
+*/
+function compareCircuitEquivalence(a, b, options = {}) {
+	const chipsA = options.customChipsA ?? options.customChips;
+	const chipsB = options.customChipsB ?? options.customChips;
+	const normalizedA = normalizeCircuitDocument(a);
+	const normalizedB = normalizeCircuitDocument(b);
+	const netlistA = buildNetlist(normalizedA, chipsA, "A");
+	const netlistB = buildNetlist(normalizedB, chipsB, "B");
+	const sequential = collectSequentialIssue(normalizedA, normalizedB);
+	if (sequential) return incomparable$1([sequential]);
+	const portsA = collectPorts$1(normalizedA, "A");
+	const portsB = collectPorts$1(normalizedB, "B");
+	const nameIssues = [...portsA.issues, ...portsB.issues];
+	if (nameIssues.length > 0) return incomparable$1(nameIssues);
+	if (portsA.outputs.length === 0 || portsB.outputs.length === 0) return incomparable$1([{
+		code: "missing-output",
+		message: "Os dois circuitos precisam ter pelo menos uma saída para serem comparados."
+	}]);
+	const interfaceIssues = [...compareNameSets$1("input-set-mismatch", "entrada", portsA.inputs, portsB.inputs), ...compareNameSets$1("output-set-mismatch", "saída", portsA.outputs, portsB.outputs)];
+	if (interfaceIssues.length > 0) return incomparable$1(interfaceIssues);
+	const widthIssues = [...compareWidths("entrada", portsA.inputs, portsB.inputs), ...compareWidths("saída", portsA.outputs, portsB.outputs)];
+	if (widthIssues.length > 0) return incomparable$1(widthIssues);
+	const inputs = portsA.inputs.map((port) => ({
+		name: port.name,
+		width: port.width
+	}));
+	const outputs = portsA.outputs.map((port) => ({
+		name: port.name,
+		width: port.width
+	}));
+	const totalInputBits = inputs.reduce((total, port) => total + port.width, 0);
+	const maxInputBits = Math.max(1, Math.min(options.maxInputBits ?? 12, 16));
+	if (totalInputBits > maxInputBits) return incomparable$1([{
+		code: "input-bits-exceeded",
+		message: `A comparação exaustiva exigiria ${totalInputBits} bits de entrada; o limite desta execução é ${maxInputBits}. Uma comparação parcial não prova equivalência, então nenhuma linha foi avaliada.`
+	}], {
+		inputs,
+		outputs,
+		totalRows: 2 ** totalInputBits
 	});
+	const totalRows = 2 ** totalInputBits;
+	const divergentOutputs = /* @__PURE__ */ new Set();
+	let divergentRows = 0;
+	let counterexample = null;
+	for (let row = 0; row < totalRows; row += 1) {
+		const values = rowValues(inputs, row, totalInputBits);
+		const resultA = evaluateVectorNetlist(netlistA, assignmentFor(inputs, values, portsA.inputIds), { customChips: chipsA });
+		const resultB = evaluateVectorNetlist(netlistB, assignmentFor(inputs, values, portsB.inputIds), { customChips: chipsB });
+		const divergences = [];
+		for (const output of outputs) {
+			const valueA = readOutput(resultA.outputs, portsA.outputIds.get(output.name), output.width);
+			const valueB = readOutput(resultB.outputs, portsB.outputIds.get(output.name), output.width);
+			if (valueA !== valueB) {
+				divergences.push({
+					output: output.name,
+					width: output.width,
+					a: valueA,
+					b: valueB
+				});
+				divergentOutputs.add(output.name);
+			}
+		}
+		if (divergences.length > 0) {
+			divergentRows += 1;
+			counterexample ??= {
+				row,
+				inputs: inputs.map((port, index) => ({
+					name: port.name,
+					width: port.width,
+					value: toBinary(values[index])
+				})),
+				divergences
+			};
+		}
+	}
+	return {
+		status: divergentRows > 0 ? "divergent" : "equivalent",
+		equivalent: divergentRows === 0,
+		exhaustive: true,
+		inputs,
+		outputs,
+		totalRows,
+		comparedRows: totalRows,
+		divergentRows,
+		divergentOutputs: outputs.map((port) => port.name).filter((name) => divergentOutputs.has(name)),
+		counterexample,
+		issues: []
+	};
+}
+function buildNetlist(document, customChips, side) {
+	try {
+		return toNetlist(document, {
+			allowBuses: true,
+			customChips
+		});
+	} catch (error) {
+		const detail = error instanceof CircuitValidationError ? error.issues[0]?.message ?? error.message : error instanceof Error ? error.message : "motivo desconhecido";
+		throw new Error(`Circuito ${side} inválido: ${detail}`);
+	}
+}
+function collectSequentialIssue(a, b) {
+	const inA = statefulTypes(a);
+	const inB = statefulTypes(b);
+	if (inA.length === 0 && inB.length === 0) return null;
+	const parts = [];
+	if (inA.length > 0) parts.push(`A usa ${inA.join(", ")}`);
+	if (inB.length > 0) parts.push(`B usa ${inB.join(", ")}`);
+	return {
+		code: "sequential-unsupported",
+		message: `A equivalência exaustiva cobre apenas circuitos combinacionais; ${parts.join(" e ")}. Componentes com estado dependem do histórico e exigem comparação temporal.`,
+		onlyInA: inA.length > 0 ? inA : void 0,
+		onlyInB: inB.length > 0 ? inB : void 0
+	};
+}
+function statefulTypes(document) {
+	const found = /* @__PURE__ */ new Set();
+	for (const node of document.nodes) if (isStatefulEditorType(node.type)) found.add(node.type);
+	return [...found].sort(compareCircuitText);
+}
+function collectPorts$1(document, side) {
+	const identity = collectCircuitPorts(document);
+	return {
+		inputs: identity.inputs,
+		outputs: identity.outputs,
+		inputIds: identity.inputIds,
+		outputIds: identity.outputIds,
+		issues: identity.duplicates.map((duplicate) => ({
+			code: "duplicate-port-name",
+			message: duplicatePortMessage(duplicate, side)
+		}))
+	};
+}
+function compareNameSets$1(code, kind, a, b) {
+	const namesA = new Set(a.map((port) => port.name));
+	const namesB = new Set(b.map((port) => port.name));
+	const onlyInA = [...namesA].filter((name) => !namesB.has(name)).sort(compareCircuitText);
+	const onlyInB = [...namesB].filter((name) => !namesA.has(name)).sort(compareCircuitText);
+	if (onlyInA.length === 0 && onlyInB.length === 0) return [];
+	const parts = [];
+	if (onlyInA.length > 0) parts.push(`só em A: ${onlyInA.join(", ")}`);
+	if (onlyInB.length > 0) parts.push(`só em B: ${onlyInB.join(", ")}`);
+	return [{
+		code,
+		message: `Os circuitos não expõem a mesma interface de ${kind} (${parts.join("; ")}).`,
+		onlyInA: onlyInA.length > 0 ? onlyInA : void 0,
+		onlyInB: onlyInB.length > 0 ? onlyInB : void 0
+	}];
+}
+function compareWidths(kind, a, b) {
+	const widthsB = new Map(b.map((port) => [port.name, port.width]));
+	const divergent = a.filter((port) => widthsB.get(port.name) !== port.width).map((port) => `${port.name} (A=${port.width}, B=${widthsB.get(port.name)})`);
+	if (divergent.length === 0) return [];
+	return [{
+		code: "width-mismatch",
+		message: `As larguras de ${kind} não coincidem: ${divergent.join("; ")}.`
+	}];
+}
+function rowValues(inputs, row, totalBits) {
+	const values = [];
+	let consumed = 0;
+	for (const port of inputs) {
+		const shift = totalBits - consumed - port.width;
+		const mask = (1n << BigInt(port.width)) - 1n;
+		values.push(bitVector(port.width, BigInt(row) >> BigInt(Math.max(0, shift)) & mask));
+		consumed += port.width;
+	}
+	return values;
+}
+function assignmentFor(inputs, values, ids) {
+	const assignment = {};
+	inputs.forEach((port, index) => {
+		const id = ids.get(port.name);
+		if (id) assignment[id] = values[index];
+	});
+	return assignment;
+}
+function readOutput(outputs, id, width) {
+	return toBinary((id ? outputs[id] : void 0) ?? bitVector(width, 0));
+}
+function incomparable$1(issues, partial = {}) {
+	return {
+		status: "incomparable",
+		equivalent: false,
+		exhaustive: false,
+		inputs: partial.inputs ?? [],
+		outputs: partial.outputs ?? [],
+		totalRows: partial.totalRows ?? 0,
+		comparedRows: 0,
+		divergentRows: 0,
+		divergentOutputs: [],
+		counterexample: null,
+		issues
+	};
 }
 /**
 * Simulador de circuitos por tiques.
@@ -22262,7 +22583,7 @@ var Simulator = class {
 			const target = this.nodes.get(input.node);
 			if (!target) throw new Error(`O componente "${spec.id}" está ligado em "${input.node}", que não existe.`);
 			const port = input.port ?? 0;
-			if (port >= outputCount(target.spec.type)) throw new Error(`"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`);
+			if (port >= outputCount(target.spec.type, target.spec.options)) throw new Error(`"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`);
 		}
 	}
 	/** Quantos tiques já rodaram desde o início ou o último reset. */
@@ -22419,6 +22740,8 @@ var Simulator = class {
 				node.next[1] = !stored;
 				return;
 			}
+			case "splitter":
+			case "combiner": throw new Error(`O componente "${node.spec.id}" exige o runtime vetorial de barramentos.`);
 			case "delay": {
 				const incoming = values[0] ?? false;
 				const extra = Math.max(1, options?.ticks ?? 1) - 1;
@@ -22455,7 +22778,7 @@ function isBooleanArray(values) {
 	return values.every((value) => typeof value === "boolean");
 }
 function createState(spec) {
-	const size = outputCount(spec.type);
+	const size = outputCount(spec.type, spec.options);
 	const initial = spec.options?.initial ?? false;
 	const value = spec.type === "constant" ? spec.options?.value ?? false : initial;
 	const outputs = new Array(size).fill(false);
@@ -22474,6 +22797,501 @@ function createState(spec) {
 		counter: 0,
 		nextCounter: 0
 	};
+}
+//#endregion
+//#region src/simulation/documentRuntime.ts
+function createDocumentRuntime(document, options = {}) {
+	const runtimeDocument = applyClockPeriods(document, options.clockPeriods);
+	const simulator = new Simulator(toNetlist(runtimeDocument.nodes.some((node) => node.type === "custom-chip") ? elaborateCustomChipDocument(runtimeDocument, { customChips: options.customChips }) : runtimeDocument));
+	for (const node of runtimeDocument.nodes) if (node.type === "input" && node.options?.initial !== void 0) simulator.setInput(node.id, node.options.initial);
+	return simulator;
+}
+function applyClockPeriods(document, clockPeriods) {
+	if (!clockPeriods) return document;
+	return {
+		...document,
+		nodes: document.nodes.map((node) => {
+			const period = clockPeriods[node.id];
+			if (node.type !== "clock" || period === void 0) return node;
+			return {
+				...node,
+				options: {
+					...node.options,
+					period: Math.max(1, Math.min(64, Math.floor(period)))
+				}
+			};
+		})
+	};
+}
+//#endregion
+//#region src/circuit/differential.ts
+/**
+* Teto de tiques de uma comparação temporal.
+*
+* O limite existe para que um roteiro mal formado não prenda a interface. Ele
+* não é uma medida de qualidade: um roteiro curto que encontra a divergência
+* vale mais que um longo que não encontra nada.
+*/
+var MAX_DIFFERENTIAL_TICKS = 1e3;
+/**
+* Roda a mesma sequência de entradas em dois circuitos e aponta o primeiro
+* tique em que eles discordam.
+*
+* É a contraparte temporal de `compareCircuitEquivalence`: cobre exatamente a
+* classe que aquela recusa — circuitos com clock, flip-flops e atrasos, cuja
+* saída depende do histórico.
+*
+* A diferença de força entre as duas é deliberada e aparece no vocabulário do
+* relatório. A equivalência percorre **todo** o espaço de entrada e por isso
+* pode dizer `equivalent`. Aqui só existe o roteiro que o autor escreveu, então
+* o melhor resultado possível é `identical` — "concordaram neste roteiro".
+* Nenhum roteiro que termina sem divergência prova que não existe uma.
+*/
+function compareCircuitTimelines(a, b, script, options = {}) {
+	const normalizedA = normalizeCircuitDocument(a);
+	const normalizedB = normalizeCircuitDocument(b);
+	const portsA = collectPorts(normalizedA, "A");
+	const portsB = collectPorts(normalizedB, "B");
+	const nameIssues = [...portsA.issues, ...portsB.issues];
+	if (nameIssues.length > 0) return incomparable(nameIssues);
+	if (portsA.outputs.length === 0 || portsB.outputs.length === 0) return incomparable([{
+		code: "missing-output",
+		message: "Os dois circuitos precisam ter pelo menos uma saída para serem comparados."
+	}]);
+	const interfaceIssues = [...compareNameSets("input-set-mismatch", "entrada", portsA.inputs, portsB.inputs), ...compareNameSets("output-set-mismatch", "saída", portsA.outputs, portsB.outputs)];
+	if (interfaceIssues.length > 0) return incomparable(interfaceIssues);
+	const inputs = [...portsA.inputs].sort(compareCircuitText);
+	const outputs = [...portsA.outputs].sort(compareCircuitText);
+	if (script.length === 0) return incomparable([{
+		code: "empty-script",
+		message: "O roteiro precisa ter pelo menos um passo."
+	}], {
+		inputs,
+		outputs
+	});
+	const unknown = /* @__PURE__ */ new Set();
+	let totalTicks = 0;
+	for (const step of script) {
+		totalTicks += normalizeTicks$1(step.ticks);
+		for (const name of Object.keys(step.set ?? {})) if (!portsA.inputIds.has(name)) unknown.add(name);
+	}
+	if (unknown.size > 0) return incomparable([{
+		code: "unknown-input",
+		message: `O roteiro aplica valores em entradas que não existem nos circuitos: ${[...unknown].sort(compareCircuitText).join(", ")}.`
+	}], {
+		inputs,
+		outputs,
+		totalTicks
+	});
+	const maxTicks = Math.max(1, Math.min(options.maxTicks ?? 1e3, MAX_DIFFERENTIAL_TICKS));
+	if (totalTicks > maxTicks) return incomparable([{
+		code: "ticks-exceeded",
+		message: `O roteiro pede ${totalTicks} tiques; o limite desta execução é ${maxTicks}. Nenhum tique foi simulado.`
+	}], {
+		inputs,
+		outputs,
+		totalTicks
+	});
+	const runtimeA = buildRuntime$1(normalizedA, "A", options);
+	const runtimeB = buildRuntime$1(normalizedB, "B", options);
+	const applied = /* @__PURE__ */ new Map();
+	for (const node of normalizedA.nodes) if (node.type === "input" && node.options?.initial !== void 0) applied.set(circuitPortName(node), node.options.initial);
+	const divergentOutputs = /* @__PURE__ */ new Set();
+	let divergentTicks = 0;
+	let comparedTicks = 0;
+	let firstDivergence = null;
+	script.forEach((step, stepIndex) => {
+		for (const [name, value] of Object.entries(step.set ?? {})) {
+			applied.set(name, value);
+			runtimeA.setInput(portsA.inputIds.get(name), value);
+			runtimeB.setInput(portsB.inputIds.get(name), value);
+		}
+		const ticks = normalizeTicks$1(step.ticks);
+		for (let index = 0; index < ticks; index += 1) {
+			runtimeA.tick();
+			runtimeB.tick();
+			comparedTicks += 1;
+			const signals = [];
+			for (const output of outputs) {
+				const valueA = runtimeA.read(portsA.outputIds.get(output));
+				const valueB = runtimeB.read(portsB.outputIds.get(output));
+				if (valueA !== valueB) {
+					signals.push({
+						signal: output,
+						a: valueA,
+						b: valueB
+					});
+					divergentOutputs.add(output);
+				}
+			}
+			if (signals.length > 0) {
+				divergentTicks += 1;
+				firstDivergence ??= {
+					tick: runtimeA.tickCount,
+					step: stepIndex,
+					inputs: inputs.map((name) => ({
+						name,
+						value: applied.get(name) ?? false
+					})),
+					signals
+				};
+			}
+		}
+	});
+	return {
+		status: divergentTicks > 0 ? "divergent" : "identical",
+		identical: divergentTicks === 0,
+		inputs,
+		outputs,
+		totalTicks,
+		comparedTicks,
+		divergentTicks,
+		divergentOutputs: outputs.filter((name) => divergentOutputs.has(name)),
+		firstDivergence,
+		issues: []
+	};
+}
+function buildRuntime$1(document, side, options) {
+	try {
+		return createDocumentRuntime(document, { customChips: options.customChips });
+	} catch (error) {
+		const detail = error instanceof CircuitValidationError ? error.issues[0]?.message ?? error.message : error instanceof Error ? error.message : "motivo desconhecido";
+		throw new Error(`Circuito ${side} inválido: ${detail}`);
+	}
+}
+function normalizeTicks$1(ticks) {
+	if (ticks === void 0) return 1;
+	if (!Number.isFinite(ticks)) return 1;
+	return Math.max(1, Math.floor(ticks));
+}
+function collectPorts(document, side) {
+	const identity = collectCircuitPorts(document);
+	return {
+		inputs: identity.inputs.map((port) => port.name),
+		outputs: identity.outputs.map((port) => port.name),
+		inputIds: identity.inputIds,
+		outputIds: identity.outputIds,
+		issues: identity.duplicates.map((duplicate) => ({
+			code: "duplicate-port-name",
+			message: duplicatePortMessage(duplicate, side)
+		}))
+	};
+}
+function compareNameSets(code, kind, a, b) {
+	const namesA = new Set(a);
+	const namesB = new Set(b);
+	const onlyInA = [...namesA].filter((name) => !namesB.has(name)).sort(compareCircuitText);
+	const onlyInB = [...namesB].filter((name) => !namesA.has(name)).sort(compareCircuitText);
+	if (onlyInA.length === 0 && onlyInB.length === 0) return [];
+	const parts = [];
+	if (onlyInA.length > 0) parts.push(`só em A: ${onlyInA.join(", ")}`);
+	if (onlyInB.length > 0) parts.push(`só em B: ${onlyInB.join(", ")}`);
+	return [{
+		code,
+		message: `Os circuitos não expõem a mesma interface de ${kind} (${parts.join("; ")}).`,
+		onlyInA: onlyInA.length > 0 ? onlyInA : void 0,
+		onlyInB: onlyInB.length > 0 ? onlyInB : void 0
+	}];
+}
+function incomparable(issues, partial = {}) {
+	return {
+		status: "incomparable",
+		identical: false,
+		inputs: partial.inputs ?? [],
+		outputs: partial.outputs ?? [],
+		totalTicks: partial.totalTicks ?? 0,
+		comparedTicks: 0,
+		divergentTicks: 0,
+		divergentOutputs: [],
+		firstDivergence: null,
+		issues
+	};
+}
+//#endregion
+//#region src/circuit/testbench.ts
+var TESTBENCH_FORMAT = "veritas-testbench";
+/** Teto de tiques somados em todos os casos sequenciais. */
+var MAX_TESTBENCH_TICKS = 1e3;
+/**
+* Roda um documento de teste contra um circuito.
+*
+* O testbench é **dado, não código**: um conjunto de vetores e expectativas.
+* Nenhuma expressão do usuário é avaliada, nada é compilado e nada é executado
+* fora do avaliador do próprio Veritas — a fronteira de segurança do formato
+* `.veritas` vale igual aqui.
+*
+* Todos os casos rodam, mesmo depois do primeiro que falha: o produto útil de
+* um testbench é saber **quantos e quais** falharam, não parar no primeiro.
+*/
+function runTestbench(document, testbench, options = {}) {
+	const normalized = normalizeCircuitDocument(document);
+	const identity = collectCircuitPorts(normalized);
+	if (identity.duplicates.length > 0) return invalid(identity.duplicates.map((duplicate) => ({
+		code: "duplicate-port-name",
+		message: duplicatePortMessage(duplicate)
+	})));
+	const shapeIssues = validateTestbenchShape(testbench);
+	if (shapeIssues.length > 0) return invalid(shapeIssues);
+	const referenceIssues = validateReferences(testbench, identity.inputIds, identity.outputIds);
+	if (referenceIssues.length > 0) return invalid(referenceIssues);
+	const results = [];
+	for (const [index, testCase] of testbench.cases.entries()) results.push(testCase.steps ? runSequentialCase(normalized, testCase, index, identity, options) : runCombinationalCase(normalized, testCase, index, identity, options));
+	const passed = results.filter((result) => result.status === "passed").length;
+	return {
+		status: passed === results.length ? "passed" : "failed",
+		total: results.length,
+		passed,
+		failed: results.length - passed,
+		cases: results,
+		issues: []
+	};
+}
+function runCombinationalCase(document, testCase, index, identity, options) {
+	const inputs = {};
+	for (const [name, value] of Object.entries(testCase.inputs ?? {})) inputs[identity.inputIds.get(name)] = value;
+	const evaluation = evaluate(document, inputs, options);
+	const mismatches = [];
+	for (const output of sortedNames(testCase.expect ?? {})) {
+		const expected = testCase.expect[output];
+		const actual = evaluation.outputs[identity.outputIds.get(output)] ?? false;
+		if (actual !== expected) mismatches.push({
+			output,
+			expected,
+			actual
+		});
+	}
+	return {
+		index,
+		name: caseName(testCase, index),
+		mode: "combinational",
+		status: mismatches.length === 0 ? "passed" : "failed",
+		mismatches
+	};
+}
+function runSequentialCase(document, testCase, index, identity, options) {
+	const runtime = buildRuntime(document, options);
+	const mismatches = [];
+	(testCase.steps ?? []).forEach((step, stepIndex) => {
+		for (const [name, value] of Object.entries(step.set ?? {})) runtime.setInput(identity.inputIds.get(name), value);
+		runtime.tick(normalizeTicks(step.ticks));
+		for (const output of sortedNames(step.expect ?? {})) {
+			const expected = step.expect[output];
+			const actual = runtime.read(identity.outputIds.get(output));
+			if (actual !== expected) mismatches.push({
+				output,
+				expected,
+				actual,
+				tick: runtime.tickCount,
+				step: stepIndex
+			});
+		}
+	});
+	return {
+		index,
+		name: caseName(testCase, index),
+		mode: "sequential",
+		status: mismatches.length === 0 ? "passed" : "failed",
+		mismatches
+	};
+}
+function evaluate(document, inputs, options) {
+	try {
+		return evaluateCircuit(document, inputs, { customChips: options.customChips });
+	} catch (error) {
+		throw new Error(`Circuito inválido: ${describe(error)}`);
+	}
+}
+function buildRuntime(document, options) {
+	try {
+		return createDocumentRuntime(document, { customChips: options.customChips });
+	} catch (error) {
+		throw new Error(`Circuito inválido: ${describe(error)}`);
+	}
+}
+function describe(error) {
+	if (error instanceof CircuitValidationError) return error.issues[0]?.message ?? error.message;
+	return error instanceof Error ? error.message : "motivo desconhecido";
+}
+function validateTestbenchShape(testbench) {
+	if (testbench?.format !== "veritas-testbench" || testbench.version !== 1 || !Array.isArray(testbench.cases)) return [{
+		code: "invalid-document",
+		message: `O documento de teste precisa ser um ${TESTBENCH_FORMAT} versão 1 com uma lista de casos.`
+	}];
+	if (testbench.cases.length === 0) return [{
+		code: "empty-cases",
+		message: "O documento de teste precisa ter pelo menos um caso."
+	}];
+	if (testbench.cases.length > 512) return [{
+		code: "cases-exceeded",
+		message: `O documento tem ${testbench.cases.length} casos; o limite é 512.`
+	}];
+	const issues = [];
+	let totalTicks = 0;
+	for (const [index, testCase] of testbench.cases.entries()) {
+		const hasSteps = Array.isArray(testCase.steps);
+		const hasVector = testCase.inputs !== void 0 || testCase.expect !== void 0;
+		if (hasSteps && hasVector) {
+			issues.push({
+				code: "mixed-case-mode",
+				caseIndex: index,
+				message: `O caso ${caseName(testCase, index)} usa "steps" e também "inputs"/"expect". Um caso é combinacional ou sequencial, nunca os dois.`
+			});
+			continue;
+		}
+		if (hasSteps) {
+			const steps = testCase.steps ?? [];
+			if (steps.length === 0) {
+				issues.push({
+					code: "missing-expectation",
+					caseIndex: index,
+					message: `O caso sequencial ${caseName(testCase, index)} não tem nenhum passo.`
+				});
+				continue;
+			}
+			if (!steps.some((step) => step.expect && Object.keys(step.expect).length > 0)) {
+				issues.push({
+					code: "missing-expectation",
+					caseIndex: index,
+					message: `O caso sequencial ${caseName(testCase, index)} não confere nenhuma saída. Um caso sem expectativa não pode falhar, então não testa nada.`
+				});
+				continue;
+			}
+			for (const step of steps) totalTicks += normalizeTicks(step.ticks);
+			continue;
+		}
+		if (!testCase.expect || Object.keys(testCase.expect).length === 0) issues.push({
+			code: "missing-expectation",
+			caseIndex: index,
+			message: `O caso ${caseName(testCase, index)} não declara nenhuma saída esperada. Um caso sem expectativa não pode falhar, então não testa nada.`
+		});
+	}
+	if (totalTicks > 1e3) issues.push({
+		code: "ticks-exceeded",
+		message: `Os casos sequenciais somam ${totalTicks} tiques; o limite é ${MAX_TESTBENCH_TICKS}. Nenhum caso foi executado.`
+	});
+	return issues;
+}
+function validateReferences(testbench, inputIds, outputIds) {
+	const unknownInputs = /* @__PURE__ */ new Set();
+	const unknownOutputs = /* @__PURE__ */ new Set();
+	const checkInputs = (record) => {
+		for (const name of Object.keys(record ?? {})) if (!inputIds.has(name)) unknownInputs.add(name);
+	};
+	const checkOutputs = (record) => {
+		for (const name of Object.keys(record ?? {})) if (!outputIds.has(name)) unknownOutputs.add(name);
+	};
+	for (const testCase of testbench.cases) {
+		checkInputs(testCase.inputs);
+		checkOutputs(testCase.expect);
+		for (const step of testCase.steps ?? []) {
+			checkInputs(step.set);
+			checkOutputs(step.expect);
+		}
+	}
+	const issues = [];
+	if (unknownInputs.size > 0) issues.push({
+		code: "unknown-input",
+		message: `O teste usa entradas que não existem no circuito: ${[...unknownInputs].sort(compareCircuitText).join(", ")}.`
+	});
+	if (unknownOutputs.size > 0) issues.push({
+		code: "unknown-output",
+		message: `O teste espera saídas que não existem no circuito: ${[...unknownOutputs].sort(compareCircuitText).join(", ")}.`
+	});
+	return issues;
+}
+function sortedNames(record) {
+	return Object.keys(record).sort(compareCircuitText);
+}
+function caseName(testCase, index) {
+	const name = testCase.name?.trim();
+	return name && name.length > 0 ? name : `#${index + 1}`;
+}
+function normalizeTicks(ticks) {
+	if (ticks === void 0 || !Number.isFinite(ticks)) return 1;
+	return Math.max(1, Math.floor(ticks));
+}
+function invalid(issues) {
+	return {
+		status: "invalid",
+		total: 0,
+		passed: 0,
+		failed: 0,
+		cases: [],
+		issues
+	};
+}
+//#endregion
+//#region src/circuit/customChip.ts
+var CUSTOM_CHIP_FORMAT = "veritas-custom-chip";
+var STATEFUL_TYPES = [
+	"clock",
+	"dff",
+	"tff",
+	"delay"
+];
+var DEFAULT_MAX_CUSTOM_CHIP_DEPTH = 8;
+/**
+* Cria uma definição serializável sem mutar o documento original.
+* Instâncias de chips existentes podem ser compostas, desde que a biblioteca
+* fornecida resolva toda a cadeia sem ciclos ou profundidade insegura.
+*/
+function buildCustomChipDefinition(document, name = document.name, options = {}) {
+	const normalizedDocument = normalizeCircuitDocument(document);
+	const normalizedName = name.trim() || normalizedDocument.name;
+	if (normalizedName.length === 0) throw new Error("O chip customizado precisa ter um nome não vazio.");
+	if (normalizedName.length > 200) throw new Error(`O nome do chip customizado pode ter no máximo 200 caracteres.`);
+	const issues = validateCircuit(normalizedDocument, {
+		allowBuses: true,
+		customChips: options.customChips
+	});
+	if (issues.length > 0) throw new CircuitValidationError(issues);
+	if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) throw new Error("Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF ou delay.");
+	validateNestedDefinitions(normalizedDocument, options.customChips ?? [], options.maxDepth ?? DEFAULT_MAX_CUSTOM_CHIP_DEPTH);
+	const inputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === "input"));
+	const outputs = buildPorts(normalizedDocument.nodes.filter((node) => node.type === "output"));
+	if (inputs.length === 0) throw new Error("O chip customizado precisa ter pelo menos uma entrada.");
+	if (outputs.length === 0) throw new Error("O chip customizado precisa ter pelo menos uma saída.");
+	return {
+		format: CUSTOM_CHIP_FORMAT,
+		version: 1,
+		name: normalizedName,
+		document: normalizedDocument,
+		inputs,
+		outputs
+	};
+}
+function validateNestedDefinitions(document, customChips, maxDepth, stack = [], depth = 0) {
+	if (!Number.isInteger(maxDepth) || maxDepth < 1) throw new Error("O limite de profundidade da hierarquia precisa ser um inteiro positivo.");
+	const definitions = new Map(customChips.map((entry) => [entry.id, entry]));
+	for (const node of document.nodes) {
+		if (node.type !== "custom-chip") continue;
+		const id = node.options?.customChipId;
+		const entry = definitions.get(id ?? NaN);
+		if (!entry) continue;
+		if (stack.includes(entry.id)) throw new Error(`A definição do chip "${entry.definition.name}" contém uma referência recursiva.`);
+		if (depth >= maxDepth) throw new Error(`A hierarquia de chips excede o limite seguro de ${maxDepth} níveis.`);
+		const childIssues = validateCircuit(entry.definition.document, {
+			allowBuses: true,
+			customChips
+		});
+		if (childIssues.length > 0) throw new CircuitValidationError(childIssues);
+		if (entry.definition.document.nodes.some((child) => STATEFUL_TYPES.includes(child.type))) throw new Error("Chips customizados desta versão precisam ser combinacionais; remova os componentes sequenciais.");
+		validateNestedDefinitions(entry.definition.document, customChips, maxDepth, [...stack, entry.id], depth + 1);
+	}
+}
+function buildPorts(nodes) {
+	const used = /* @__PURE__ */ new Map();
+	return [...nodes].sort((a, b) => a.id.localeCompare(b.id)).map((node) => {
+		const baseName = (node.label?.trim() || node.id).replace(/\s+/g, " ");
+		const key = baseName.toLocaleLowerCase("pt-BR");
+		const occurrence = (used.get(key) ?? 0) + 1;
+		used.set(key, occurrence);
+		return {
+			id: node.id,
+			name: occurrence === 1 ? baseName : `${baseName}_${occurrence}`,
+			width: node.options?.width ?? 1
+		};
+	});
 }
 //#endregion
 //#region src/algorithms/model.ts
@@ -23475,6 +24293,149 @@ function circuitVectorTruthTable(query) {
 function vectorColumnLabel(label, width) {
 	return width > 1 ? `${label}[${width - 1}:0]` : label;
 }
+function circuitEquivalence(query) {
+	try {
+		if (!isCircuitDocumentShape(query.documentA)) return {
+			isError: true,
+			text: "O documento A não possui o formato veritas-circuit esperado."
+		};
+		if (!isCircuitDocumentShape(query.documentB)) return {
+			isError: true,
+			text: "O documento B não possui o formato veritas-circuit esperado."
+		};
+		return { text: formatEquivalenceReport(compareCircuitEquivalence(query.documentA, query.documentB, {
+			customChipsA: normalizeCustomChipLibrary(query.customChipsA),
+			customChipsB: normalizeCustomChipLibrary(query.customChipsB),
+			maxInputBits: query.maxInputBits
+		})) };
+	} catch (error) {
+		return {
+			isError: true,
+			text: error instanceof Error ? error.message : "Falha ao comparar os circuitos."
+		};
+	}
+}
+function formatEquivalenceReport(report) {
+	if (report.status === "incomparable") return [
+		"Resultado: não comparável",
+		"",
+		...report.issues.map((issue) => `- [${issue.code}] ${issue.message}`),
+		"",
+		"Nenhuma linha foi avaliada; este resultado não afirma nem nega equivalência."
+	].join("\n");
+	const interfaceLine = (ports) => ports.map((port) => port.width > 1 ? `${port.name}[${port.width - 1}:0]` : port.name).join(", ");
+	const lines = [
+		report.status === "equivalent" ? "Resultado: equivalente" : "Resultado: não equivalente",
+		"",
+		`Entradas: ${interfaceLine(report.inputs)}`,
+		`Saídas: ${interfaceLine(report.outputs)}`,
+		`Linhas comparadas: ${report.comparedRows} de ${report.totalRows} (comparação exaustiva)`
+	];
+	if (report.status === "equivalent") {
+		lines.push("", "Os dois circuitos concordam em todas as combinações de entrada.");
+		return lines.join("\n");
+	}
+	const counterexample = report.counterexample;
+	lines.push(`Linhas divergentes: ${report.divergentRows}`);
+	lines.push(`Saídas divergentes: ${report.divergentOutputs.join(", ")}`);
+	if (counterexample) {
+		lines.push("", `Contraexemplo (linha ${counterexample.row}):`);
+		lines.push("", "| Entrada | Valor |", "| --- | --- |");
+		for (const input of counterexample.inputs) lines.push(`| ${input.name} | ${input.value} |`);
+		lines.push("", "| Saída | A | B |", "| --- | --- | --- |");
+		for (const divergence of counterexample.divergences) lines.push(`| ${divergence.output} | ${divergence.a} | ${divergence.b} |`);
+	}
+	return lines.join("\n");
+}
+function circuitDifferential(query) {
+	try {
+		if (!isCircuitDocumentShape(query.documentA)) return {
+			isError: true,
+			text: "O documento A não possui o formato veritas-circuit esperado."
+		};
+		if (!isCircuitDocumentShape(query.documentB)) return {
+			isError: true,
+			text: "O documento B não possui o formato veritas-circuit esperado."
+		};
+		return { text: formatDifferentialReport(compareCircuitTimelines(query.documentA, query.documentB, query.script, { maxTicks: query.maxTicks })) };
+	} catch (error) {
+		return {
+			isError: true,
+			text: error instanceof Error ? error.message : "Falha ao comparar as linhas do tempo."
+		};
+	}
+}
+function formatDifferentialReport(report) {
+	if (report.status === "incomparable") return [
+		"Resultado: não comparável",
+		"",
+		...report.issues.map((issue) => `- [${issue.code}] ${issue.message}`),
+		"",
+		"Nenhum tique foi simulado."
+	].join("\n");
+	const lines = [
+		report.status === "identical" ? "Resultado: idêntico neste roteiro" : "Resultado: divergente",
+		"",
+		`Entradas: ${report.inputs.join(", ") || "(nenhuma)"}`,
+		`Saídas: ${report.outputs.join(", ")}`,
+		`Tiques simulados: ${report.comparedTicks}`
+	];
+	if (report.status === "identical") {
+		lines.push("", "Os dois circuitos concordaram em todos os tiques do roteiro. Isso não é prova de", "equivalência: outro roteiro ainda pode separá-los.");
+		return lines.join("\n");
+	}
+	const first = report.firstDivergence;
+	lines.push(`Tiques divergentes: ${report.divergentTicks}`);
+	lines.push(`Saídas divergentes: ${report.divergentOutputs.join(", ")}`);
+	if (first) {
+		lines.push("", `Primeira divergência no tique ${first.tick} (passo ${first.step}):`);
+		if (first.inputs.length > 0) {
+			lines.push("", "| Entrada | Valor |", "| --- | --- |");
+			for (const input of first.inputs) lines.push(`| ${input.name} | ${input.value ? 1 : 0} |`);
+		}
+		lines.push("", "| Saída | A | B |", "| --- | --- | --- |");
+		for (const signal of first.signals) lines.push(`| ${signal.signal} | ${signal.a ? 1 : 0} | ${signal.b ? 1 : 0} |`);
+	}
+	return lines.join("\n");
+}
+function runTestbenchTool(query) {
+	try {
+		if (!isCircuitDocumentShape(query.document)) return {
+			isError: true,
+			text: "O documento não possui o formato veritas-circuit esperado."
+		};
+		return { text: formatTestbenchReport(runTestbench(query.document, query.testbench, { customChips: normalizeCustomChipLibrary(query.customChips) })) };
+	} catch (error) {
+		return {
+			isError: true,
+			text: error instanceof Error ? error.message : "Falha ao rodar o testbench."
+		};
+	}
+}
+function formatTestbenchReport(report) {
+	if (report.status === "invalid") return [
+		"Resultado: documento de teste inválido",
+		"",
+		...report.issues.map((issue) => `- [${issue.code}] ${issue.message}`),
+		"",
+		"Nenhum caso foi executado."
+	].join("\n");
+	const lines = [
+		report.status === "passed" ? "Resultado: todos os casos passaram" : "Resultado: há casos falhando",
+		"",
+		`Casos: ${report.passed} de ${report.total} passaram`
+	];
+	if (report.status === "passed") {
+		lines.push("", "O circuito satisfez todos os vetores declarados. Isso cobre exatamente os casos escritos —", "para uma prova sobre todo o espaço de entrada, use circuit_equivalence.");
+		return lines.join("\n");
+	}
+	lines.push("", "| Caso | Saída | Esperado | Obtido | Tique |", "| --- | --- | --- | --- | --- |");
+	for (const item of report.cases) {
+		if (item.status === "passed") continue;
+		for (const mismatch of item.mismatches) lines.push(`| ${item.name} | ${mismatch.output} | ${mismatch.expected ? 1 : 0} | ${mismatch.actual ? 1 : 0} | ${mismatch.tick === void 0 ? "—" : mismatch.tick} |`);
+	}
+	return lines.join("\n");
+}
 function normalizeCustomChipLibrary(entries = []) {
 	if (entries.length > 128) throw new Error(`A biblioteca MCP aceita no máximo 128 chips customizados por chamada.`);
 	const ids = /* @__PURE__ */ new Set();
@@ -23793,6 +24754,77 @@ function registerVeritasTools(server) {
 		outputId: output_id,
 		maxBits: max_bits,
 		maxRows: max_rows,
+		customChips: custom_chips
+	})));
+	server.registerTool("circuit_equivalence", {
+		title: "Equivalência entre circuitos",
+		description: "Compara dois CircuitDocument combinacionais por comportamento e devolve um contraexemplo determinístico quando eles discordam. A identidade das portas é o rótulo (ou o ID, quando não houver rótulo), então implementações estruturalmente diferentes da mesma função são reconhecidas como equivalentes. A comparação é exaustiva: quando o espaço de entrada excede o limite, a ferramenta recusa em vez de devolver uma prova parcial. Circuitos com clock, DFF, TFF ou delay não são aceitos.",
+		inputSchema: {
+			document_a: unknown().describe("CircuitDocument de referência, no formato veritas-circuit"),
+			document_b: unknown().describe("CircuitDocument comparado, no formato veritas-circuit"),
+			max_input_bits: number().int().min(1).max(16).default(12).describe("Teto de bits de entrada da comparação exaustiva; acima disso a comparação é recusada"),
+			custom_chips_a: array(object$1({
+				id: number().int().min(1),
+				definition: unknown()
+			})).max(128).default([]).describe("Definições veritas-custom-chip usadas pelo documento A"),
+			custom_chips_b: array(object$1({
+				id: number().int().min(1),
+				definition: unknown()
+			})).max(128).default([]).describe("Definições veritas-custom-chip usadas pelo documento B")
+		}
+	}, async ({ document_a, document_b, max_input_bits, custom_chips_a, custom_chips_b }) => guard(() => circuitEquivalence({
+		documentA: document_a,
+		documentB: document_b,
+		maxInputBits: max_input_bits,
+		customChipsA: custom_chips_a,
+		customChipsB: custom_chips_b
+	})));
+	server.registerTool("circuit_differential", {
+		title: "Comparação temporal entre circuitos",
+		description: "Roda a mesma sequência de entradas em dois CircuitDocument e aponta o primeiro tique em que eles discordam. É a contraparte temporal de circuit_equivalence: cobre justamente a classe que aquela recusa — clock, flip-flops (dff/tff) e atrasos, cuja saída depende do histórico. Concordar em um roteiro NÃO é prova de equivalência: só a comparação exaustiva de circuit_equivalence prova isso, e apenas para circuitos combinacionais.",
+		inputSchema: {
+			document_a: unknown().describe("CircuitDocument de referência, no formato veritas-circuit"),
+			document_b: unknown().describe("CircuitDocument comparado, no formato veritas-circuit"),
+			script: array(object$1({
+				set: record(string(), boolean()).optional().describe("Valores a aplicar nas entradas, por rótulo, antes de rodar"),
+				ticks: number().int().min(1).default(1).describe("Quantos tiques rodar neste passo")
+			})).min(1).describe("Roteiro aplicado igualmente aos dois circuitos, em ordem"),
+			max_ticks: number().int().min(1).max(1e3).default(1e3).describe("Teto de tiques do roteiro; acima disso a comparação é recusada sem simular")
+		}
+	}, async ({ document_a, document_b, script, max_ticks }) => guard(() => circuitDifferential({
+		documentA: document_a,
+		documentB: document_b,
+		script,
+		maxTicks: max_ticks
+	})));
+	server.registerTool("run_testbench", {
+		title: "Rodar testbench",
+		description: "Roda um documento de teste declarativo contra um CircuitDocument e devolve quais casos falharam, com a saída, o valor esperado e o obtido. O teste é DADO, não código: nenhuma expressão é avaliada. Cada caso é combinacional (inputs + expect) ou sequencial (steps com set/ticks/expect), nunca os dois. Passar em todos os casos cobre apenas os vetores escritos — para prova sobre todo o espaço de entrada, use circuit_equivalence.",
+		inputSchema: {
+			document: unknown().describe("CircuitDocument serializável do formato veritas-circuit"),
+			testbench: object$1({
+				format: literal("veritas-testbench"),
+				version: literal(1),
+				name: string().min(1),
+				cases: array(object$1({
+					name: string().optional(),
+					inputs: record(string(), boolean()).optional().describe("Modo combinacional: entradas por rótulo"),
+					expect: record(string(), boolean()).optional().describe("Modo combinacional: saídas esperadas por rótulo"),
+					steps: array(object$1({
+						set: record(string(), boolean()).optional(),
+						ticks: number().int().min(1).default(1),
+						expect: record(string(), boolean()).optional().describe("Conferido depois dos tiques")
+					})).optional().describe("Modo sequencial: roteiro com expectativas")
+				})).min(1).max(512)
+			}).describe("Documento veritas-testbench versão 1"),
+			custom_chips: array(object$1({
+				id: number().int().min(1),
+				definition: unknown()
+			})).max(128).default([]).describe("Definições veritas-custom-chip usadas pelo circuito (somente casos combinacionais)")
+		}
+	}, async ({ document, testbench, custom_chips }) => guard(() => runTestbenchTool({
+		document,
+		testbench,
 		customChips: custom_chips
 	})));
 	server.registerTool("debug_algorithm", {

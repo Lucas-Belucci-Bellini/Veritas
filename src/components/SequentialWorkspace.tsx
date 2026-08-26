@@ -10,6 +10,7 @@ import {
   type SequentialDemoId,
   type SequentialSnapshot,
 } from '../simulation/workspace'
+import { buildWaveform } from '../simulation/waveform'
 
 const MAX_TIMELINE_ROWS = 24
 const RUN_TICKS = 8
@@ -31,6 +32,7 @@ export function SequentialWorkspace() {
   ])
 
   const current = timeline[timeline.length - 1] ?? snapshotSequentialSimulator(simulator)
+  const waveform = useMemo(() => buildWaveform(demo.watch, timeline), [demo.watch, timeline])
 
   function reset(nextDemoId: SequentialDemoId = demoId) {
     const nextDemo = getSequentialDemo(nextDemoId)
@@ -43,7 +45,7 @@ export function SequentialWorkspace() {
   }
 
   function changeDemo(value: string) {
-    if (!['dff-clock', 'tff-clock', 'delay', 'feedback-counter'].includes(value)) return
+    if (!['dff-clock', 'tff-clock', 'jk-clock', 'sr-clock', 'register-4bit', 'counter-4bit', 'delay', 'feedback-counter'].includes(value)) return
     reset(value as SequentialDemoId)
   }
 
@@ -62,7 +64,7 @@ export function SequentialWorkspace() {
     const nextSnapshots: SequentialSnapshot[] = []
     if (demo.controlMode === 'manual-clock') {
       for (let index = 0; index < RUN_TICKS / 2; index += 1) {
-        nextSnapshots.push(...pulseClock(simulator, 'clk'))
+        nextSnapshots.push(...pulseClock(simulator, 'clk', demo.clockSettleTicks))
       }
       setInputs((currentInputs) => ({ ...currentInputs, clk: false }))
     } else {
@@ -76,7 +78,7 @@ export function SequentialWorkspace() {
   }
 
   function manualPulse() {
-    const nextSnapshots = pulseClock(simulator, 'clk')
+    const nextSnapshots = pulseClock(simulator, 'clk', demo.clockSettleTicks)
     setInputs((currentInputs) => ({ ...currentInputs, clk: false }))
     setTimeline((currentTimeline) => appendSnapshots(currentTimeline, nextSnapshots))
   }
@@ -107,6 +109,10 @@ export function SequentialWorkspace() {
           >
             <option value="dff-clock">Flip-flop D com clock</option>
             <option value="tff-clock">Flip-flop T com clock</option>
+            <option value="jk-clock">Flip-flop JK com clock</option>
+            <option value="sr-clock">Flip-flop SR com clock</option>
+            <option value="register-4bit">Registrador paralelo de 4 bits</option>
+            <option value="counter-4bit">Contador síncrono de 4 bits</option>
             <option value="delay">Atraso de propagação</option>
             <option value="feedback-counter">Contador com feedback</option>
           </select>
@@ -215,6 +221,45 @@ export function SequentialWorkspace() {
           </div>
         </section>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-label="Forma de onda sequencial">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Forma de onda</h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Cada célula representa o nível observado no snapshot correspondente da timeline.</p>
+          </div>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{waveform.length} sinais · {timeline.length} amostras</span>
+        </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <th scope="col" className="sticky left-0 bg-white px-2 py-2 font-semibold dark:bg-slate-900">Sinal</th>
+                {timeline.map((snapshot) => (
+                  <th scope="col" key={snapshot.tick} className="min-w-12 px-2 py-2 text-center font-mono font-semibold">t{snapshot.tick}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {waveform.map((track) => (
+                <tr key={`${track.nodeId}:${track.port ?? 0}:${track.label}`} className="border-b border-slate-100 dark:border-slate-800">
+                  <th scope="row" className="sticky left-0 whitespace-nowrap bg-white px-2 py-2 font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">{track.label}</th>
+                  {track.samples.map((sample) => (
+                    <td key={`${track.nodeId}:${track.port ?? 0}:${sample.tick}`} className="px-1 py-1 text-center">
+                      <div
+                        className={`rounded px-2 py-1 font-mono font-bold ${sample.value ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}
+                        aria-label={`${track.label} no tique ${sample.tick}: ${signalLabel(sample.value)}`}
+                      >
+                        {signalLabel(sample.value)}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   )
 }

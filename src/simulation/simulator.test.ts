@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { collectVariables, evaluate, parse } from '../engine'
 import { assignmentForRow } from '../engine/truthTable'
 import { netlistFromAst } from './fromAst'
-import { Simulator } from './simulator'
+import { MAX_SETTLE_TICKS, MAX_TOTAL_TICKS, Simulator } from './simulator'
 import type { Netlist } from './components'
 
 describe('validação do circuito', () => {
@@ -66,6 +66,74 @@ describe('lógica combinacional', () => {
     sim.setInput('b', true)
     expect(sim.settle()).toBe(true)
     expect(sim.read('out')).toBe(true)
+  })
+
+  it('recusa budgets de settle não finitos, fracionários ou acima do teto', () => {
+    expect(() => new Simulator(andCircuit, { maxSettleTicks: 0 })).toThrow('orçamento de settle')
+    expect(() => new Simulator(andCircuit, { maxSettleTicks: Number.POSITIVE_INFINITY })).toThrow('orçamento de settle')
+    expect(() => new Simulator(andCircuit, { maxSettleTicks: 1.5 })).toThrow('orçamento de settle')
+
+    const sim = new Simulator(andCircuit)
+    expect(() => sim.settle(-1)).toThrow('orçamento de settle')
+    expect(() => sim.settle(MAX_SETTLE_TICKS + 1)).toThrow('orçamento de settle')
+    expect(sim.settle(0)).toBe(false)
+    expect(sim.tickCount).toBe(0)
+  })
+
+  it('diagnostica estabilização combinacional com contagem de tiques', () => {
+    const sim = new Simulator(andCircuit)
+    sim.setInput('a', true)
+    sim.setInput('b', true)
+
+    const diagnostic = sim.diagnoseSettle()
+    expect(diagnostic.status).toBe('stabilized')
+    expect(diagnostic.ticksExecuted).toBeGreaterThan(0)
+    expect(sim.read('out')).toBe(true)
+  })
+
+  it('diagnostica ciclo de clock e informa período observado', () => {
+    const sim = new Simulator({
+      components: [{ id: 'clk', type: 'clock', options: { period: 1 } }],
+    })
+
+    const diagnostic = sim.diagnoseSettle(20)
+    expect(diagnostic).toMatchObject({
+      status: 'cycle-detected',
+      ticksExecuted: 2,
+      cycleStartTick: 0,
+      cyclePeriod: 2,
+    })
+  })
+
+  it('distingue orçamento de diagnóstico esgotado de um ciclo detectado', () => {
+    const sim = new Simulator({
+      components: [{ id: 'clk', type: 'clock', options: { period: 1 } }],
+    })
+
+    expect(sim.diagnoseSettle(1)).toEqual({ status: 'budget-exhausted', ticksExecuted: 1 })
+  })
+
+  it('limita o orçamento total de tiques e rejeita contagens inválidas', () => {
+    const sim = new Simulator(andCircuit, { maxTotalTicks: 3 })
+    sim.tick(3)
+    expect(sim.tickCount).toBe(3)
+    expect(() => sim.tick()).toThrow('orçamento total')
+    expect(() => sim.tick(-1)).toThrow('quantidade de tiques')
+    expect(() => sim.tick(1.5)).toThrow('quantidade de tiques')
+    expect(() => sim.tick(Number.POSITIVE_INFINITY)).toThrow('quantidade de tiques')
+    expect(() => new Simulator(andCircuit, { maxTotalTicks: 0 })).toThrow('orçamento total')
+    expect(() => new Simulator(andCircuit, { maxTotalTicks: MAX_TOTAL_TICKS + 1 })).toThrow('orçamento total')
+  })
+
+  it('rejeita restoreState acima do orçamento sem mutar o runtime', () => {
+    const source = new Simulator(andCircuit, { maxTotalTicks: 2 })
+    source.setInput('a', true)
+    source.tick(2)
+
+    const target = new Simulator(andCircuit, { maxTotalTicks: 1 })
+    expect(() => target.restoreState(source.exportState())).toThrow('excede o orçamento total')
+    expect(target.tickCount).toBe(0)
+    expect(target.read('a')).toBe(false)
   })
 
   it('trata entrada solta como falso', () => {
@@ -210,6 +278,99 @@ describe('memória', () => {
     expect(sim.read('ff')).toBe(true)
     pulse()
     expect(sim.read('ff')).toBe(false)
+  })
+
+  it('implementa a tabela de transição do flip-flop JK na borda de subida', () => {
+    const sim = new Simulator({
+      components: [
+        { id: 'j', type: 'input' },
+        { id: 'k', type: 'input' },
+        { id: 'clk', type: 'input' },
+        { id: 'ff', type: 'jk', inputs: [{ node: 'j' }, { node: 'k' }, { node: 'clk' }] },
+      ],
+    })
+
+    const pulse = () => {
+      sim.setInput('clk', true)
+      sim.tick()
+      sim.setInput('clk', false)
+      sim.tick()
+    }
+
+    const setInputs = (j: boolean, k: boolean) => {
+      sim.setInput('j', j)
+      sim.setInput('k', k)
+    }
+
+    setInputs(false, false)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+
+    setInputs(true, false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    expect(sim.read('ff', 1)).toBe(false)
+
+    setInputs(false, false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+
+    setInputs(false, true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+
+    setInputs(true, true)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+  })
+
+  it('implementa set, reset e hold do flip-flop SR com S=R=1 determinístico', () => {
+    const sim = new Simulator({
+      components: [
+        { id: 's', type: 'input' },
+        { id: 'r', type: 'input' },
+        { id: 'clk', type: 'input' },
+        { id: 'ff', type: 'sr', inputs: [{ node: 's' }, { node: 'r' }, { node: 'clk' }] },
+      ],
+    })
+
+    const pulse = () => {
+      sim.setInput('clk', true)
+      sim.tick()
+      sim.setInput('clk', false)
+      sim.tick()
+    }
+
+    sim.setInput('s', true)
+    sim.setInput('r', false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    expect(sim.read('ff', 1)).toBe(false)
+
+    sim.setInput('s', false)
+    sim.setInput('r', false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+
+    sim.setInput('s', true)
+    sim.setInput('r', true)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    expect(sim.read('ff', 1)).toBe(false)
+
+    sim.setInput('s', false)
+    sim.setInput('r', true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+    expect(sim.read('ff', 1)).toBe(true)
+
+    sim.setInput('s', true)
+    sim.setInput('r', true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+    expect(sim.read('ff', 1)).toBe(true)
   })
 
   it('segura o estado num latch SR feito de portas NOR', () => {

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Veritas",
+  "version": "0.1.0-alpha.1",
+  "identifier": "com.lucasbelucci.veritas",
+  "mainBinaryName": "veritas",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Veritas — Tabelas Verdade e Circuitos Lógicos",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage", "nsis", "dmg"],
+    "category": "Education",
+    "shortDescription": "Tabelas verdade e simulador de circuitos lógicos",
+    "longDescription": "Veritas é uma calculadora de lógica e um simulador de circuitos que funciona localmente, offline e sem exigir conta.",
+    "publisher": "Lucas Belucci Bellini",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
+  }
+}

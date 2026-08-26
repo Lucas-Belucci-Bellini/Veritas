@@ -7,6 +7,7 @@ import {
   type CircuitDocument,
 } from '../circuit'
 import { useCircuitProjects } from '../hooks/useCircuitProjects'
+import { useCustomChips } from '../hooks/useCustomChips'
 import { CircuitPicker } from './CircuitPicker'
 
 interface DraftStep {
@@ -27,6 +28,11 @@ const INITIAL_STEPS: DraftStep[] = [{ set: {}, ticks: 4 }]
  */
 export function TimelineComparisonPanel() {
   const { projects, ready, unavailable } = useCircuitProjects()
+  const customChips = useCustomChips()
+  const customChipEntries = useMemo(
+    () => customChips.chips.map((chip) => ({ id: chip.id, definition: chip.definition })),
+    [customChips.chips],
+  )
   const [idA, setIdA] = useState<number | ''>('')
   const [idB, setIdB] = useState<number | ''>('')
   const [steps, setSteps] = useState<DraftStep[]>(INITIAL_STEPS)
@@ -49,7 +55,7 @@ export function TimelineComparisonPanel() {
         set: step.set,
         ticks: step.ticks,
       }))
-      setReport(compareCircuitTimelines(documentA.document, documentB.document, script))
+      setReport(compareCircuitTimelines(documentA.document, documentB.document, script, { customChips: customChipEntries }))
     } catch (cause) {
       setReport(null)
       setError(cause instanceof Error ? cause.message : 'Não foi possível comparar os circuitos.')

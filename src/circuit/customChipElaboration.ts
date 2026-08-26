@@ -67,6 +67,9 @@ function elaborate(
 
   const nodes: CircuitNode[] = nativeNodes.map((node) => ({
     ...node,
+    // Uma entrada interna deixa de ser uma fonte externa após a expansão: ela
+    // vira uma fronteira dirigível pelo fio que alimenta a instância.
+    type: prefix && node.type === 'input' ? 'output' : node.type,
     id: idMap.get(node.id)!,
     position: { x: node.position.x, y: node.position.y },
     options: markInternalBoundary(node, prefix),

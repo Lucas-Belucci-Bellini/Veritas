@@ -57,6 +57,9 @@ jobs:
       - name: TypeScript/Rust controlled benchmark
         run: npm run bench:compare
 
+      - name: Circuit scale benchmark
+        run: npm run bench:circuit-scale
+
       - name: Typecheck frontend and MCP
         run: npm run typecheck
 
@@ -130,6 +133,18 @@ jobs:
         with:
           name: veritas-acceptance-reports-${{ github.run_id }}
           path: artifacts/*.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload performance benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veritas-performance-benchmark-${{ github.run_id }}
+          path: |
+            artifacts/logic-scale-benchmark.md
+            artifacts/logic-scale-benchmark.json
+            artifacts/logic-scale-measurements.json
           if-no-files-found: ignore
           retention-days: 14
 

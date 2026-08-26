@@ -4,7 +4,7 @@ import {
   type CircuitDocument,
   type CustomChipLibraryEntry,
 } from '../circuit'
-import { Simulator, type SimulatorState } from './simulator'
+import { Simulator, type SettleDiagnostic, type SimulatorState } from './simulator'
 
 export interface DocumentRuntimeSnapshot {
   tick: number
@@ -19,8 +19,12 @@ export interface DocumentRuntimeWatch {
 
 export interface DocumentRuntimeOptions {
   clockPeriods?: Readonly<Record<string, number>>
-  /** Definições para expandir instâncias `custom-chip` antes de simular. */
+  /** Definições locais usadas para expandir chips em circuitos sequenciais. */
   customChips?: readonly CustomChipLibraryEntry[]
+  /** Teto por chamada de settle para este runtime de documento. */
+  maxSettleTicks?: number
+  /** Teto acumulado de tiques para este runtime de documento. */
+  maxTotalTicks?: number
 }
 
 export interface DocumentRuntimeState {
@@ -31,25 +35,30 @@ export interface DocumentRuntimeState {
   timeline: DocumentRuntimeSnapshot[]
 }
 
-/**
- * Monta o simulador temporal de um documento.
- *
- * Instâncias `custom-chip` são **achatadas antes** de virar netlist, em vez de
- * ensinar o simulador a recursar. Chips são combinacionais por contrato, então
- * achatar preserva o comportamento — e reusa a elaboração que já serve à
- * exportação HDL, com sua detecção de ciclo e limite de profundidade.
- *
- * A elaboração preserva os IDs do nível de topo, então `setInput`, o watch e a
- * linha do tempo continuam falando dos mesmos nós que o autor vê no canvas.
- */
+export interface DocumentRuntimeDiagnosticPreviewOptions extends DocumentRuntimeOptions {
+  /** Entradas a aplicar na cópia antes do diagnóstico. */
+  inputs?: Readonly<Record<string, boolean>>
+  /** Estado a restaurar na cópia antes de aplicar as entradas. */
+  simulatorState?: SimulatorState
+  /** Budget explícito desta execução diagnóstica. */
+  maxTicks?: number
+}
+
+export interface DocumentRuntimeDiagnosticPreview {
+  diagnostic: SettleDiagnostic
+  snapshot: DocumentRuntimeSnapshot
+  simulatorState: SimulatorState
+}
+
 export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
   const runtimeDocument = applyClockPeriods(document, options.clockPeriods)
-  const flattened = runtimeDocument.nodes.some((node) => node.type === 'custom-chip')
+  const executableDocument = runtimeDocument.nodes.some((node) => node.type === 'custom-chip')
     ? elaborateCustomChipDocument(runtimeDocument, { customChips: options.customChips })
     : runtimeDocument
-  const simulator = new Simulator(toNetlist(flattened))
-  // Os valores iniciais vêm do documento original: são os pinos que o autor
-  // declarou, e a elaboração não os renomeia no topo.
+  const simulator = new Simulator(toNetlist(executableDocument), {
+    maxSettleTicks: options.maxSettleTicks,
+    maxTotalTicks: options.maxTotalTicks,
+  })
   for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {
       simulator.setInput(node.id, node.options.initial)
@@ -73,10 +82,57 @@ function applyClockPeriods(
   }
 }
 
-export function snapshotDocumentRuntime(simulator: Simulator): DocumentRuntimeSnapshot {
+export function diagnoseDocumentRuntime(
+  simulator: Simulator,
+  maxTicks?: number,
+): SettleDiagnostic {
+  return simulator.diagnoseSettle(maxTicks)
+}
+
+export function diagnoseDocumentRuntimePreview(
+  document: CircuitDocument,
+  options: DocumentRuntimeDiagnosticPreviewOptions = {},
+): DocumentRuntimeDiagnosticPreview {
+  const { inputs, simulatorState, maxTicks, ...runtimeOptions } = options
+  const simulator = createDocumentRuntime(document, runtimeOptions)
+  if (simulatorState) simulator.restoreState(simulatorState)
+  for (const [id, value] of Object.entries(inputs ?? {})) simulator.setInput(id, value)
+
+  const diagnostic = diagnoseDocumentRuntime(simulator, maxTicks)
+  return {
+    diagnostic,
+    snapshot: snapshotDocumentRuntime(simulator, document, options.customChips),
+    simulatorState: simulator.exportState(),
+  }
+}
+
+export function snapshotDocumentRuntime(
+  simulator: Simulator,
+  document?: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[] = [],
+): DocumentRuntimeSnapshot {
+  const values = simulator.snapshot()
+  if (document) projectCustomChipValues(values, document, customChips)
   return {
     tick: simulator.tickCount,
-    values: simulator.snapshot(),
+    values,
+  }
+}
+
+function projectCustomChipValues(
+  values: Record<string, boolean[]>,
+  document: CircuitDocument,
+  customChips: readonly CustomChipLibraryEntry[],
+): void {
+  const definitions = new Map(customChips.map((entry) => [entry.id, entry] as const))
+  for (const node of document.nodes) {
+    if (node.type !== 'custom-chip') continue
+    const definition = definitions.get(node.options?.customChipId ?? NaN)?.definition
+    if (!definition) continue
+    const outputNodes = definition.document.nodes
+      .filter((child) => child.type === 'output')
+      .sort((left, right) => left.id.localeCompare(right.id))
+    values[node.id] = outputNodes.map((output) => values[`${node.id}__${output.id}`]?.[0] ?? false)
   }
 }
 
@@ -87,7 +143,7 @@ export function documentInputIds(document: CircuitDocument): readonly string[] {
 export function documentWatches(document: CircuitDocument): readonly DocumentRuntimeWatch[] {
   return document.nodes.flatMap((node) => {
     const label = node.label ?? node.id
-    if (node.type === 'dff' || node.type === 'tff') {
+    if (node.type === 'dff' || node.type === 'tff' || node.type === 'jk' || node.type === 'sr') {
       return [
         { nodeId: node.id, label: `${label} · Q` },
         { nodeId: node.id, label: `${label} · Q̄`, port: 1 },

@@ -96,7 +96,7 @@ export type { RemoteConflictAction, RemoteConflictDecision, RemoteConflictReason
 export { normalizeWirelessChannel, resolveWirelessChannels } from './wirelessChannels'
 export type { WirelessChannel, WirelessChannelIssue, WirelessChannelResolution, WirelessEndpoint, WirelessEndpointKind } from './wirelessChannels'
 export { buildCustomChipDefinition, CUSTOM_CHIP_FORMAT, CUSTOM_CHIP_VERSION } from './customChip'
-export type { CustomChipDefinition, CustomChipLibraryEntry, CustomChipPort } from './customChip'
+export type { CustomChipDefinition, CustomChipDefinitionOptions, CustomChipLibraryEntry, CustomChipPort } from './customChip'
 export { assertCustomChipDepth, MAX_CUSTOM_CHIP_DEPTH, resolveCustomChipDefinition } from './customChipInstance'
 export type { CustomChipInstanceOptions } from './customChipInstance'
 export { documentSerializedBytes, getCircuitDocumentBoundIssues, isCircuitDocumentShape, normalizeCircuitDocument } from './documentContract'
