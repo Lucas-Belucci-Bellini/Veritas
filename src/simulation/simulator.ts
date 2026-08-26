@@ -45,6 +45,7 @@ export interface SimulatorState {
 }
 
 export const DEFAULT_MAX_SETTLE_TICKS = 200
+export const MAX_SETTLE_TICKS = 10_000
 
 /**
  * Simulador de circuitos por tiques.
@@ -62,7 +63,7 @@ export class Simulator {
   private ticks = 0
 
   constructor(netlist: Netlist, options: SimulatorOptions = {}) {
-    this.maxSettleTicks = options.maxSettleTicks ?? DEFAULT_MAX_SETTLE_TICKS
+    this.maxSettleTicks = normalizeSettleBudget(options.maxSettleTicks ?? DEFAULT_MAX_SETTLE_TICKS, false)
 
     for (const spec of netlist.components) {
       if (this.nodes.has(spec.id)) {
@@ -180,7 +181,8 @@ export class Simulator {
    * estabiliza — nesse caso devolve `false` ao bater no teto.
    */
   settle(maxTicks = this.maxSettleTicks): boolean {
-    for (let index = 0; index < maxTicks; index += 1) {
+    const budget = normalizeSettleBudget(maxTicks, true)
+    for (let index = 0; index < budget; index += 1) {
       const before = this.serialize()
       this.tick()
       if (this.serialize() === before) return true
@@ -341,6 +343,15 @@ export class Simulator {
 
 function isBooleanArray(values: readonly unknown[]): values is boolean[] {
   return values.every((value) => typeof value === 'boolean')
+}
+
+function normalizeSettleBudget(value: number, allowZero: boolean): number {
+  const minimum = allowZero ? 0 : 1
+  if (!Number.isInteger(value) || value < minimum || value > MAX_SETTLE_TICKS) {
+    const lowerBound = allowZero ? '0' : '1'
+    throw new RangeError(`O orçamento de settle deve ser um inteiro entre ${lowerBound} e ${MAX_SETTLE_TICKS}.`)
+  }
+  return value
 }
 
 function createState(spec: ComponentSpec): NodeState {

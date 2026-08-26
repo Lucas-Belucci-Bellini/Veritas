@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { collectVariables, evaluate, parse } from '../engine'
 import { assignmentForRow } from '../engine/truthTable'
 import { netlistFromAst } from './fromAst'
-import { Simulator } from './simulator'
+import { MAX_SETTLE_TICKS, Simulator } from './simulator'
 import type { Netlist } from './components'
 
 describe('validação do circuito', () => {
@@ -66,6 +66,18 @@ describe('lógica combinacional', () => {
     sim.setInput('b', true)
     expect(sim.settle()).toBe(true)
     expect(sim.read('out')).toBe(true)
+  })
+
+  it('recusa budgets de settle não finitos, fracionários ou acima do teto', () => {
+    expect(() => new Simulator(andCircuit, { maxSettleTicks: 0 })).toThrow('orçamento de settle')
+    expect(() => new Simulator(andCircuit, { maxSettleTicks: Number.POSITIVE_INFINITY })).toThrow('orçamento de settle')
+    expect(() => new Simulator(andCircuit, { maxSettleTicks: 1.5 })).toThrow('orçamento de settle')
+
+    const sim = new Simulator(andCircuit)
+    expect(() => sim.settle(-1)).toThrow('orçamento de settle')
+    expect(() => sim.settle(MAX_SETTLE_TICKS + 1)).toThrow('orçamento de settle')
+    expect(sim.settle(0)).toBe(false)
+    expect(sim.tickCount).toBe(0)
   })
 
   it('trata entrada solta como falso', () => {
