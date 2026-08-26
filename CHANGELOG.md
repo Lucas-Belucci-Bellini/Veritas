@@ -21,6 +21,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - O workspace sequencial ganhou as demos `jk-clock` e `sr-clock`, com controles de entradas, clock automático, Step/Run/Reset, watches e timeline reutilizada; os contratos e pulsos principais têm regressões determinísticas.
 - A seção de waveform do workspace agora projeta as amostras da timeline em faixas digitais acessíveis, com ticks, níveis 0/1 e labels de sinal; o helper puro possui cobertura de ordem, valores, snapshots vazios e compressão de mudanças.
 - O workspace sequencial ganhou a demo `register-4bit`, um registrador paralelo didático composto por quatro DFFs com clock compartilhado, controles D0–D3 e watches Q0–Q3; a captura simultânea e a retenção entre bordas têm regressão determinística.
+- O workspace sequencial ganhou a demo `counter-4bit`, um contador síncrono de 4 bits construído com quatro TFFs e carry combinacional AND. Cada pulso manual percorre a acomodação declarada de dois tiques e a regressão cobre 0000 → 1111 → 0000.
 
 ## [0.12.0] — 2026-08-25
 
