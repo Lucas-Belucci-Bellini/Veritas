@@ -7,6 +7,8 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 ### Trajetória de plataforma
 
 - A trajetória de continuidade foi ampliada de v2.5.0 para v5.0.0. `docs/VERITAS_V3_V5_ROADMAP.md` define os marcos pós-v2.5.0 — verification, segurança de execução, migrações, modularidade, plugins, workspace profissional, reprodutibilidade, distribuição e o gate final de Digital Logic Platform — sem promover qualquer versão automaticamente.
+- A fila operacional detalhada de 26 fases foi preservada em `docs/VERITAS_MASTER_BUILD_QUEUE.md`, com gates explícitos para v2.6.0–v5.0.0, RC final, segurança de distribuição e validação multiplataforma.
+- A primeira fatia da v2.6.0 integrou diagnósticos bounded ao `runTestbench`: casos sequenciais agora retornam `stabilized`, `cycle-detected` ou `budget-exhausted` em uma cópia isolada, o painel apresenta status acessível e o MCP serializa o diagnóstico. A cobertura focada passou; a release v2.6.0 e a validação visual/nativa permanecem pendentes.
 
 ### Qualidade e distribuição
 

@@ -275,6 +275,21 @@ entrada — isso é `compareCircuitEquivalence`. O relatório do MCP e o painel
 dizem isso junto do resultado positivo, pela mesma razão que a comparação
 temporal diz "idêntico neste roteiro".
 
+Para casos sequenciais, o resultado também inclui um diagnóstico bounded do
+estado final. O diagnóstico é informativo e não substitui `passed` ou `failed`:
+
+| Diagnóstico | Significado |
+| --- | --- |
+| `stabilized` | O estado final ficou estável dentro da janela diagnóstica |
+| `cycle-detected` | O runtime repetiu um estado; o relatório informa início e período quando observáveis |
+| `budget-exhausted` | A janela bounded terminou sem estabilização ou repetição observável |
+
+O diagnóstico roda sobre uma cópia isolada do estado final do caso. Ele não
+avança o runtime usado para conferir as expectativas e não altera o runtime ativo
+da interface. O budget padrão é `MAX_TESTBENCH_DIAGNOSTIC_TICKS` (64 tiques), e
+o chamador pode fornecer um valor inteiro entre 1 e 64 por meio de
+`TestbenchOptions.diagnosticTicks`.
+
 | | VERIFY-001 | VERIFY-002 | VERIFY-003 |
 | --- | --- | --- | --- |
 | compara | circuito × circuito | circuito × circuito | circuito × intenção |
@@ -287,6 +302,7 @@ temporal diz "idêntico neste roteiro".
 | --- | --- |
 | `MAX_TESTBENCH_CASES` | 512 casos |
 | `MAX_TESTBENCH_TICKS` | 1000 tiques somados nos casos sequenciais |
+| `MAX_TESTBENCH_DIAGNOSTIC_TICKS` | 64 tiques na janela diagnóstica por caso sequencial |
 
 Referências a portas inexistentes (`unknown-input`, `unknown-output`) e rótulos
 duplicados são recusados **antes** de qualquer execução.
@@ -298,9 +314,9 @@ temporal recebe a biblioteca e achata os chips antes de simular.
 
 | Camada | Entrada |
 | --- | --- |
-| Domínio | `runTestbench` em `src/circuit/testbench.ts` |
-| Interface | painel “Testes do circuito” (`src/components/TestbenchPanel.tsx`) — a tabela **é** o documento de teste; cobre o modo combinacional |
-| MCP | ferramenta `run_testbench`, com os dois modos |
+| Domínio | `runTestbench` em `src/circuit/testbench.ts`; casos sequenciais retornam diagnóstico bounded |
+| Interface | painel “Testes do circuito” (`src/components/TestbenchPanel.tsx`) — a tabela **é** o documento de teste e apresenta o diagnóstico por caso |
+| MCP | ferramenta `run_testbench`, com o diagnóstico serializado em texto |
 
 ### Cobertura
 
@@ -313,8 +329,8 @@ temporal recebe a biblioteca e achata os chips antes de simular.
   rótulo duplicado, guarda de custom-chip sequencial, passo sem `ticks`,
   determinismo e ordem canônica das divergências.
 - `mcp/src/tools.test.ts` — golden aprovado (incluindo o aviso sobre o que não
-  prova), golden reprovado tabulado, documento inválido e circuito fora do
-  formato.
+  prova), golden reprovado tabulado, documento inválido, circuito fora do
+  formato e diagnóstico bounded de ciclo no resultado headless.
 - `scripts/mcp-acceptance.mjs` — `MCP-TB-001` e `MCP-TB-002` pelo transporte
   stdio real.
 

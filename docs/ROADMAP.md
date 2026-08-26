@@ -110,7 +110,7 @@ Para cada release, será produzido um pequeno registro com as decisões tomadas,
 
 ## 9. Trajetória pós-v2.5.0 até v5.0.0
 
-A partir da v2.6.0, o trabalho deixa de ser apenas a soma de features do editor e passa a tratar o Veritas como uma plataforma integrada. O detalhamento executável está em [`VERITAS_V3_V5_ROADMAP.md`](./VERITAS_V3_V5_ROADMAP.md).
+A partir da v2.6.0, o trabalho deixa de ser apenas a soma de features do editor e passa a tratar o Veritas como uma plataforma integrada. O resumo executivo está em [`VERITAS_V3_V5_ROADMAP.md`](./VERITAS_V3_V5_ROADMAP.md) e a fila operacional detalhada, com 26 fases, está em [`VERITAS_MASTER_BUILD_QUEUE.md`](./VERITAS_MASTER_BUILD_QUEUE.md). A fila é um plano de construção, não uma lista de releases já publicadas.
 
 | Marco | Foco | Gate resumido |
 |---|---|---|
@@ -1054,3 +1054,14 @@ A semântica comprovada é `OUT = IN XOR CONTROL` por bit. Com controle `0`, o b
 Os critérios de aceite foram atendidos com 86 testes focados e 565 testes na suíte completa, além de typecheck, lint, builds e gates MCP/HTTP, acessibilidade, WASM, Rust e HDL. O smoke visual confirmou o card, a persistência local como ID 13, a instância no canvas, o resumo `IN 8 + 1 bits · OUT 8 bits` e três alças de largura 8/1/8. A instância isolada exibiu dois problemas de entradas desconectadas, como esperado; não houve alertas inesperados no DOM.
 
 Esta release cobre somente a negação condicional combinacional `NEGATE-8`; não a interpreta como somador de complemento de dois. `NEGATE-8` é um contrato distinto de `NOT-8 Bits`, e chips temporais, memória, tri-state e dependências não mapeadas permanecem fora da allowlist.
+
+
+## Implementação v2.6.0 — verification bounded no testbench — 2026-08-26
+
+A primeira fatia da v2.6.0 transformou o diagnóstico bounded em metadado oficial de casos sequenciais do `runTestbench`. O relatório agora preserva os estados de caso `passed`/`failed` e anexa `stabilized`, `cycle-detected` ou `budget-exhausted`, com tiques executados e, quando observáveis, início e período do ciclo. O diagnóstico usa uma cópia isolada do estado final; não avança o runtime usado para conferir as expectativas nem o runtime ativo da interface.
+
+O contrato aceita `TestbenchOptions.diagnosticTicks`, com padrão de 64 tiques e validação fail-closed entre 1 e 64. O limite de 1000 tiques do roteiro permanece separado da janela diagnóstica adicional. Foram adicionadas regressões para estabilização de registrador, ciclo de clock, budget esgotado e budget inválido, além de uma regressão MCP que verifica a exposição textual do ciclo no resultado headless.
+
+O `TestbenchPanel` apresenta o diagnóstico por caso com status acessível, sem substituir os badges existentes de passou/falhou. A ferramenta MCP `run_testbench` serializa o diagnóstico bounded sem alterar a tabela de divergências. A especificação detalhada está em [`docs/VERIFICATION.md`](./VERIFICATION.md).
+
+A implementação foi validada com 22 testes do domínio de testbench, 51 testes MCP, typecheck e lint. A validação visual interativa do painel, o smoke nativo e a release `v2.6.0` continuam pendentes; este registro é um marco `Unreleased`, não uma tag ou GitHub Release.

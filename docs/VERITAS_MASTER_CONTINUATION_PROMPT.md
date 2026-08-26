@@ -385,7 +385,7 @@ O incremento só pode ser considerado concluído quando:
 
 ## 7. ROADMAP EXECUTÁVEL ATÉ v2.5.0
 
-> A trajetória pós-v2.5.0 até v5.0.0 está em [`VERITAS_V3_V5_ROADMAP.md`](./VERITAS_V3_V5_ROADMAP.md). Ela é complementar a esta seção e não promove nenhuma versão automaticamente.
+> A trajetória pós-v2.5.0 até v5.0.0 está resumida em [`VERITAS_V3_V5_ROADMAP.md`](./VERITAS_V3_V5_ROADMAP.md) e detalhada operacionalmente em [`VERITAS_MASTER_BUILD_QUEUE.md`](./VERITAS_MASTER_BUILD_QUEUE.md). Esses documentos são complementares a esta seção e não promovem nenhuma versão automaticamente.
 
 As seções a seguir são a lista completa de trabalho. O agente deve avançar na ordem de dependência e pode quebrar cada seção em vários commits/releases intermediários. Não é permitido declarar um marco concluído porque somente parte da funcionalidade foi implementada.
 
@@ -1458,7 +1458,7 @@ Quando o usuário abrir outra conversa e disser “continue o Veritas”, o agen
 2. Ler este arquivo `docs/VERITAS_MASTER_CONTINUATION_PROMPT.md`.
 3. Executar a auditoria de Git/GitHub da seção 3.
 4. Comparar o HEAD real com o snapshot escrito aqui.
-5. Ler `docs/ROADMAP.md`, `CHANGELOG.md` e `tests/desktop/QA_MATRIX.md`.
+5. Ler `docs/ROADMAP.md`, `docs/VERITAS_V3_V5_ROADMAP.md`, `docs/VERITAS_MASTER_BUILD_QUEUE.md`, `CHANGELOG.md` e `tests/desktop/QA_MATRIX.md`.
 6. Identificar qual foi o último commit funcional e o último commit documental.
 7. Confirmar se a árvore está limpa.
 8. Confirmar se alguma nova release foi criada desde o snapshot.
@@ -1573,6 +1573,8 @@ Construa corretamente até a **Veritas Digital Logic Platform v5.0.0**, sem ante
 ## Referências
 
 [4]: ./VERITAS_V3_V5_ROADMAP.md "Trajetória pós-v2.5.0 até v5.0.0"
+
+[5]: ./VERITAS_MASTER_BUILD_QUEUE.md "Fila mestre operacional até v5.0.0"
 
 [1]: https://github.com/Lucas-Belucci-Bellini/Veritas "Repositório oficial do Veritas"
 
