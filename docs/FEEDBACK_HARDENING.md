@@ -8,6 +8,8 @@ O orçamento padrão de `settle()` continua em `200` tiques. Para impedir config
 
 Além disso, cada instância possui um orçamento total acumulado padrão de `100.000` tiques, configurável entre `1` e `1.000.000`. `tick(count)` rejeita contagens fracionárias, negativas ou não finitas e falha antes de ultrapassar o orçamento restante. `restoreState()` rejeita estados cujo `tickCount` exceda o orçamento da instância, sem mutar o runtime.
 
+A ponte `documentRuntime` encaminha esses limites por `DocumentRuntimeOptions` e expõe `diagnoseDocumentRuntime(simulator, maxTicks?)` como um adaptador fino para o diagnóstico do mesmo `Simulator`. Essa função é explicitamente operacional: o diagnóstico avança o runtime recebido e, portanto, não deve ser tratado como uma inspeção pura ou conectado à UI ativa sem uma cópia/preview isolada.
+
 > Um `settle()` que retorna `false` é uma evidência de que o circuito não estabilizou dentro do orçamento observado; não é uma falha automática do circuito nem uma autorização para aumentar o limite sem diagnóstico.
 
 ## Comportamento coberto
@@ -26,6 +28,7 @@ Além disso, cada instância possui um orçamento total acumulado padrão de `10
 | `diagnoseSettle()` em circuito combinacional | retorna `stabilized` e quantidade de tiques executados |
 | `diagnoseSettle()` em clock/feedback oscilante | retorna `cycle-detected`, período e início do ciclo quando observado |
 | `diagnoseSettle()` sem concluir no budget | retorna `budget-exhausted` sem permitir execução ilimitada |
+| Documento usando `diagnoseDocumentRuntime()` | usa o mesmo `Simulator`, encaminha budgets configurados e deixa explícito que a chamada avança o runtime recebido |
 
 ## Limites do marco
 

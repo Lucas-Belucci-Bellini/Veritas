@@ -59,6 +59,7 @@ O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian,
 | Demo de contador 4-bit | `counter-4bit` usa quatro TFFs síncronos, carry AND, pulso manual e dois tiques de acomodação | PASSED na regressão 0000 → 1111 → 0000; inspeção visual interativa, persistência do demo e smoke desktop permanecem `NOT VERIFIED` |
 | Hardening de feedback/settle | `settle()` aceita budgets finitos entre 1 e 10.000, `settle(0)` é vazio; o runtime também limita o total acumulado entre 1 e 1.000.000, além de validar `tick()` e `restoreState()` | PASSED em regressões do Simulator |
 | Diagnóstico de estabilização | `diagnoseSettle()` diferencia `stabilized`, `cycle-detected` e `budget-exhausted`, informando tiques e período observado quando há repetição | PASSED em regressões do Simulator; classificação de ciclos no grafo, budgets de operação/memória e medição desktop durante simulação permanecem `NOT VERIFIED` |
+| Diagnóstico cross-layer | `diagnoseDocumentRuntime()` expõe o diagnóstico pela ponte `CircuitDocument → Simulator`; `maxSettleTicks` e `maxTotalTicks` são configuráveis por documento | PASSED em testes de documentRuntime; UI de diagnóstico, classificação de ciclos no grafo e smoke desktop permanecem `NOT VERIFIED` |
 
 A regressão cruzada usa `buildTruthTable(parse(expression))` como intenção e `createDocumentRuntime()`/`Simulator` como execução do `CircuitDocument`. Qualquer divergência ou não-estabilização faz o teste falhar e impede o gate automatizado da release; isso não transforma um teste local em validação de runtime desktop.
 
