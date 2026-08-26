@@ -2,6 +2,14 @@
 
 As mudanças relevantes do Veritas são registradas neste arquivo. As versões `0.y.z` continuam sendo candidatas de evolução da API e do formato de circuito.
 
+## [Unreleased]
+
+### Qualidade e distribuição
+
+- Adicionado baseline permanente `Expression → TruthTable` versus `Circuit → Simulator` em `tests/regression/`, cobrindo portas fundamentais, meio somador, somador completo e multiplexador.
+- Adicionados testes determinísticos do medidor desktop e do gerador `desktop-release-manifest.json`/`SHA256SUMS`, incluindo rejeição fail-closed de assets inesperados.
+- O workflow desktop passou a bloquear builds nativos sem `test`, typecheck, lint e build web; os runners Windows/Linux também executam smoke de instalação, startup e remoção com limites explícitos.
+
 ## [0.12.0] — 2026-08-25
 
 ### Adicionado
