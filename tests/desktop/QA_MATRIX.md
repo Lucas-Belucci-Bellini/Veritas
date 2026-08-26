@@ -57,6 +57,7 @@ O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian,
 | Waveform sequencial | Helper puro `buildWaveform` projeta watches e snapshots; workspace renderiza ticks, níveis 0/1, labels acessíveis e janela limitada pela timeline | PASSED em testes determinísticos e build; inspeção visual interativa, FPS e exportação de waveform permanecem `NOT VERIFIED` |
 | Demo de registrador 4-bit | `register-4bit` usa quatro DFFs com clock compartilhado, controles D0–D3 e watches Q0–Q3 | PASSED em testes de workspace; inspeção visual interativa, persistência do demo e smoke desktop permanecem `NOT VERIFIED` |
 | Demo de contador 4-bit | `counter-4bit` usa quatro TFFs síncronos, carry AND, pulso manual e dois tiques de acomodação | PASSED na regressão 0000 → 1111 → 0000; inspeção visual interativa, persistência do demo e smoke desktop permanecem `NOT VERIFIED` |
+| Hardening de feedback/settle | `settle()` aceita apenas budgets finitos, inteiros e limitados a 10.000; `settle(0)` é vazio; clocks oscilantes continuam limitados | PASSED em regressões do Simulator; detecção diagnóstica de ciclos, budgets de operação/memória e medição desktop durante simulação permanecem `NOT VERIFIED` |
 
 A regressão cruzada usa `buildTruthTable(parse(expression))` como intenção e `createDocumentRuntime()`/`Simulator` como execução do `CircuitDocument`. Qualquer divergência ou não-estabilização faz o teste falhar e impede o gate automatizado da release; isso não transforma um teste local em validação de runtime desktop.
 

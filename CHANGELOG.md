@@ -22,6 +22,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - A seção de waveform do workspace agora projeta as amostras da timeline em faixas digitais acessíveis, com ticks, níveis 0/1 e labels de sinal; o helper puro possui cobertura de ordem, valores, snapshots vazios e compressão de mudanças.
 - O workspace sequencial ganhou a demo `register-4bit`, um registrador paralelo didático composto por quatro DFFs com clock compartilhado, controles D0–D3 e watches Q0–Q3; a captura simultânea e a retenção entre bordas têm regressão determinística.
 - O workspace sequencial ganhou a demo `counter-4bit`, um contador síncrono de 4 bits construído com quatro TFFs e carry combinacional AND. Cada pulso manual percorre a acomodação declarada de dois tiques e a regressão cobre 0000 → 1111 → 0000.
+- O `Simulator` passou a validar o orçamento de `settle()` de forma fail-closed: apenas inteiros finitos entre 1 e 10.000 no construtor, com `settle(0)` permitido como janela vazia; clocks e feedback oscilantes continuam limitados sem loops infinitos. A decisão está documentada em `docs/FEEDBACK_HARDENING.md`.
 
 ## [0.12.0] — 2026-08-25
 
