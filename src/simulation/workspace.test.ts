@@ -72,6 +72,30 @@ describe('workspace sequencial', () => {
     expect(simulator.read('ff')).toBe(false)
   })
 
+  it('expõe e executa o registrador paralelo de 4 bits', () => {
+    const simulator = createSequentialSimulator('register-4bit')
+    const demo = getSequentialDemo('register-4bit')
+
+    expect(demo.controls).toEqual(['d0', 'd1', 'd2', 'd3'])
+    expect(demo.watch.map((watch) => watch.label)).toEqual(['D0', 'D1', 'D2', 'D3', 'CLK', 'Q0', 'Q1', 'Q2', 'Q3'])
+
+    simulator.setInput('d0', true)
+    simulator.setInput('d1', false)
+    simulator.setInput('d2', true)
+    simulator.setInput('d3', true)
+    simulator.tick(2)
+    expect(['ff0', 'ff1', 'ff2', 'ff3'].map((id) => simulator.read(id))).toEqual([true, false, true, true])
+
+    simulator.setInput('d0', false)
+    simulator.setInput('d1', true)
+    simulator.setInput('d2', false)
+    simulator.setInput('d3', false)
+    simulator.tick()
+    expect(['ff0', 'ff1', 'ff2', 'ff3'].map((id) => simulator.read(id))).toEqual([true, false, true, true])
+    simulator.tick()
+    expect(['ff0', 'ff1', 'ff2', 'ff3'].map((id) => simulator.read(id))).toEqual([false, true, false, false])
+  })
+
   it('captura D na borda de subida do clock automático', () => {
     const simulator = createSequentialSimulator('dff-clock')
     simulator.setInput('d', true)

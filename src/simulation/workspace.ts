@@ -1,7 +1,7 @@
 import { Simulator } from './simulator'
 import type { Netlist } from './components'
 
-export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'jk-clock' | 'sr-clock' | 'delay' | 'feedback-counter'
+export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'jk-clock' | 'sr-clock' | 'register-4bit' | 'delay' | 'feedback-counter'
 export type SequentialControlMode = 'auto-clock' | 'manual-input' | 'manual-clock'
 
 export interface SequentialWatch {
@@ -122,6 +122,43 @@ const SR_CLOCK: SequentialDemo = {
   },
 }
 
+const REGISTER_4BIT: SequentialDemo = {
+  id: 'register-4bit',
+  title: 'Registrador paralelo de 4 bits',
+  description: 'Os quatro bits de entrada são capturados juntos na borda de subida do clock.',
+  controlMode: 'auto-clock',
+  controls: ['d0', 'd1', 'd2', 'd3'],
+  initialInputs: { d0: false, d1: false, d2: false, d3: false },
+  watch: [
+    { nodeId: 'd0', label: 'D0' },
+    { nodeId: 'd1', label: 'D1' },
+    { nodeId: 'd2', label: 'D2' },
+    { nodeId: 'd3', label: 'D3' },
+    { nodeId: 'clk', label: 'CLK' },
+    { nodeId: 'ff0', label: 'Q0' },
+    { nodeId: 'ff1', label: 'Q1' },
+    { nodeId: 'ff2', label: 'Q2' },
+    { nodeId: 'ff3', label: 'Q3' },
+  ],
+  netlist: {
+    components: [
+      { id: 'd0', type: 'input' },
+      { id: 'd1', type: 'input' },
+      { id: 'd2', type: 'input' },
+      { id: 'd3', type: 'input' },
+      { id: 'clk', type: 'clock', options: { period: 1 } },
+      { id: 'ff0', type: 'dff', inputs: [{ node: 'd0' }, { node: 'clk' }] },
+      { id: 'ff1', type: 'dff', inputs: [{ node: 'd1' }, { node: 'clk' }] },
+      { id: 'ff2', type: 'dff', inputs: [{ node: 'd2' }, { node: 'clk' }] },
+      { id: 'ff3', type: 'dff', inputs: [{ node: 'd3' }, { node: 'clk' }] },
+      { id: 'qout0', type: 'output', inputs: [{ node: 'ff0' }] },
+      { id: 'qout1', type: 'output', inputs: [{ node: 'ff1' }] },
+      { id: 'qout2', type: 'output', inputs: [{ node: 'ff2' }] },
+      { id: 'qout3', type: 'output', inputs: [{ node: 'ff3' }] },
+    ],
+  },
+}
+
 const DELAY: SequentialDemo = {
   id: 'delay',
   title: 'Atraso de propagação',
@@ -170,6 +207,7 @@ export const SEQUENTIAL_DEMOS: readonly SequentialDemo[] = [
   TFF_CLOCK,
   JK_CLOCK,
   SR_CLOCK,
+  REGISTER_4BIT,
   DELAY,
   FEEDBACK_COUNTER,
 ]
