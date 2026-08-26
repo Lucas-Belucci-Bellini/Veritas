@@ -29,6 +29,8 @@ export type EditorComponentType = Extract<
   | 'clock'
   | 'dff'
   | 'tff'
+  | 'jk'
+  | 'sr'
   | 'delay'
   | 'transmitter'
   | 'receiver'
@@ -51,6 +53,8 @@ export const EDITOR_COMPONENT_TYPES: readonly EditorComponentType[] = [
   'clock',
   'dff',
   'tff',
+  'jk',
+  'sr',
   'delay',
   'transmitter',
   'receiver',
@@ -159,11 +163,14 @@ export function editorInputCount(type: EditorComponentType): number {
     case 'dff':
     case 'tff':
       return 2
+    case 'jk':
+    case 'sr':
+      return 3
   }
 }
 
 export function isStatefulEditorType(type: EditorComponentType): boolean {
-  return type === 'clock' || type === 'dff' || type === 'tff' || type === 'delay'
+  return type === 'clock' || type === 'dff' || type === 'tff' || type === 'jk' || type === 'sr' || type === 'delay'
 }
 
 export function createCircuitDocument(name = 'Circuito sem título'): CircuitDocument {

@@ -38,7 +38,7 @@ export interface CustomChipDefinitionOptions {
   maxDepth?: number
 }
 
-const STATEFUL_TYPES: readonly EditorComponentType[] = ['clock', 'dff', 'tff', 'delay']
+const STATEFUL_TYPES: readonly EditorComponentType[] = ['clock', 'dff', 'tff', 'jk', 'sr', 'delay']
 const DEFAULT_MAX_CUSTOM_CHIP_DEPTH = 8
 
 
@@ -65,7 +65,7 @@ export function buildCustomChipDefinition(
   })
   if (issues.length > 0) throw new CircuitValidationError(issues)
   if (normalizedDocument.nodes.some((node) => STATEFUL_TYPES.includes(node.type))) {
-    throw new Error('Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF ou delay.')
+    throw new Error('Chips customizados desta versão precisam ser combinacionais; remova clock, DFF, TFF, JK, SR ou delay.')
   }
   validateNestedDefinitions(normalizedDocument, options.customChips ?? [], options.maxDepth ?? DEFAULT_MAX_CUSTOM_CHIP_DEPTH)
 

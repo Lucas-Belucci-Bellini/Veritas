@@ -19,6 +19,8 @@ export type ComponentType =
   | 'clock'
   | 'dff'
   | 'tff'
+  | 'jk'
+  | 'sr'
   | 'delay'
   | 'transmitter'
   | 'receiver'
@@ -40,7 +42,7 @@ export interface ComponentOptions {
   ticks?: number
   /** `constant`: o valor fixo. */
   value?: boolean
-  /** `input`, `dff`, `tff`, `clock`: valor no instante zero. */
+  /** `input`, `dff`, `tff`, `jk`, `sr`, `clock`: valor no instante zero. */
   initial?: boolean
   /** Largura do sinal em bits; ausente equivale a um bit. */
   width?: number
@@ -71,13 +73,13 @@ export interface Netlist {
 /** Quantas saídas cada tipo de componente tem. */
 export function outputCount(type: ComponentType, options?: ComponentOptions): number {
   if (type === 'splitter') return options?.widths?.length ?? 0
-  return type === 'dff' || type === 'tff' ? 2 : 1
+  return type === 'dff' || type === 'tff' || type === 'jk' || type === 'sr' ? 2 : 1
 }
 
 /** Nomes das saídas, na ordem — usados nas mensagens e na interface. */
 export function outputNames(type: ComponentType, options?: ComponentOptions): string[] {
   if (type === 'splitter') return Array.from({ length: options?.widths?.length ?? 0 }, (_, index) => `OUT ${index + 1}`)
-  return type === 'dff' || type === 'tff' ? ['Q', 'Q̄'] : ['OUT']
+  return type === 'dff' || type === 'tff' || type === 'jk' || type === 'sr' ? ['Q', 'Q̄'] : ['OUT']
 }
 
 /** Nomes das entradas esperadas, quando o componente tem uma ordem fixa. */
@@ -87,6 +89,10 @@ export function inputNames(type: ComponentType): string[] | null {
       return ['D', 'CLK']
     case 'tff':
       return ['T', 'CLK']
+    case 'jk':
+      return ['J', 'K', 'CLK']
+    case 'sr':
+      return ['S', 'R', 'CLK']
     case 'delay':
     case 'not':
     case 'output':

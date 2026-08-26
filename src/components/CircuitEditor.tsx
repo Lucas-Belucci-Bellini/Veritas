@@ -104,6 +104,8 @@ const PALETTE: readonly { type: EditorComponentType; label: string; description:
   { type: 'clock', label: 'Clock', description: 'Relógio sequencial' },
   { type: 'dff', label: 'DFF', description: 'Flip-flop D · D/CLK → Q' },
   { type: 'tff', label: 'TFF', description: 'Flip-flop T · T/CLK → Q' },
+  { type: 'jk', label: 'JK', description: 'Flip-flop JK · J/K/CLK → Q' },
+  { type: 'sr', label: 'SR', description: 'Flip-flop SR · S/R/CLK → Q' },
   { type: 'delay', label: 'Delay', description: 'Atraso de N tiques' },
   { type: 'transmitter', label: 'Transmissor', description: 'Publica sinal em um canal wireless' },
   { type: 'receiver', label: 'Receptor', description: 'Lê sinal de um canal wireless' },
@@ -125,6 +127,8 @@ const NODE_LABELS: Record<EditorComponentType, string> = {
   clock: 'Clock',
   dff: 'DFF',
   tff: 'TFF',
+  jk: 'JK',
+  sr: 'SR',
   delay: 'Delay',
   transmitter: 'Transmissor',
   receiver: 'Receptor',
@@ -258,7 +262,7 @@ export function CircuitEditor() {
 
   const hasBuses = useMemo(() => document.nodes.some((node) => (node.options?.width ?? 1) > 1), [document])
   const hasSequential = useMemo(
-    () => document.nodes.some((node) => node.type === 'clock' || node.type === 'dff' || node.type === 'tff' || node.type === 'delay'),
+    () => document.nodes.some((node) => node.type === 'clock' || node.type === 'dff' || node.type === 'tff' || node.type === 'jk' || node.type === 'sr' || node.type === 'delay'),
     [document],
   )
   const issues = useMemo(() => validateCircuit(document, { allowBuses: true, customChips: customChipEntries }), [customChipEntries, document])
@@ -1004,7 +1008,7 @@ export function CircuitEditor() {
 
       {showGuide && (
                   <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-brand-900 dark:border-brand-900/70 dark:bg-brand-950/40 dark:text-brand-100">
-            <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, use Transmissor/Receptor com o mesmo canal para compartilhar um sinal sem fio pelo circuito. Clock/DFF/TFF/Delay criam circuitos com estado; salve o desenho no navegador. A tabela verdade permanece exclusiva para circuitos combinacionais.
+            <strong>Como usar:</strong> adicione componentes na paleta, arraste os pontos de saída para as entradas, use Transmissor/Receptor com o mesmo canal para compartilhar um sinal sem fio pelo circuito. Clock/DFF/TFF/JK/SR/Delay criam circuitos com estado; salve o desenho no navegador. A tabela verdade permanece exclusiva para circuitos combinacionais.
 
         </div>
       )}
@@ -1476,10 +1480,17 @@ function EditorLogicNode({ data }: NodeProps<EditorFlowNode>) {
   }
 
   if (data.kind === 'sequential') {
-    const isFlipFlop = data.componentType === 'dff' || data.componentType === 'tff'
+    const isFlipFlop = data.componentType === 'dff' || data.componentType === 'tff' || data.componentType === 'jk' || data.componentType === 'sr'
     const outputClass = `!h-1.5 !w-1.5 !border-0 ${lit ? '!bg-amber-500' : '!bg-slate-400 dark:!bg-slate-500'}`
     return (
       <div className="relative flex h-16 w-24 flex-col items-center justify-center rounded-lg border-2 border-brand-300 bg-white px-2 text-center shadow-sm dark:border-brand-700 dark:bg-slate-900" title={data.label}>
+        {data.inputs === 3 && (
+          <>
+            <Handle type="target" position={Position.Left} id="a" style={{ top: 14 }} className={dot} />
+            <Handle type="target" position={Position.Left} id="b" style={{ top: 32 }} className={dot} />
+            <Handle type="target" position={Position.Left} id="c" style={{ top: 50 }} className={dot} />
+          </>
+        )}
         {data.inputs === 2 && (
           <>
             <Handle type="target" position={Position.Left} id="a" style={{ top: 22 }} className={dot} />
@@ -1541,7 +1552,7 @@ function buildNodeOptions(data: EditorNodeData): CircuitNode['options'] {
   if (data.componentType === 'constant') options.value = data.value ?? false
   if (data.componentType === 'clock') options.period = Math.max(1, Math.floor(data.period ?? 1))
   if (data.componentType === 'delay') options.ticks = Math.max(1, Math.floor(data.ticks ?? 1))
-  if (data.componentType === 'input' || data.componentType === 'clock' || data.componentType === 'dff' || data.componentType === 'tff') {
+  if (data.componentType === 'input' || data.componentType === 'clock' || data.componentType === 'dff' || data.componentType === 'tff' || data.componentType === 'jk' || data.componentType === 'sr') {
     options.initial = data.initial ?? false
   }
   if (data.componentType === 'transmitter' || data.componentType === 'receiver') options.channel = normalizeWirelessChannel(data.channel ?? '')
@@ -1585,7 +1596,7 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
     ? type
     : type === 'output'
       ? 'output'
-      : type === 'clock' || type === 'dff' || type === 'tff' || type === 'delay'
+      : type === 'clock' || type === 'dff' || type === 'tff' || type === 'jk' || type === 'sr' || type === 'delay'
         ? 'sequential'
         : type === 'transmitter' || type === 'receiver'
           ? 'wireless'
@@ -1604,7 +1615,7 @@ function createNode(type: EditorComponentType, index: number, id = `${type}-${in
       componentType: type,
       label,
       inputs: type === 'splitter' ? 1 : type === 'combiner' ? busWidths!.length : editorInputCount(type),
-      outputs: type === 'dff' || type === 'tff' ? 2 : type === 'splitter' ? busWidths!.length : 1,
+      outputs: type === 'dff' || type === 'tff' || type === 'jk' || type === 'sr' ? 2 : type === 'splitter' ? busWidths!.length : 1,
       widths: busWidths,
       width: nodeWidth,
       op: type === 'not' ? 'not' : type === 'and' || type === 'nand' || type === 'or' || type === 'nor' || type === 'xor' || type === 'xnor' ? type : undefined,
@@ -1745,10 +1756,12 @@ function fromDocument(document: CircuitDocument, customChips: readonly CustomChi
       const targetPort = connection.target.port
       const sourceHandle = sourceNode?.type === 'custom-chip' || sourceNode?.type === 'splitter'
         ? `out-${sourcePort}`
-        : sourceNode?.type === 'dff' || sourceNode?.type === 'tff'
+        : sourceNode?.type === 'dff' || sourceNode?.type === 'tff' || sourceNode?.type === 'jk' || sourceNode?.type === 'sr'
           ? sourcePort === 1 ? 'qbar' : 'q'
           : undefined
-      const targetHandle = targetNode?.type === 'custom-chip' || targetNode?.type === 'combiner' ? `in-${targetPort}` : targetPort === 1 ? 'b' : 'a'
+      const targetHandle = targetNode?.type === 'custom-chip' || targetNode?.type === 'combiner'
+        ? `in-${targetPort}`
+        : targetPort === 2 ? 'c' : targetPort === 1 ? 'b' : 'a'
       return {
         id: `${connection.source.node}->${connection.target.node}:${sourcePort}:${targetPort}`,
         source: connection.source.node,
@@ -1778,6 +1791,7 @@ function loadProject(
 
 function portFromHandle(handle: string | null | undefined, nativeHandle: string): { port?: number } {
   if (handle === nativeHandle) return { port: 1 }
+  if (handle === 'c') return { port: 2 }
   const match = /^(?:in|out)-(\d+)$/.exec(handle ?? '')
   if (match) return { port: Number(match[1]) }
   return {}

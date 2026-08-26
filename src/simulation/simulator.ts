@@ -262,21 +262,33 @@ export class Simulator {
       }
 
       case 'dff':
-      case 'tff': {
-        const data = values[0] ?? false
-        const clock = values[1] ?? false
+      case 'tff':
+      case 'jk':
+      case 'sr': {
+        const clock = type === 'dff' || type === 'tff' ? values[1] ?? false : values[2] ?? false
         const rising = clock && !node.lastClock
         node.nextLastClock = clock
 
         const current = node.outputs[0]
-        // Fora da borda de subida o flip-flop ignora a entrada e segura o valor.
-        const stored = !rising
-          ? current
-          : type === 'dff'
-            ? data
-            : data
-              ? !current
-              : current
+        // Fora da borda de subida o componente ignora as entradas e segura o valor.
+        let stored = current
+        if (rising) {
+          if (type === 'dff') {
+            stored = values[0] ?? false
+          } else if (type === 'tff') {
+            stored = (values[0] ?? false) ? !current : current
+          } else if (type === 'jk') {
+            const j = values[0] ?? false
+            const k = values[1] ?? false
+            stored = j && k ? !current : j ? true : k ? false : current
+          } else {
+            const set = values[0] ?? false
+            const reset = values[1] ?? false
+            // S=R=1 é a condição proibida do latch SR; em simulação
+            // determinística ela preserva o estado anterior e mantém Q̄ complementar.
+            stored = set && reset ? current : set ? true : reset ? false : current
+          }
+        }
 
         node.next[0] = stored
         node.next[1] = !stored

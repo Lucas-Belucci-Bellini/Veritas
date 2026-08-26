@@ -60,6 +60,26 @@ describe('documentRuntime', () => {
     expect(documentWatches(document).map((watch) => watch.label)).toEqual(['clk', 'ff · Q', 'ff · Q̄', 'out'])
   })
 
+  it('expõe Q e Q̄ de JK/SR nos watches do documento', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'Watches sequenciais',
+      nodes: [
+        { id: 'jk', type: 'jk', position: { x: 0, y: 0 } },
+        { id: 'sr', type: 'sr', position: { x: 180, y: 0 }, label: 'Memória SR' },
+      ],
+      connections: [],
+    }
+
+    expect(documentWatches(document).map((watch) => watch.label)).toEqual([
+      'jk · Q',
+      'jk · Q̄',
+      'Memória SR · Q',
+      'Memória SR · Q̄',
+    ])
+  })
+
   it('propaga sinal wireless sem estado extra no runtime', () => {
     const document: CircuitDocument = {
       format: 'veritas-circuit',

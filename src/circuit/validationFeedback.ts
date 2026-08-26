@@ -57,7 +57,7 @@ const GUIDANCE: Record<CircuitIssue['code'], Pick<CircuitIssueGuidance, 'title' 
   },
   'unsupported-width': {
     title: 'Largura ainda não suportada neste fluxo',
-    action: 'Use Splitter/Combiner e o fluxo vetorial para barramentos; Clock, DFF, TFF e Delay continuam escalares nesta release.',
+    action: 'Use Splitter/Combiner e o fluxo vetorial para barramentos; Clock, DFF, TFF, JK, SR e Delay continuam escalares nesta release.',
   },
   'width-mismatch': {
     title: 'Larguras incompatíveis',

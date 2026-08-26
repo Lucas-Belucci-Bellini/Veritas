@@ -97,7 +97,7 @@ export function documentInputIds(document: CircuitDocument): readonly string[] {
 export function documentWatches(document: CircuitDocument): readonly DocumentRuntimeWatch[] {
   return document.nodes.flatMap((node) => {
     const label = node.label ?? node.id
-    if (node.type === 'dff' || node.type === 'tff') {
+    if (node.type === 'dff' || node.type === 'tff' || node.type === 'jk' || node.type === 'sr') {
       return [
         { nodeId: node.id, label: `${label} · Q` },
         { nodeId: node.id, label: `${label} · Q̄`, port: 1 },

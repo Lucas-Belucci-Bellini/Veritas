@@ -212,6 +212,99 @@ describe('memória', () => {
     expect(sim.read('ff')).toBe(false)
   })
 
+  it('implementa a tabela de transição do flip-flop JK na borda de subida', () => {
+    const sim = new Simulator({
+      components: [
+        { id: 'j', type: 'input' },
+        { id: 'k', type: 'input' },
+        { id: 'clk', type: 'input' },
+        { id: 'ff', type: 'jk', inputs: [{ node: 'j' }, { node: 'k' }, { node: 'clk' }] },
+      ],
+    })
+
+    const pulse = () => {
+      sim.setInput('clk', true)
+      sim.tick()
+      sim.setInput('clk', false)
+      sim.tick()
+    }
+
+    const setInputs = (j: boolean, k: boolean) => {
+      sim.setInput('j', j)
+      sim.setInput('k', k)
+    }
+
+    setInputs(false, false)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+
+    setInputs(true, false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    expect(sim.read('ff', 1)).toBe(false)
+
+    setInputs(false, false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+
+    setInputs(false, true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+
+    setInputs(true, true)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+  })
+
+  it('implementa set, reset e hold do flip-flop SR com S=R=1 determinístico', () => {
+    const sim = new Simulator({
+      components: [
+        { id: 's', type: 'input' },
+        { id: 'r', type: 'input' },
+        { id: 'clk', type: 'input' },
+        { id: 'ff', type: 'sr', inputs: [{ node: 's' }, { node: 'r' }, { node: 'clk' }] },
+      ],
+    })
+
+    const pulse = () => {
+      sim.setInput('clk', true)
+      sim.tick()
+      sim.setInput('clk', false)
+      sim.tick()
+    }
+
+    sim.setInput('s', true)
+    sim.setInput('r', false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    expect(sim.read('ff', 1)).toBe(false)
+
+    sim.setInput('s', false)
+    sim.setInput('r', false)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+
+    sim.setInput('s', true)
+    sim.setInput('r', true)
+    pulse()
+    expect(sim.read('ff')).toBe(true)
+    expect(sim.read('ff', 1)).toBe(false)
+
+    sim.setInput('s', false)
+    sim.setInput('r', true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+    expect(sim.read('ff', 1)).toBe(true)
+
+    sim.setInput('s', true)
+    sim.setInput('r', true)
+    pulse()
+    expect(sim.read('ff')).toBe(false)
+    expect(sim.read('ff', 1)).toBe(true)
+  })
+
   it('segura o estado num latch SR feito de portas NOR', () => {
     const sim = new Simulator({
       components: [

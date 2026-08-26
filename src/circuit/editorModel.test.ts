@@ -181,6 +181,43 @@ describe('editorModel', () => {
     ]))
   })
 
+  it('aceita JK e SR com portas J/S, K/R, CLK e saídas complementares', () => {
+    for (const [type, first, second] of [
+      ['jk', 'j', 'k'],
+      ['sr', 's', 'r'],
+    ] as const) {
+      const document: CircuitDocument = {
+        ...createCircuitDocument(`${type.toUpperCase()} de teste`),
+        nodes: [
+          { id: first, type: 'input', position: { x: 0, y: 0 } },
+          { id: second, type: 'input', position: { x: 0, y: 100 } },
+          { id: 'clk', type: 'input', position: { x: 0, y: 200 } },
+          { id: 'ff', type, position: { x: 180, y: 100 } },
+          { id: 'q', type: 'output', position: { x: 360, y: 80 } },
+          { id: 'nq', type: 'output', position: { x: 360, y: 120 } },
+        ],
+        connections: [
+          { source: { node: first }, target: { node: 'ff', port: 0 } },
+          { source: { node: second }, target: { node: 'ff', port: 1 } },
+          { source: { node: 'clk' }, target: { node: 'ff', port: 2 } },
+          { source: { node: 'ff', port: 0 }, target: { node: 'q', port: 0 } },
+          { source: { node: 'ff', port: 1 }, target: { node: 'nq', port: 0 } },
+        ],
+      }
+
+      expect(EDITOR_COMPONENT_TYPES).toContain(type)
+      expect(editorInputCount(type)).toBe(3)
+      expect(validateCircuit(document)).toEqual([])
+      expect(toNetlist(document).components).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'ff',
+          type,
+          inputs: [{ node: first }, { node: second }, { node: 'clk' }],
+        }),
+      ]))
+    }
+  })
+
   it('permite feedback quando o ciclo passa por um componente com estado', () => {
     const document: CircuitDocument = {
       ...createCircuitDocument('Contador de teste'),
