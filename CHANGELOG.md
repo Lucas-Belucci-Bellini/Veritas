@@ -18,6 +18,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - Registrada a decisão em `docs/LARGE_CIRCUITS.md`: manter os limites oficiais do `CircuitDocument`, usar o Netlist bruto apenas para diagnóstico do Simulator e exigir contrato versionado, budgets, renderização, persistência, segurança e QA multiplataforma antes de anunciar suporte a circuitos grandes.
 - Adicionados flip-flops JK e SR ao contrato de componentes, Simulator, editor visual, conversão de conexões, watches do runtime e proteção de chips customizados. A semântica é síncrona na borda de subida: JK cobre hold/set/reset/toggle; SR cobre hold/set/reset e trata S=R=1 de forma determinística, preservando o estado anterior.
 - A cobertura de JK/SR inclui regressões de runtime, validação/conversão do editor e watches Q/Q̄ do `documentRuntime`; a inspeção visual interativa ainda permanece `NOT VERIFIED` neste ambiente sem Browser disponível.
+- O workspace sequencial ganhou as demos `jk-clock` e `sr-clock`, com controles de entradas, clock automático, Step/Run/Reset, watches e timeline reutilizada; os contratos e pulsos principais têm regressões determinísticas.
 
 ## [0.12.0] — 2026-08-25
 
