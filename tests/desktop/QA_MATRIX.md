@@ -55,6 +55,7 @@ O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian,
 | BENCH-002 — capacidade bruta do runtime | Mesmo fixture como `Netlist` bruto, executado diretamente pelo `Simulator`, sem alterar limites do editor | BASELINE RECORDED: 10/100/500/1000/5000 medidos no Linux x86_64; isso não promove suporte oficial, persistência, editor ou renderização nessa escala |
 | Demos sequenciais JK/SR | Workspace com demos `jk-clock` e `sr-clock`, controles de entradas, clock automático, watches Q/Q̄ e timeline reutilizada | PASSED em testes de workspace/runtime; inspeção visual interativa e smoke desktop permanecem `NOT VERIFIED` |
 | Waveform sequencial | Helper puro `buildWaveform` projeta watches e snapshots; workspace renderiza ticks, níveis 0/1, labels acessíveis e janela limitada pela timeline | PASSED em testes determinísticos e build; inspeção visual interativa, FPS e exportação de waveform permanecem `NOT VERIFIED` |
+| Demo de registrador 4-bit | `register-4bit` usa quatro DFFs com clock compartilhado, controles D0–D3 e watches Q0–Q3 | PASSED em testes de workspace; inspeção visual interativa, persistência do demo e smoke desktop permanecem `NOT VERIFIED` |
 
 A regressão cruzada usa `buildTruthTable(parse(expression))` como intenção e `createDocumentRuntime()`/`Simulator` como execução do `CircuitDocument`. Qualquer divergência ou não-estabilização faz o teste falhar e impede o gate automatizado da release; isso não transforma um teste local em validação de runtime desktop.
 

@@ -20,6 +20,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - A cobertura de JK/SR inclui regressões de runtime, validação/conversão do editor e watches Q/Q̄ do `documentRuntime`; a inspeção visual interativa ainda permanece `NOT VERIFIED` neste ambiente sem Browser disponível.
 - O workspace sequencial ganhou as demos `jk-clock` e `sr-clock`, com controles de entradas, clock automático, Step/Run/Reset, watches e timeline reutilizada; os contratos e pulsos principais têm regressões determinísticas.
 - A seção de waveform do workspace agora projeta as amostras da timeline em faixas digitais acessíveis, com ticks, níveis 0/1 e labels de sinal; o helper puro possui cobertura de ordem, valores, snapshots vazios e compressão de mudanças.
+- O workspace sequencial ganhou a demo `register-4bit`, um registrador paralelo didático composto por quatro DFFs com clock compartilhado, controles D0–D3 e watches Q0–Q3; a captura simultânea e a retenção entre bordas têm regressão determinística.
 
 ## [0.12.0] — 2026-08-25
 
