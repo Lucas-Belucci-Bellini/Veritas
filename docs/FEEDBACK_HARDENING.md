@@ -35,4 +35,4 @@ Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`
 
 ## Limites do marco
 
-Este marco protege o custo da operação de acomodação, o total de tiques de uma instância e oferece diagnóstico básico de repetição de estado. Ainda são trabalhos futuros a classificação de ciclos no grafo antes da execução, budgets de operações/memória por documento, avaliação incremental/compilada, integração visual da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.
+Este marco protege o custo da operação de acomodação, o total de tiques de uma instância e oferece diagnóstico básico de repetição de estado. Ainda são trabalhos futuros a classificação de ciclos no grafo antes da execução, budgets de operações/memória por documento, avaliação incremental/compilada, validação visual/desktop da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.

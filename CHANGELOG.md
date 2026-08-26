@@ -26,6 +26,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - Adicionado `diagnoseSettle()` como caminho opt-in para diferenciar estabilização, ciclo detectado e esgotamento de budget, incluindo início e período do ciclo quando observáveis; `settle()` preserva sua semântica compatível baseada nas saídas.
 - O `documentRuntime` agora expõe `diagnoseDocumentRuntime()` e encaminha `maxSettleTicks`/`maxTotalTicks` por documento, com regressões cross-layer para circuito combinacional estabilizado, clock cíclico e bloqueio do orçamento total.
 - Adicionada `diagnoseDocumentRuntimePreview()`: uma execução diagnóstica em runtime isolado que pode restaurar estado e aplicar entradas sem mutar o runtime ativo, retornando diagnóstico, snapshot e estado final; o barrel de simulação também exporta o contrato de `documentRuntime`.
+- O workspace sequencial agora oferece a ação explícita `Diagnosticar preview`, limitada a 64 tiques, com status acessível para estabilização, ciclo detectado ou budget esgotado. A ação usa a cópia isolada e informa que o runtime ativo não foi alterado; inspeção visual interativa continua pendente neste ambiente.
 
 ## [0.12.0] — 2026-08-25
 
