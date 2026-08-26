@@ -77,6 +77,22 @@ function descriptorFor(filename) {
   return ARTIFACT_RULES.find((rule) => rule.match.test(filename))?.descriptor;
 }
 
+async function listFiles(directory, relativeDirectory = "") {
+  const entries = await readdir(join(directory, relativeDirectory), {
+    withFileTypes: true,
+  });
+  const files = [];
+  for (const entry of entries) {
+    const relativePath = join(relativeDirectory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listFiles(directory, relativePath)));
+    } else if (entry.isFile()) {
+      files.push(relativePath);
+    }
+  }
+  return files;
+}
+
 async function sha256(path) {
   const contents = await readFile(path);
   return createHash("sha256").update(contents).digest("hex");
@@ -96,30 +112,35 @@ async function main() {
   );
   assertSafeValue("commit", options.commit, /^[0-9a-f]{7,64}$/i);
 
-  const entries = (await readdir(options.inputDir, { withFileTypes: true }))
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .sort();
-  const descriptors = entries.map((filename) => descriptorFor(filename));
+  const relativePaths = (await listFiles(options.inputDir)).sort();
+  const filenames = relativePaths.map((relativePath) => basename(relativePath));
+  const descriptors = filenames.map((filename) => descriptorFor(filename));
   if (
-    entries.length !== ARTIFACT_RULES.length ||
-    descriptors.some((descriptor) => descriptor === undefined)
+    relativePaths.length !== ARTIFACT_RULES.length ||
+    descriptors.some((descriptor) => descriptor === undefined) ||
+    new Set(filenames).size !== filenames.length
   ) {
     throw new Error(
-      `Unexpected desktop artifact set. Received ${entries.join(", ")}`,
+      `Unexpected desktop artifact set. Received ${relativePaths.join(", ")}`,
     );
   }
 
-  const artifacts = [];
-  for (const filename of entries) {
-    const path = join(options.inputDir, filename);
+  const artifacts = relativePaths
+    .map((relativePath, index) => ({
+      relativePath,
+      filename: filenames[index],
+      descriptor: descriptors[index],
+    }))
+    .sort((left, right) => left.filename.localeCompare(right.filename));
+  const manifestArtifacts = [];
+  for (const artifact of artifacts) {
+    const path = join(options.inputDir, artifact.relativePath);
     const metadata = await stat(path);
-    const descriptor = descriptorFor(filename);
-    artifacts.push({
-      filename,
-      platform: descriptor.platform,
-      architecture: descriptor.architecture,
-      kind: descriptor.kind,
+    manifestArtifacts.push({
+      filename: artifact.filename,
+      platform: artifact.descriptor.platform,
+      architecture: artifact.descriptor.architecture,
+      kind: artifact.descriptor.kind,
       size: metadata.size,
       sha256: await sha256(path),
     });
@@ -131,9 +152,9 @@ async function main() {
     version: options.version,
     tag: options.tag,
     commit: options.commit,
-    artifacts,
+    artifacts: manifestArtifacts,
   };
-  const checksums = `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.filename}`).join("\n")}\n`;
+  const checksums = `${manifestArtifacts.map((artifact) => `${artifact.sha256}  ${artifact.filename}`).join("\n")}\n`;
 
   await writeFile(
     options.manifestOut,
@@ -142,7 +163,7 @@ async function main() {
   );
   await writeFile(options.checksumsOut, checksums, "utf8");
   console.log(
-    `Generated ${basename(options.manifestOut)} and ${basename(options.checksumsOut)} for ${artifacts.length} artifacts.`,
+    `Generated ${basename(options.manifestOut)} and ${basename(options.checksumsOut)} for ${manifestArtifacts.length} artifacts.`,
   );
 }
 
