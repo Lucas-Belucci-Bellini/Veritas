@@ -4,7 +4,7 @@ import {
   type CircuitDocument,
   type CustomChipLibraryEntry,
 } from '../circuit'
-import { Simulator, type SimulatorState } from './simulator'
+import { Simulator, type SettleDiagnostic, type SimulatorState } from './simulator'
 
 export interface DocumentRuntimeSnapshot {
   tick: number
@@ -21,6 +21,10 @@ export interface DocumentRuntimeOptions {
   clockPeriods?: Readonly<Record<string, number>>
   /** Definições locais usadas para expandir chips em circuitos sequenciais. */
   customChips?: readonly CustomChipLibraryEntry[]
+  /** Teto por chamada de settle para este runtime de documento. */
+  maxSettleTicks?: number
+  /** Teto acumulado de tiques para este runtime de documento. */
+  maxTotalTicks?: number
 }
 
 export interface DocumentRuntimeState {
@@ -36,7 +40,10 @@ export function createDocumentRuntime(document: CircuitDocument, options: Docume
   const executableDocument = runtimeDocument.nodes.some((node) => node.type === 'custom-chip')
     ? elaborateCustomChipDocument(runtimeDocument, { customChips: options.customChips })
     : runtimeDocument
-  const simulator = new Simulator(toNetlist(executableDocument))
+  const simulator = new Simulator(toNetlist(executableDocument), {
+    maxSettleTicks: options.maxSettleTicks,
+    maxTotalTicks: options.maxTotalTicks,
+  })
   for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {
       simulator.setInput(node.id, node.options.initial)
@@ -58,6 +65,13 @@ function applyClockPeriods(
       return { ...node, options: { ...node.options, period: Math.max(1, Math.min(64, Math.floor(period))) } }
     }),
   }
+}
+
+export function diagnoseDocumentRuntime(
+  simulator: Simulator,
+  maxTicks?: number,
+): SettleDiagnostic {
+  return simulator.diagnoseSettle(maxTicks)
 }
 
 export function snapshotDocumentRuntime(

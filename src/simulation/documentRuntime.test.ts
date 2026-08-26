@@ -6,6 +6,7 @@ import {
 } from '../circuit'
 import {
   createDocumentRuntime,
+  diagnoseDocumentRuntime,
   documentInputIds,
   documentWatches,
   runtimeValue,
@@ -58,6 +59,47 @@ describe('documentRuntime', () => {
     expect(snapshot.tick).toBe(0)
     expect(runtimeValue(snapshot, 'ff')).toBe(false)
     expect(documentWatches(document).map((watch) => watch.label)).toEqual(['clk', 'ff · Q', 'ff · Q̄', 'out'])
+  })
+
+  it('expõe diagnóstico de estabilização do documento sem duplicar o Simulator', () => {
+    const combinational: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'Diagnóstico combinacional',
+      nodes: [
+        { id: 'input', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'not', type: 'not', position: { x: 120, y: 0 } },
+        { id: 'out', type: 'output', position: { x: 240, y: 0 } },
+      ],
+      connections: [
+        { source: { node: 'input' }, target: { node: 'not', port: 0 } },
+        { source: { node: 'not' }, target: { node: 'out', port: 0 } },
+      ],
+    }
+    const simulator = createDocumentRuntime(combinational)
+    simulator.setInput('input', true)
+
+    expect(diagnoseDocumentRuntime(simulator)).toMatchObject({ status: 'stabilized' })
+    expect(simulator.read('out')).toBe(false)
+  })
+
+  it('detecta ciclo de clock no documento e aplica budget total configurado', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'Clock diagnóstico',
+      nodes: [{ id: 'clk', type: 'clock', position: { x: 0, y: 0 }, options: { period: 1 } }],
+      connections: [],
+    }
+    const simulator = createDocumentRuntime(document, { maxTotalTicks: 4 })
+
+    expect(diagnoseDocumentRuntime(simulator, 20)).toMatchObject({
+      status: 'cycle-detected',
+      cycleStartTick: 0,
+      cyclePeriod: 2,
+    })
+    expect(simulator.tickCount).toBe(2)
+    expect(() => simulator.tick(3)).toThrow('orçamento total')
   })
 
   it('expõe Q e Q̄ de JK/SR nos watches do documento', () => {
