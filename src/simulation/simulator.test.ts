@@ -80,6 +80,39 @@ describe('lógica combinacional', () => {
     expect(sim.tickCount).toBe(0)
   })
 
+  it('diagnostica estabilização combinacional com contagem de tiques', () => {
+    const sim = new Simulator(andCircuit)
+    sim.setInput('a', true)
+    sim.setInput('b', true)
+
+    const diagnostic = sim.diagnoseSettle()
+    expect(diagnostic.status).toBe('stabilized')
+    expect(diagnostic.ticksExecuted).toBeGreaterThan(0)
+    expect(sim.read('out')).toBe(true)
+  })
+
+  it('diagnostica ciclo de clock e informa período observado', () => {
+    const sim = new Simulator({
+      components: [{ id: 'clk', type: 'clock', options: { period: 1 } }],
+    })
+
+    const diagnostic = sim.diagnoseSettle(20)
+    expect(diagnostic).toMatchObject({
+      status: 'cycle-detected',
+      ticksExecuted: 2,
+      cycleStartTick: 0,
+      cyclePeriod: 2,
+    })
+  })
+
+  it('distingue orçamento de diagnóstico esgotado de um ciclo detectado', () => {
+    const sim = new Simulator({
+      components: [{ id: 'clk', type: 'clock', options: { period: 1 } }],
+    })
+
+    expect(sim.diagnoseSettle(1)).toEqual({ status: 'budget-exhausted', ticksExecuted: 1 })
+  })
+
   it('limita o orçamento total de tiques e rejeita contagens inválidas', () => {
     const sim = new Simulator(andCircuit, { maxTotalTicks: 3 })
     sim.tick(3)

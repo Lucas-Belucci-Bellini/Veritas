@@ -46,6 +46,15 @@ export interface SimulatorState {
   nodes: Record<string, SimulatorNodeState>
 }
 
+export type SettleDiagnosticStatus = 'stabilized' | 'cycle-detected' | 'budget-exhausted'
+
+export interface SettleDiagnostic {
+  status: SettleDiagnosticStatus
+  ticksExecuted: number
+  cycleStartTick?: number
+  cyclePeriod?: number
+}
+
 export const DEFAULT_MAX_SETTLE_TICKS = 200
 export const MAX_SETTLE_TICKS = 10_000
 export const DEFAULT_MAX_TOTAL_TICKS = 100_000
@@ -194,6 +203,49 @@ export class Simulator {
    * tantos tiques quanto for a profundidade. Um circuito com clock nunca
    * estabiliza — nesse caso devolve `false` ao bater no teto.
    */
+  diagnoseSettle(maxTicks = this.maxSettleTicks): SettleDiagnostic {
+    const budget = normalizeSettleBudget(maxTicks, true)
+    const seen = new Map<string, number>()
+    let ticksExecuted = 0
+
+    for (let index = 0; index < budget; index += 1) {
+      if (this.ticks >= this.maxTotalTicks) {
+        return { status: 'budget-exhausted', ticksExecuted }
+      }
+
+      const before = this.serializeRuntime()
+      const previousTick = seen.get(before)
+      if (previousTick !== undefined) {
+        return {
+          status: 'cycle-detected',
+          ticksExecuted,
+          cycleStartTick: previousTick,
+          cyclePeriod: this.ticks - previousTick,
+        }
+      }
+      seen.set(before, this.ticks)
+
+      this.tick()
+      ticksExecuted += 1
+      const after = this.serializeRuntime()
+      if (after === before) {
+        return { status: 'stabilized', ticksExecuted }
+      }
+
+      const repeatedTick = seen.get(after)
+      if (repeatedTick !== undefined) {
+        return {
+          status: 'cycle-detected',
+          ticksExecuted,
+          cycleStartTick: repeatedTick,
+          cyclePeriod: this.ticks - repeatedTick,
+        }
+      }
+    }
+
+    return { status: 'budget-exhausted', ticksExecuted }
+  }
+
   settle(maxTicks = this.maxSettleTicks): boolean {
     const budget = normalizeSettleBudget(maxTicks, true)
     for (let index = 0; index < budget; index += 1) {
@@ -351,6 +403,25 @@ export class Simulator {
     let result = ''
     for (const id of this.order) {
       result += this.nodes.get(id)!.outputs.map((value) => (value ? '1' : '0')).join('')
+    }
+    return result
+  }
+
+  private serializeRuntime(): string {
+    let result = ''
+    for (const id of this.order) {
+      const node = this.nodes.get(id)!
+      result += [
+        node.outputs,
+        node.next,
+        node.lastClock,
+        node.nextLastClock,
+        node.queue,
+        node.nextQueue,
+        node.counter,
+        node.nextCounter,
+      ].map((value) => typeof value === 'boolean' ? (value ? '1' : '0') : Array.isArray(value) ? value.map((item) => (item ? '1' : '0')).join('') : String(value)).join(':')
+      result += '|'
     }
     return result
   }
