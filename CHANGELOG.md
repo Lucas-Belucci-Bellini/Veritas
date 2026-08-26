@@ -25,6 +25,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - O `Simulator` passou a validar os budgets de `settle()` e de tiques totais de forma fail-closed: apenas inteiros finitos entre 1 e 10.000 para acomodação e entre 1 e 1.000.000 para o orçamento acumulado, com `settle(0)` permitido como janela vazia; `tick()` e `restoreState()` não ultrapassam o limite. Clocks e feedback oscilantes continuam limitados sem loops infinitos. A decisão está documentada em `docs/FEEDBACK_HARDENING.md`.
 - Adicionado `diagnoseSettle()` como caminho opt-in para diferenciar estabilização, ciclo detectado e esgotamento de budget, incluindo início e período do ciclo quando observáveis; `settle()` preserva sua semântica compatível baseada nas saídas.
 - O `documentRuntime` agora expõe `diagnoseDocumentRuntime()` e encaminha `maxSettleTicks`/`maxTotalTicks` por documento, com regressões cross-layer para circuito combinacional estabilizado, clock cíclico e bloqueio do orçamento total.
+- Adicionada `diagnoseDocumentRuntimePreview()`: uma execução diagnóstica em runtime isolado que pode restaurar estado e aplicar entradas sem mutar o runtime ativo, retornando diagnóstico, snapshot e estado final; o barrel de simulação também exporta o contrato de `documentRuntime`.
 
 ## [0.12.0] — 2026-08-25
 

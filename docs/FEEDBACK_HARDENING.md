@@ -10,6 +10,8 @@ Além disso, cada instância possui um orçamento total acumulado padrão de `10
 
 A ponte `documentRuntime` encaminha esses limites por `DocumentRuntimeOptions` e expõe `diagnoseDocumentRuntime(simulator, maxTicks?)` como um adaptador fino para o diagnóstico do mesmo `Simulator`. Essa função é explicitamente operacional: o diagnóstico avança o runtime recebido e, portanto, não deve ser tratado como uma inspeção pura ou conectado à UI ativa sem uma cópia/preview isolada.
 
+Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`. O helper cria um runtime novo com o mesmo caminho de elaboração/netlist, restaura opcionalmente um `SimulatorState`, aplica as entradas fornecidas apenas na cópia, executa o diagnóstico limitado e devolve diagnóstico, snapshot e estado final. Assim, o chamador pode apresentar uma prévia sem alterar o runtime ativo.
+
 > Um `settle()` que retorna `false` é uma evidência de que o circuito não estabilizou dentro do orçamento observado; não é uma falha automática do circuito nem uma autorização para aumentar o limite sem diagnóstico.
 
 ## Comportamento coberto
@@ -29,7 +31,8 @@ A ponte `documentRuntime` encaminha esses limites por `DocumentRuntimeOptions` e
 | `diagnoseSettle()` em clock/feedback oscilante | retorna `cycle-detected`, período e início do ciclo quando observado |
 | `diagnoseSettle()` sem concluir no budget | retorna `budget-exhausted` sem permitir execução ilimitada |
 | Documento usando `diagnoseDocumentRuntime()` | usa o mesmo `Simulator`, encaminha budgets configurados e deixa explícito que a chamada avança o runtime recebido |
+| Preview de diagnóstico de documento | cria uma cópia via `createDocumentRuntime()`, aceita estado/entradas, retorna diagnóstico e preserva o runtime original |
 
 ## Limites do marco
 
-Este marco protege o custo da operação de acomodação, o total de tiques de uma instância e oferece diagnóstico básico de repetição de estado. Ainda são trabalhos futuros a classificação de ciclos no grafo antes da execução, budgets de operações/memória por documento, avaliação incremental/compilada, renderização parcial e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.
+Este marco protege o custo da operação de acomodação, o total de tiques de uma instância e oferece diagnóstico básico de repetição de estado. Ainda são trabalhos futuros a classificação de ciclos no grafo antes da execução, budgets de operações/memória por documento, avaliação incremental/compilada, integração visual da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.
