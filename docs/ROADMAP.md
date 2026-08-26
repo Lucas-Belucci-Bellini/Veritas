@@ -105,6 +105,12 @@ Uma release oficial deve ter mudança intencional, commits rastreáveis, testes 
 
 `BUILD VERIFIED` significa que o runner nativo produziu e validou o artefato. `RUNTIME VERIFIED` exige executar o aplicativo nesse sistema; `SMOKE VERIFIED` exige concluir o roteiro funcional definido. O sandbox Linux não pode converter um build Windows/macOS em validação de runtime. A ausência de hardware nativo é um bloqueio de evidência, não uma licença para afirmar sucesso.
 
+### Implementação QA-001 — métricas e regressão cross-runtime — 2026-08-25
+
+O medidor desktop foi refatorado para expor helpers determinísticos, separar a coleta da execução CLI e manter `NOT VERIFIED` explícito para binário ausente, memória de simulação e installed size. Os testes cobrem parsing de `VmRSS`, tamanho de arquivos regulares, ausência de binário e geração local de JSON/Markdown sem rede. `npm run desktop:metrics` foi executado novamente no Linux para atualizar a linha de base observada.
+
+A suíte permanente `tests/regression/cross-runtime.test.ts` compara `buildTruthTable(parse(expression))` com `createDocumentRuntime()`/`Simulator` para todas as combinações das portas AND, NAND, OR, NOR, XOR, XNOR e NOT, além de meio somador, somador completo e multiplexador 2:1. São 12 casos e 16 testes novos incluindo métricas; uma divergência ou não-estabilização falha o teste, portanto o gate de release não pode prosseguir. Os fixtures são `CircuitDocument` declarativos e não executam JSON DLS, código importado ou uma linguagem de expressões.
+
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 
 O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.

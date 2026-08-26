@@ -12,7 +12,7 @@ Um workflow concluído prova somente que uma etapa de automação terminou. Cada
 | Windows x64 | PASSED no runner nativo | PASSED: NSIS `.exe` | PASSED: PE32/NSIS, `MZ`, SHA-256 | NOT VERIFIED | NOT VERIFIED | NOT VERIFIED | Não estável |
 | macOS arm64 | PASSED no runner nativo | PASSED: `.dmg` e `.app.zip` | PASSED: trailer DMG/ZIP íntegro, SHA-256 | NOT VERIFIED | NOT VERIFIED | NOT VERIFIED | Não estável |
 
-A release pública [`desktop-v0.1.0-alpha.1`](https://github.com/Lucas-Belucci-Bellini/Veritas/releases/tag/desktop-v0.1.0-alpha.1) é uma **pré-release**. Ela contém artefatos para os três alvos, mas não é uma declaração de suporte estável.
+A release pública [`desktop-v0.1.0-alpha.1`](https://github.com/Lucas-Belucci-Bellini/Veritas/releases/tag/desktop-v0.1.0-alpha.1) é uma **pré-release**. Ela contém artefatos para os três alvos, `SHA256SUMS` e `desktop-release-manifest.json`, mas não é uma declaração de suporte estável.
 
 ## Gate Windows — instalador `.exe`
 
@@ -41,9 +41,19 @@ O runner macOS confirmou build, bundle e upload de `Veritas_0.1.0-alpha.1_aarch6
 
 O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian, o AppImage, os metadados e a inicialização controlada do binário foram verificados no sandbox. Ainda faltam instalação limpa do `.deb`, execução distribuída do AppImage em uma distribuição independente, atualização, remoção e smoke funcional interativo completo.
 
+## Gates automatizados do núcleo e da distribuição
+
+| Gate | Cobertura atual | Estado |
+| --- | --- | --- |
+| Regressão cruzada permanente | 12 casos: AND, NAND, OR, NOR, XOR, XNOR, NOT, meio somador, somador completo e multiplexador; todas as combinações possíveis em cada caso | PASSED localmente |
+| Helpers de métricas desktop | 4 testes: parser de RSS, tamanho de arquivos, binário ausente e geração de JSON/Markdown sem rede | PASSED localmente |
+| Medição Linux | `npm run desktop:metrics`, baseline de tamanho, spawn e RSS ocioso; simulação e installed size explicitamente não inferidos | PASSED para medidas disponíveis; demais campos `NOT VERIFIED` |
+
+A regressão cruzada usa `buildTruthTable(parse(expression))` como intenção e `createDocumentRuntime()`/`Simulator` como execução do `CircuitDocument`. Qualquer divergência ou não-estabilização faz o teste falhar e impede o gate automatizado da release; isso não transforma um teste local em validação de runtime desktop.
+
 ## Início formal dos testes — desktop `0.5.0`
 
-A `0.5.0` só será aberta quando houver builds por plataforma e um conjunto de máquinas ou runners capazes de executar os fluxos. O checklist mínimo será repetido em cada sistema: instalar, criar circuito, conectar portas, simular, salvar projeto local, fechar, reabrir, exportar/importar `.veritas`, exportar Verilog/VHDL, testar sem rede, atualizar e desinstalar. O resultado deverá incluir logs, versões do sistema, hash dos artefatos e a classificação de cada caso como `PASSED`, `FAILED` ou `NOT VERIFIED`.
+A `0.5.0` só será aberta quando houver builds por plataforma e um conjunto de máquinas ou runners capazes de executar os fluxos. O checklist mínimo será repetido em cada sistema: instalar, criar circuito, conectar portas, simular, salvar projeto local, fechar, reabrir, exportar/importar `.veritas`, exportar Verilog/VHDL, testar sem rede, atualizar e desinstalar. O resultado deverá incluir logs, versões do sistema, hash dos artefatos e a classificação de cada caso como `BUILD VERIFIED`, `RUNTIME VERIFIED`, `SMOKE VERIFIED`, `FAILED` ou `NOT VERIFIED`.
 
 ## Promoção estável — desktop `1.0.0`
 
