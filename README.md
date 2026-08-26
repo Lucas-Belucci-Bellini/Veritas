@@ -521,9 +521,10 @@ O Veritas também possui um shell desktop leve em Tauri 2, com os assets Vite em
 npm run desktop:dev          # executa o shell Tauri em desenvolvimento
 npm run desktop:build:linux  # gera .deb e .AppImage no Linux
 npm run desktop:build        # usa os targets configurados no Tauri
+npm run desktop:metrics      # mede tamanho, startup e memória localmente
 ```
 
-A distribuição planejada cobre Windows, macOS e Linux. O instalador Windows será um `.exe` NSIS produzido em runner Windows; o workflow também prepara `.app`/`.dmg` para macOS e `.deb`/`.AppImage` para Linux. A compilação Linux já foi validada localmente. Builds nativos de Windows e macOS devem ocorrer em seus respectivos runners, com assinatura mantida fora do repositório. O início formal dos testes do aplicativo está reservado para a `0.5.0`; a `1.0.0` só será promovida após estabilidade comprovada em todos os alvos suportados. O guia completo está em [`docs/DESKTOP.md`](./docs/DESKTOP.md).
+A distribuição pública da prévia cobre Windows, macOS e Linux. A release [`desktop-v0.1.0-alpha.1`](https://github.com/Lucas-Belucci-Bellini/Veritas/releases/tag/desktop-v0.1.0-alpha.1) publica o instalador oficial Windows `Veritas-Setup.exe`, `.app.zip`/`.dmg` para macOS arm64, `.deb`/`.AppImage` para Linux amd64, além de `SHA256SUMS` e `desktop-release-manifest.json`. Os builds são produzidos em runners nativos; a compilação e a inicialização controlada Linux têm evidência local, enquanto instalação e runtime interativo Windows/macOS continuam **NOT VERIFIED**. Assinaturas Authenticode e Apple/notarização continuam pendentes para uma release estável. O início formal dos testes do aplicativo está reservado para a `0.5.0`; a `1.0.0` só será promovida após estabilidade comprovada em todos os alvos suportados. As primeiras métricas Linux da prévia são registradas por `npm run desktop:metrics`; elas não substituem a matriz por plataforma. O guia completo está em [`docs/DESKTOP.md`](./docs/DESKTOP.md).
 
 ## Como o código está organizado
 

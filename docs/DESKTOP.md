@@ -16,11 +16,19 @@ A escolha privilegia um aplicativo leve em vez de empacotar um runtime Node ou u
 
 O pacote Linux validado nesta etapa é `Veritas_0.1.0-alpha.1_amd64.deb` e `Veritas_0.1.0-alpha.1_amd64.AppImage`. O executável otimizado foi gerado pelo Tauri com o nome `veritas`. A configuração declara os três sistemas, mas o sandbox Linux não pode afirmar uma compilação nativa de Windows ou macOS sem seus respectivos toolchains e runners.
 
+A prévia pública está em [`desktop-v0.1.0-alpha.1`](https://github.com/Lucas-Belucci-Bellini/Veritas/releases/tag/desktop-v0.1.0-alpha.1). Ela contém o instalador oficial `Veritas-Setup.exe` para Windows x64, os dois pacotes Linux e os bundles macOS gerados nos runners nativos. A release também publica `SHA256SUMS` e `desktop-release-manifest.json`, ambos associados à tag e ao commit de build. A existência e a assinatura de tipo do `.exe` foram verificadas localmente como instalador PE/NSIS; a instalação, execução, atalho, atualização e remoção no Windows permanecem **NOT VERIFIED** até executar o instalador em uma máquina Windows.
+
 ## Desenvolvimento local
 
-Depois de instalar as dependências JavaScript, o shell pode ser executado com `npm run desktop:dev`. O comando usa o servidor Vite em `http://localhost:5173`, a porta é fixa para evitar que o Tauri carregue uma aplicação diferente e o watcher ignora `src-tauri/`. Para compilar o shell sem empacotar, use `npm run tauri -- build --no-bundle`. Para os pacotes Linux, use `npm run desktop:build:linux` em uma máquina com as bibliotecas WebKitGTK e GTK exigidas pela distribuição.
+Depois de instalar as dependências JavaScript, o shell pode ser executado com `npm run desktop:dev`. O comando usa o servidor Vite em `http://localhost:5173`, a porta é fixa para evitar que o Tauri carregue uma aplicação diferente e o watcher ignora `src-tauri/`. Para compilar o shell sem empacotar, use `npm run tauri -- build --no-bundle`. Para os pacotes Linux, use `npm run desktop:build:linux` em uma máquina com as bibliotecas WebKitGTK e GTK exigidas pela distribuição. Para capturar métricas locais de tamanho, criação do processo e memória ociosa, use `npm run desktop:metrics`; o script não envia dados pela rede e deixa medidas que exigem interação como `NOT VERIFIED`.
 
-O manifesto nativo está em [`src-tauri/tauri.conf.json`](../src-tauri/tauri.conf.json), o código de entrada em [`src-tauri/src/`](../src-tauri/src/) e os scripts no [`package.json`](../package.json). O workflow [`desktop-release.yml`](../.github/workflows/desktop-release.yml) constrói os artefatos em runners nativos e os anexa a uma release existente do GitHub. Ele não cria uma release sem uma tag já validada, evitando publicar uma versão não testada por acidente.
+O manifesto nativo está em [`src-tauri/tauri.conf.json`](../src-tauri/tauri.conf.json), o código de entrada em [`src-tauri/src/`](../src-tauri/src/) e os scripts no [`package.json`](../package.json). O workflow [`desktop-release.yml`](../.github/workflows/desktop-release.yml) constrói os artefatos em runners nativos, gera o manifesto por [`generate-desktop-manifest.mjs`](../scripts/generate-desktop-manifest.mjs) e os anexa a uma release desktop. Ele só aceita uma tag SemVer válida — `desktop-vX.Y.Z` no disparo automático ou uma tag informada manualmente — e cria a release como prévia quando ela ainda não existe. O manifesto falha fechado se o conjunto não contiver exatamente os formatos allowlisted de Windows, macOS e Linux.
+
+## Métricas iniciais
+
+Na prévia Linux `0.1.0-alpha.1`, o executável otimizado mediu 11.203.024 bytes, o pacote Debian 3.176.986 bytes e o AppImage 77.748.728 bytes no build local. O tempo até criação do processo foi 1,59 ms e o RSS ocioso observado foi 170.532 kB no sandbox. Esses números são uma linha de base técnica, não um compromisso de desempenho nem uma medição de startup completo da interface. Memória durante simulação, installed size real e métricas Windows/macOS permanecem `NOT VERIFIED`.
+
+Os dados brutos ficam em `artifacts/desktop-metrics-0.1.0-alpha.1.json` e a versão legível em `artifacts/desktop-metrics-0.1.0-alpha.1.md`. As métricas devem ser comparadas por release e por plataforma, investigando qualquer aumento significativo antes de aceitar uma nova feature.
 
 ## Testes por maturidade
 
@@ -37,7 +45,7 @@ A existência de um instalador `.exe` não será tratada como sinônimo de estab
 
 ## Windows e o instalador `.exe`
 
-O workflow usa o bundle NSIS do Tauri e produz um instalador `.exe` em `src-tauri/target/release/bundle/nsis/`. O Windows precisa do WebView2 e das Microsoft C++ Build Tools para desenvolvimento e build. O modo configurado usa o bootstrapper silencioso do WebView2 quando o runtime não estiver presente; a política final de distribuição será confirmada nos testes da 0.5.0 para equilibrar instalação leve e execução offline.
+O workflow usa o bundle NSIS do Tauri e produz um instalador `.exe` em `src-tauri/target/release/bundle/nsis/`, normalizado para o nome oficial `Veritas-Setup.exe` antes do upload. A primeira prévia pública já publicou esse arquivo na release desktop. O Windows precisa do WebView2 e das Microsoft C++ Build Tools para desenvolvimento e build. O modo configurado usa o bootstrapper silencioso do WebView2 quando o runtime não estiver presente; a política final de distribuição será confirmada nos testes da 0.5.0 para equilibrar instalação leve e execução offline.
 
 A distribuição pública do `.exe` deverá receber assinatura Authenticode antes de ser tratada como release estável. Certificados, segredo de assinatura e eventual notarização não serão armazenados no repositório. Enquanto a assinatura não estiver configurada, o artefato pode ser usado para testes internos, mas deve ser identificado como prévia.
 
