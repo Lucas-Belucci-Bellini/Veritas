@@ -43,7 +43,7 @@ export function SequentialWorkspace() {
   }
 
   function changeDemo(value: string) {
-    if (!['dff-clock', 'tff-clock', 'delay', 'feedback-counter'].includes(value)) return
+    if (!['dff-clock', 'tff-clock', 'jk-clock', 'sr-clock', 'delay', 'feedback-counter'].includes(value)) return
     reset(value as SequentialDemoId)
   }
 
@@ -107,6 +107,8 @@ export function SequentialWorkspace() {
           >
             <option value="dff-clock">Flip-flop D com clock</option>
             <option value="tff-clock">Flip-flop T com clock</option>
+            <option value="jk-clock">Flip-flop JK com clock</option>
+            <option value="sr-clock">Flip-flop SR com clock</option>
             <option value="delay">Atraso de propagação</option>
             <option value="feedback-counter">Contador com feedback</option>
           </select>

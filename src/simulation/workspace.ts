@@ -1,7 +1,7 @@
 import { Simulator } from './simulator'
 import type { Netlist } from './components'
 
-export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'delay' | 'feedback-counter'
+export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'jk-clock' | 'sr-clock' | 'delay' | 'feedback-counter'
 export type SequentialControlMode = 'auto-clock' | 'manual-input' | 'manual-clock'
 
 export interface SequentialWatch {
@@ -72,6 +72,56 @@ const TFF_CLOCK: SequentialDemo = {
   },
 }
 
+const JK_CLOCK: SequentialDemo = {
+  id: 'jk-clock',
+  title: 'Flip-flop JK com clock',
+  description: 'J e K são amostrados na borda de subida: hold, set, reset ou toggle.',
+  controlMode: 'auto-clock',
+  controls: ['j', 'k'],
+  initialInputs: { j: false, k: false },
+  watch: [
+    { nodeId: 'j', label: 'J' },
+    { nodeId: 'k', label: 'K' },
+    { nodeId: 'clk', label: 'CLK' },
+    { nodeId: 'ff', label: 'Q' },
+    { nodeId: 'ff', label: 'Q̄', port: 1 },
+  ],
+  netlist: {
+    components: [
+      { id: 'j', type: 'input' },
+      { id: 'k', type: 'input' },
+      { id: 'clk', type: 'clock', options: { period: 1 } },
+      { id: 'ff', type: 'jk', inputs: [{ node: 'j' }, { node: 'k' }, { node: 'clk' }] },
+      { id: 'qout', type: 'output', inputs: [{ node: 'ff' }] },
+    ],
+  },
+}
+
+const SR_CLOCK: SequentialDemo = {
+  id: 'sr-clock',
+  title: 'Flip-flop SR com clock',
+  description: 'S e R são amostrados na borda de subida; S=R=1 preserva o estado de forma determinística.',
+  controlMode: 'auto-clock',
+  controls: ['s', 'r'],
+  initialInputs: { s: false, r: false },
+  watch: [
+    { nodeId: 's', label: 'S' },
+    { nodeId: 'r', label: 'R' },
+    { nodeId: 'clk', label: 'CLK' },
+    { nodeId: 'ff', label: 'Q' },
+    { nodeId: 'ff', label: 'Q̄', port: 1 },
+  ],
+  netlist: {
+    components: [
+      { id: 's', type: 'input' },
+      { id: 'r', type: 'input' },
+      { id: 'clk', type: 'clock', options: { period: 1 } },
+      { id: 'ff', type: 'sr', inputs: [{ node: 's' }, { node: 'r' }, { node: 'clk' }] },
+      { id: 'qout', type: 'output', inputs: [{ node: 'ff' }] },
+    ],
+  },
+}
+
 const DELAY: SequentialDemo = {
   id: 'delay',
   title: 'Atraso de propagação',
@@ -118,6 +168,8 @@ const FEEDBACK_COUNTER: SequentialDemo = {
 export const SEQUENTIAL_DEMOS: readonly SequentialDemo[] = [
   DFF_CLOCK,
   TFF_CLOCK,
+  JK_CLOCK,
+  SR_CLOCK,
   DELAY,
   FEEDBACK_COUNTER,
 ]

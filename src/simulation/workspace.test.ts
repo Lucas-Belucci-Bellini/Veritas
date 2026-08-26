@@ -15,6 +15,63 @@ describe('workspace sequencial', () => {
     expect(getSequentialDemo('feedback-counter').controlMode).toBe('manual-clock')
   })
 
+  it('expõe demos JK/SR com controles e watches observáveis', () => {
+    expect(getSequentialDemo('jk-clock')).toMatchObject({
+      controlMode: 'auto-clock',
+      controls: ['j', 'k'],
+      initialInputs: { j: false, k: false },
+      watch: expect.arrayContaining([
+        { nodeId: 'ff', label: 'Q' },
+        { nodeId: 'ff', label: 'Q̄', port: 1 },
+      ]),
+    })
+    expect(getSequentialDemo('sr-clock')).toMatchObject({
+      controlMode: 'auto-clock',
+      controls: ['s', 'r'],
+      initialInputs: { s: false, r: false },
+    })
+  })
+
+  it('executa hold, set, reset e toggle na demo JK', () => {
+    const simulator = createSequentialSimulator('jk-clock')
+
+    simulator.setInput('j', true)
+    simulator.setInput('k', false)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+
+    simulator.setInput('j', false)
+    simulator.setInput('k', true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(false)
+
+    simulator.setInput('j', true)
+    simulator.setInput('k', true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(false)
+  })
+
+  it('executa set, hold e reset na demo SR', () => {
+    const simulator = createSequentialSimulator('sr-clock')
+
+    simulator.setInput('s', true)
+    simulator.setInput('r', false)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+
+    simulator.setInput('s', false)
+    simulator.setInput('r', false)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(true)
+
+    simulator.setInput('s', false)
+    simulator.setInput('r', true)
+    simulator.tick(2)
+    expect(simulator.read('ff')).toBe(false)
+  })
+
   it('captura D na borda de subida do clock automático', () => {
     const simulator = createSequentialSimulator('dff-clock')
     simulator.setInput('d', true)
