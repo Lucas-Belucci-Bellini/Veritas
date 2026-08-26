@@ -46,7 +46,8 @@
     "desktop:build": "tauri build",
     "desktop:build:linux": "tauri build --bundles deb,appimage",
     "desktop:build:windows": "tauri build --bundles nsis",
-    "desktop:build:macos": "tauri build --bundles app,dmg"
+    "desktop:build:macos": "tauri build --bundles app,dmg",
+    "desktop:metrics": "node scripts/desktop-metrics.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

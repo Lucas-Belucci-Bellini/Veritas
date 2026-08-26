@@ -34,15 +34,13 @@ jobs:
           - platform: windows
             os: windows-latest
             args: "--bundles nsis"
-            artifact_glob: |
-              src-tauri/target/release/bundle/nsis/*.exe
-              Veritas-Setup.exe
+            artifact_glob: "Veritas-Setup.exe"
           - platform: macos
             os: macos-latest
             args: "--bundles app,dmg"
             artifact_glob: |
               src-tauri/target/release/bundle/dmg/*.dmg
-              veritas-desktop-*.app.zip
+              Veritas_0.1.0-alpha.1_*.app.zip
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -91,7 +89,13 @@ jobs:
           set -euo pipefail
           app="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -type d -name '*.app' -print -quit)"
           test -n "$app"
-          ditto -c -k --sequesterRsrc --keepParent "$app" "veritas-desktop-${GITHUB_SHA}.app.zip"
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64) suffix="aarch64" ;;
+            x86_64) suffix="x86_64" ;;
+            *) suffix="$arch" ;;
+          esac
+          ditto -c -k --sequesterRsrc --keepParent "$app" "Veritas_0.1.0-alpha.1_${suffix}.app.zip"
 
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
@@ -149,6 +153,11 @@ jobs:
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" --title "Veritas Desktop $RELEASE_TAG" --prerelease --generate-notes
           fi
-          legacy_asset="Veritas_0.1.0-alpha.1_x64-setup.exe"
-          gh release delete-asset "$RELEASE_TAG" "$legacy_asset" --yes >/dev/null 2>&1 || true
+          while IFS= read -r asset; do
+            case "$asset" in
+              Veritas_0.1.0-alpha.1_x64-setup.exe|veritas-desktop-*.app.zip|Veritas_0.1.0-alpha.1_*.app.zip)
+                gh release delete-asset "$RELEASE_TAG" "$asset" --yes >/dev/null 2>&1 || true
+                ;;
+            esac
+          done < <(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')
           find desktop-artifacts -type f -print0 | xargs -0 gh release upload "$RELEASE_TAG" --clobber
