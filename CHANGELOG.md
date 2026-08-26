@@ -10,6 +10,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - Adicionados testes determinísticos do medidor desktop e do gerador `desktop-release-manifest.json`/`SHA256SUMS`, incluindo rejeição fail-closed de assets inesperados.
 - O workflow desktop passou a bloquear builds nativos sem `test`, typecheck, lint e build web; os runners Windows/Linux também executam smoke de instalação, startup e remoção com limites explícitos.
 - O painel de testbench agora edita casos sequenciais com passos, entradas `0/1/mantém`, ticks e expectativas por saída, usando o mesmo runner declarativo do domínio; a ponte UI→Simulator ganhou regressão permanente para um registrador.
+- Testbenches agora podem ser salvos, atualizados, reabertos, removidos, importados e exportados localmente como `veritas-testbenches` versão 1; a nova tabela IndexedDB é associada ao circuito e o parser recusa formato, modos e limites inválidos.
 
 ## [0.12.0] — 2026-08-25
 

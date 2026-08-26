@@ -115,6 +115,8 @@ A publicação quality-gated `desktop-v0.1.0-alpha.1` também executou um smoke 
 
 O painel de testbench deixou de ser apenas combinacional: agora permite criar casos sequenciais, editar passos, alternar entradas entre `0`, `1` e `mantém`, definir ticks e conferir expectativas por saída. A transformação continua declarativa e reutiliza `runTestbench`; `tests/regression/sequential-testbench.test.ts` prova a ponte UI→Simulator com um registrador. A verificação visual interativa do painel não foi executada neste ambiente porque o navegador de sandbox não estava disponível; o preview HTTP e o build web passaram.
 
+Testbenches agora também são dados persistentes: a versão 5 do IndexedDB adiciona `testbenchProjects` associado ao circuito, e a UI oferece novo, salvar, atualizar, carregar, remover, importar e exportar. O formato `veritas-testbenches` versão 1 é validado fail-closed, aplica os limites canônicos de casos/tiques e não executa conteúdo importado. Os fluxos de salvar/reabrir no navegador real e a inspeção visual interativa continuam aguardando smoke de runtime; os testes fake-IndexedDB e de round-trip passaram localmente.
+
 ### Atualização da implementação — Desktop 0.1.0-alpha.1
 
 O Veritas agora possui um shell desktop leve em Tauri 2, separado da numeração do núcleo web. A configuração embute `dist/` no binário, usa a porta fixa `5173` no desenvolvimento e não introduz servidor, conta, telemetria ou endpoint obrigatório. O fluxo de cálculo, simulação, IndexedDB local e exportação permanece no frontend já validado.

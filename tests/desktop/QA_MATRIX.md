@@ -49,6 +49,7 @@ O Linux possui a maior evidência desta prévia. O build Tauri, o pacote Debian,
 | Helpers de métricas desktop | 4 testes: parser de RSS, tamanho de arquivos, binário ausente e geração de JSON/Markdown sem rede | PASSED localmente |
 | Gerador de manifesto/checksum | 2 testes: determinismo para os cinco assets allowlisted e rejeição fail-closed de arquivo inesperado | PASSED localmente |
 | Testbench sequencial UI→domínio | 4 testes puros de rascunho e 1 regressão cross-layer com registrador, além de 19 testes do runner de domínio | PASSED localmente |
+| Testbench local persistente | 4 testes: CRUD por circuito, ordenação, round-trip/import e rejeição de JSON/formato/modos inválidos | PASSED localmente |
 | Medição Linux | `npm run desktop:metrics`, baseline de tamanho, spawn e RSS ocioso; simulação e installed size explicitamente não inferidos | PASSED para medidas disponíveis; demais campos `NOT VERIFIED` |
 
 A regressão cruzada usa `buildTruthTable(parse(expression))` como intenção e `createDocumentRuntime()`/`Simulator` como execução do `CircuitDocument`. Qualquer divergência ou não-estabilização faz o teste falhar e impede o gate automatizado da release; isso não transforma um teste local em validação de runtime desktop.
