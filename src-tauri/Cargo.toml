@@ -1,0 +1,23 @@
+[package]
+name = "veritas-desktop"
+version = "0.1.0-alpha.1"
+description = "Veritas — Tabelas Verdade e Circuitos Lógicos"
+authors = ["Lucas Belucci Bellini"]
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+repository = "https://github.com/Lucas-Belucci-Bellini/Veritas"
+
+[lib]
+name = "veritas_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "=2.11.5", features = [] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+default = ["custom-protocol"]

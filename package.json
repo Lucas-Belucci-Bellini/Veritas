@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.9.0-rc.15",
   "type": "module",
-  "description": "Calculadora de tabelas verdade e simulador de circuitos logicos, 100% no navegador.",
+  "description": "Calculadora de tabelas verdade e simulador de circuitos logicos, no navegador e em app desktop local.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -40,7 +40,13 @@
     "beta:readiness": "node scripts/beta-readiness.mjs",
     "release:guard": "node scripts/release-promotion-guard.mjs",
     "beta:evidence": "node scripts/aggregate-beta-evidence.mjs",
-    "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict"
+    "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugins/veritas-logic --strict",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "desktop:build:linux": "tauri build --bundles deb,appimage",
+    "desktop:build:windows": "tauri build --bundles nsis",
+    "desktop:build:macos": "tauri build --bundles app,dmg"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
@@ -54,6 +60,7 @@
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

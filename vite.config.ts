@@ -4,6 +4,15 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  server: {
+    // O Tauri usa uma porta fixa durante o desenvolvimento e não deve
+    // observar os fontes Rust como parte do grafo HMR do frontend.
+    port: 5173,
+    strictPort: true,
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
