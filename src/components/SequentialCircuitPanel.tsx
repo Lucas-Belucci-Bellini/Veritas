@@ -6,6 +6,7 @@ import {
   documentInputIds,
   documentWatches,
   runtimeValue,
+  preflightDocumentRuntime,
   snapshotDocumentRuntime,
   tickDocumentRuntimeAsync,
   type DocumentRuntimeDiagnosticPreview,
@@ -93,6 +94,7 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
   const inputIds = useMemo(() => documentInputIds(document), [document])
   const clockIds = useMemo(() => document.nodes.filter((node) => node.type === 'clock').map((node) => node.id), [document])
   const watches = useMemo(() => documentWatches(document), [document])
+  const executionSafety = useMemo(() => preflightDocumentRuntime(document, { customChips }), [document, customChips])
   const current = timeline[timeline.length - 1]
 
   function persist(
@@ -325,6 +327,15 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
   }
 
   const statusText = error ? 'erro' : isRunning ? 'executando' : current ? `tique ${current.tick}` : 'preparando'
+  const safetyText = executionSafety.status === 'acyclic'
+    ? 'topologia acíclica'
+    : executionSafety.status === 'temporal-feedback'
+      ? 'feedback temporal classificado'
+      : executionSafety.status === 'combinational-cycle'
+        ? 'ciclo combinacional detectado'
+        : executionSafety.status === 'unclassified-cycle'
+          ? 'ciclo não classificável'
+          : 'documento inválido'
   const remoteStateTick = requestedRuntimeState?.snapshot.tick
   const remoteStateAge = requestedRuntimeStateSentAt ? runtimeFreshness(requestedRuntimeStateSentAt)?.ageMs ?? null : null
   const remoteStateIsCurrent = requestedRuntimeStateBaseVersion !== undefined && currentBaseVersion !== undefined && runtimeOfferDecision(requestedRuntimeStateBaseVersion, currentBaseVersion) === 'current'
@@ -336,7 +347,7 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
         <div>
           <p className="text-xs font-semibold tracking-wide text-emerald-700 uppercase dark:text-emerald-300">Simulação temporal</p>
           <h3 className="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">Circuito do canvas conectado ao Simulator</h3>
-          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{statusText} · {persistenceStatus} · {presenceText} · duas fases preservam feedback sem laço infinito.</p>
+          <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{statusText} · {persistenceStatus} · {presenceText} · {safetyText} · duas fases preservam feedback sem laço infinito.</p>
           {runtimeMetrics && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">local: {runtimeMetrics.received} recebidos · {runtimeMetrics.applied} aplicados · {runtimeMetrics.versionConflicts} conflitos · {runtimeMetrics.expired + runtimeMetrics.invalidOrStale} expirados/rejeitados · {runtimeMetrics.publishFailures} falhas</p>}
           {runtimeMetrics && runtimeMetrics.events.length > 0 && <details className="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><summary className="cursor-pointer">histórico local ({runtimeMetrics.events.length})</summary><div className="mt-1 max-h-24 overflow-auto space-y-0.5">{[...runtimeMetrics.events].reverse().map((event) => <div key={event.id}><span className="font-mono">{new Date(event.at).toLocaleTimeString('pt-BR')}</span> · {event.message}</div>)}</div></details>}
         </div>
