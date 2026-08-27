@@ -20,8 +20,8 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 
 - O `Simulator` passou a contabilizar budgets de operações por tique e acumulados por runtime, com rollback atômico quando o limite é excedido; a ponte `documentRuntime` encaminha as opções sem duplicar a engine.
 - O adapter MCP `simulateCircuit` passou a aplicar budgets headless de operações e memória estimada, mantendo o limite público de 1000 tiques e executando `shutdown()` em `finally` para não reter o runtime após sucesso, erro ou watch inválido; as regressões MCP correspondentes passaram junto com a suíte.
-- Adicionados cancelamento cooperativo por `simulator.cancel()`, `AbortSignal`, `reset()` que limpa cancelamento e `shutdown()` idempotente que libera o estado interno. O preflight `documentRuntime` encaminha a análise estática de SCCs, e o runtime rejeita netlists acima do budget de memória estimada antes de alocar filas de delay. Os testes focados passaram: 53/53, incluindo 45 de Simulator/documentRuntime e 8 de análise estática/preflight.
-- A fase v2.7 permanece `Unreleased`: limites combinados por documento/worker, integração completa do preflight em UI/Worker/MCP/desktop, cancelamento assíncrono de operações longas, smoke visual e QA nativo ainda não foram concluídos.
+- Adicionados cancelamento cooperativo por `simulator.cancel()`, `AbortSignal`, `reset()` que limpa cancelamento e `shutdown()` idempotente que libera o estado interno. O preflight `documentRuntime` encaminha a análise estática de SCCs, o runtime rejeita netlists acima do budget de memória estimada antes de alocar filas de delay, e `tickAsync()` oferece yield/timeout com rollback. Os testes focados passaram: 57/57, sendo 35 de Simulator, 16 de documentRuntime e 6 de análise estática de circuitos.
+- A fase v2.7 permanece `Unreleased`: limites combinados por documento/worker, integração completa do preflight e do `tickAsync()` em UI/Worker/MCP/desktop, smoke visual e QA nativo ainda não foram concluídos.
 
 ### Trajetória de plataforma
 

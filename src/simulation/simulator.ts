@@ -23,6 +23,15 @@ interface NodeState {
   nextCounter: number
 }
 
+export interface SimulatorAsyncOptions {
+  /** Quantos tiques executar antes de devolver controle ao event loop. */
+  yieldEvery?: number
+  /** Tempo máximo da operação assíncrona, em milissegundos. */
+  timeoutMs?: number
+  /** Sinal adicional para cancelar esta execução. */
+  signal?: AbortSignal
+}
+
 export interface SimulatorOptions {
   /** Teto de tiques em `settle`, para não rodar para sempre. */
   maxSettleTicks?: number
@@ -63,7 +72,7 @@ export interface SettleDiagnostic {
   cyclePeriod?: number
 }
 
-export type SimulatorExecutionErrorCode = 'aborted' | 'cancelled' | 'shutdown' | 'operation-budget'
+export type SimulatorExecutionErrorCode = 'aborted' | 'cancelled' | 'shutdown' | 'operation-budget' | 'timeout'
 
 export class SimulatorExecutionError extends Error {
   readonly code: SimulatorExecutionErrorCode
@@ -85,6 +94,10 @@ export const DEFAULT_MAX_TOTAL_OPERATIONS = 1_000_000_000
 export const MAX_TOTAL_OPERATIONS = 10_000_000_000
 export const DEFAULT_MAX_MEMORY_BYTES = 64 * 1024 * 1024
 export const MAX_MEMORY_BYTES = 512 * 1024 * 1024
+export const DEFAULT_ASYNC_YIELD_EVERY = 16
+export const MAX_ASYNC_YIELD_EVERY = 1_000
+export const DEFAULT_ASYNC_TIMEOUT_MS = 30_000
+export const MAX_ASYNC_TIMEOUT_MS = 300_000
 
 /**
  * Simulador de circuitos por tiques.
@@ -291,6 +304,46 @@ export class Simulator {
           this.chargeOperation(operationsThisTick)
         })
         this.ticks += 1
+      }
+    } catch (error) {
+      this.restoreStateUnchecked(before)
+      this.operations = operationsBefore
+      throw error
+    }
+  }
+
+  /**
+   * Executa tiques devolvendo controle ao event loop entre lotes.
+   *
+   * A operação é transacional: timeout, cancelamento, abort ou budget restaura
+   * o estado anterior ao lote inteiro, sem deixar execução parcial publicada.
+   */
+  async tickAsync(count = 1, options: SimulatorAsyncOptions = {}): Promise<void> {
+    this.ensureRunnable(options.signal)
+    const requested = normalizeTickCount(count)
+    if (requested === 0) return
+    if (this.ticks + requested > this.maxTotalTicks) {
+      throw new RangeError(`O simulador excederia o orçamento total de ${this.maxTotalTicks} tiques.`)
+    }
+
+    const yieldEvery = normalizeAsyncYieldEvery(options.yieldEvery ?? DEFAULT_ASYNC_YIELD_EVERY)
+    const timeoutMs = normalizeAsyncTimeout(options.timeoutMs ?? DEFAULT_ASYNC_TIMEOUT_MS)
+    const startedAt = Date.now()
+    const before = this.exportState()
+    const operationsBefore = this.operations
+    try {
+      for (let index = 0; index < requested; index += 1) {
+        this.ensureRunnable(options.signal)
+        if (Date.now() - startedAt >= timeoutMs) {
+          throw new SimulatorExecutionError('timeout', `A execução excedeu o timeout de ${timeoutMs} ms.`)
+        }
+        this.tick()
+        if (Date.now() - startedAt >= timeoutMs && index + 1 < requested) {
+          throw new SimulatorExecutionError('timeout', `A execução excedeu o timeout de ${timeoutMs} ms.`)
+        }
+        if (index + 1 < requested && (index + 1) % yieldEvery === 0) {
+          await yieldExecution()
+        }
       }
     } catch (error) {
       this.restoreStateUnchecked(before)
@@ -520,12 +573,12 @@ export class Simulator {
     }
   }
 
-  private ensureRunnable(): void {
+  private ensureRunnable(signal?: AbortSignal): void {
     this.ensureNotShutdown()
     if (this.cancelled) {
       throw new SimulatorExecutionError('cancelled', 'A execução do simulador foi cancelada.')
     }
-    if (this.signal?.aborted) {
+    if (this.signal?.aborted || signal?.aborted) {
       throw new SimulatorExecutionError('aborted', 'A execução do simulador foi abortada.')
     }
   }
@@ -612,6 +665,24 @@ function normalizeMemoryBudget(value: number): number {
     throw new RangeError(`O orçamento de memória deve ser um inteiro entre 1024 e ${MAX_MEMORY_BYTES} bytes.`)
   }
   return value
+}
+
+function normalizeAsyncYieldEvery(value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_ASYNC_YIELD_EVERY) {
+    throw new RangeError(`O yield assíncrono deve ser um inteiro entre 1 e ${MAX_ASYNC_YIELD_EVERY} tiques.`)
+  }
+  return value
+}
+
+function normalizeAsyncTimeout(value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_ASYNC_TIMEOUT_MS) {
+    throw new RangeError(`O timeout assíncrono deve ser um inteiro entre 1 e ${MAX_ASYNC_TIMEOUT_MS} ms.`)
+  }
+  return value
+}
+
+function yieldExecution(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 function estimateNetlistMemory(netlist: Netlist): number {

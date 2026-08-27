@@ -176,6 +176,39 @@ describe('lógica combinacional', () => {
     expect(sim.read('g')).toBe(false)
   })
 
+  it('executa tiques assíncronos em lotes e preserva o estado', async () => {
+    const sim = new Simulator(andCircuit)
+    sim.setInput('a', true)
+    sim.setInput('b', true)
+
+    await sim.tickAsync(2, { yieldEvery: 1 })
+
+    expect(sim.tickCount).toBe(2)
+    expect(sim.read('g')).toBe(true)
+  })
+
+  it('faz rollback completo quando AbortSignal cancela entre lotes', async () => {
+    const controller = new AbortController()
+    const sim = new Simulator(andCircuit)
+    const before = sim.exportState()
+    const abortTimer = setTimeout(() => controller.abort(), 0)
+
+    await expect(sim.tickAsync(8, { yieldEvery: 1, signal: controller.signal })).rejects.toThrow('execução do simulador foi abortada')
+    clearTimeout(abortTimer)
+
+    expect(sim.exportState()).toEqual(before)
+    expect(sim.operationCount).toBe(0)
+  })
+
+  it('encerra tickAsync por timeout e valida opções assíncronas fail-closed', async () => {
+    const sim = new Simulator(andCircuit)
+
+    await expect(sim.tickAsync(1, { yieldEvery: 0 })).rejects.toThrow('yield assíncrono')
+    await expect(sim.tickAsync(1, { timeoutMs: 0 })).rejects.toThrow('timeout assíncrono')
+    await expect(sim.tickAsync(1_000, { yieldEvery: 1, timeoutMs: 1 })).rejects.toThrow('timeout de 1 ms')
+    expect(sim.tickCount).toBe(0)
+  })
+
   it('cancela execução de forma idempotente e permite reset explícito', () => {
     const sim = new Simulator(andCircuit)
     sim.cancel()

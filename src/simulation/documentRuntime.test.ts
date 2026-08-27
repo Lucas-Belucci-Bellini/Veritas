@@ -10,6 +10,7 @@ import {
   diagnoseDocumentRuntimePreview,
   documentInputIds,
   preflightDocumentRuntime,
+  tickDocumentRuntimeAsync,
   documentWatches,
   runtimeValue,
   snapshotDocumentRuntime,
@@ -100,6 +101,15 @@ describe('documentRuntime', () => {
 
     expect(diagnoseDocumentRuntime(simulator)).toMatchObject({ status: 'stabilized' })
     expect(simulator.read('out')).toBe(false)
+  })
+
+  it('executa tiques assíncronos pelo adaptador de documento e devolve snapshot', async () => {
+    const simulator = createDocumentRuntime(feedbackDocument())
+
+    const snapshot = await tickDocumentRuntimeAsync(simulator, 2, { yieldEvery: 1 })
+
+    expect(snapshot.tick).toBe(2)
+    expect(snapshot.values.ff).toEqual([false, true])
   })
 
   it('encaminha o budget de memória e rejeita delays excessivos antes da alocação', () => {

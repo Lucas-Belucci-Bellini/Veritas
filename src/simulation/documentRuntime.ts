@@ -6,7 +6,7 @@ import {
   type CircuitExecutionSafetyReport,
   type CustomChipLibraryEntry,
 } from '../circuit'
-import { Simulator, type SettleDiagnostic, type SimulatorState } from './simulator'
+import { Simulator, type SettleDiagnostic, type SimulatorAsyncOptions, type SimulatorState } from './simulator'
 
 export interface DocumentRuntimeSnapshot {
   tick: number
@@ -133,6 +133,15 @@ export function diagnoseDocumentRuntimePreview(
     snapshot: snapshotDocumentRuntime(simulator, document, options.customChips),
     simulatorState: simulator.exportState(),
   }
+}
+
+export async function tickDocumentRuntimeAsync(
+  simulator: Simulator,
+  count = 1,
+  options: SimulatorAsyncOptions = {},
+): Promise<DocumentRuntimeSnapshot> {
+  await simulator.tickAsync(count, options)
+  return snapshotDocumentRuntime(simulator)
 }
 
 export function snapshotDocumentRuntime(

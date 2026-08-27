@@ -14,6 +14,8 @@ O mesmo slice calcula uma estimativa determinística do estado do netlist antes 
 
 A execução também aceita `AbortSignal` e cancelamento explícito por `simulator.cancel()`. O cancelamento é cooperativo, verificável antes de cada tique e não transforma uma execução parcialmente mutada em estado aceito. `reset()` limpa o cancelamento e os contadores. `shutdown()` limpa nós e ordem interna de forma idempotente; chamadas posteriores falham de modo explícito, sem manter o runtime em memória.
 
+`tickAsync(count, options?)` executa em lotes com `yieldEvery`, timeout bounded e `AbortSignal` específico da operação. Timeout, abort, cancelamento ou budget restauram o snapshot anterior ao lote assíncrono; o adaptador `tickDocumentRuntimeAsync()` devolve um `DocumentRuntimeSnapshot` somente após a conclusão. O yield é cooperativo e não promete preempção durante uma chamada síncrona individual de `tick()`.
+
 A ponte `documentRuntime` encaminha esses limites por `DocumentRuntimeOptions` e expõe `diagnoseDocumentRuntime(simulator, maxTicks?)` como um adaptador fino para o diagnóstico do mesmo `Simulator`. Essa função é explicitamente operacional: o diagnóstico avança o runtime recebido e, portanto, não deve ser tratado como uma inspeção pura ou conectado à UI ativa sem uma cópia/preview isolada.
 
 O preflight `preflightDocumentRuntime(document, options?)` usa `analyzeCircuitExecutionSafety()` antes de criar o runtime. A análise iterativa de componentes fortemente conectados classifica ciclos como `combinational-cycle`, `temporal-feedback` ou `unclassified-cycle`; erros adicionais mantêm o status `invalid`. A ordem dos IDs e dos componentes é normalizada para que o relatório seja determinístico, inclusive em grafos que futuramente excedam a profundidade segura de recursão.
@@ -38,6 +40,7 @@ Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`
 | Budget de memória inválido ou netlist acima do limite | rejeição antes de alocar o estado do runtime |
 | Delay com quantidade inválida de tiques | rejeição `RangeError` fail-closed |
 | `AbortSignal` abortado ou `cancel()` chamado | rejeição cooperativa antes de executar |
+| `tickAsync()` excede timeout ou é abortado entre lotes | rollback do snapshot anterior e erro explícito `timeout`/`aborted` |
 | `shutdown()` repetido | operação idempotente; nós são limpos uma única vez |
 | Opção de construtor inválida | rejeição antes de iniciar o runtime |
 | Sequenciais com clock manual | usam `tick()`/pulsos controlados, não `settle()` como mecanismo de captura |
@@ -49,4 +52,4 @@ Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`
 
 ## Limites do marco
 
-Este marco protege o custo da operação de acomodação, o total de tiques de uma instância, os custos estimados de memória e operações do runtime, cancelamento cooperativo, limpeza explícita e classificação estática de ciclos no domínio, além de oferecer diagnóstico básico de repetição de estado. Ainda são trabalhos futuros limites combinados de memória/operações por documento/worker, integração do preflight em todas as superfícies UI/Worker/MCP/desktop, avaliação incremental/compilada, validação visual/desktop da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.
+Este marco protege o custo da operação de acomodação, o total de tiques de uma instância, os custos estimados de memória e operações do runtime, cancelamento cooperativo, limpeza explícita e classificação estática de ciclos no domínio, além de oferecer diagnóstico básico de repetição de estado. Ainda são trabalhos futuros limites combinados de memória/operações por documento/worker, integração do preflight e do cancelamento assíncrono em todas as superfícies UI/Worker/MCP/desktop, avaliação incremental/compilada, validação visual/desktop da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.
