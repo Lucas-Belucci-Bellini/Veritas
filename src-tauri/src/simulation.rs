@@ -13,6 +13,8 @@ pub const MAX_SERIALIZED_BYTES: usize = 500_000;
 pub const MAX_STEPS: usize = 256;
 pub const MAX_TICKS: u64 = 1_000;
 pub const MAX_WATCHES: usize = 128;
+pub const MAX_NATIVE_PROGRESS_MESSAGES: u64 = 64;
+pub const NATIVE_SIMULATION_PROGRESS_EVENT: &str = "veritas://simulation-progress";
 pub const MAX_REQUEST_ID_LENGTH: usize = 128;
 pub const DEFAULT_MAX_OPERATIONS: u64 = 1_000_000_000;
 pub const MAX_OPERATIONS: u64 = 10_000_000_000;
@@ -112,6 +114,15 @@ pub struct NativeSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NativeSimulationProgress {
+    #[serde(rename = "protocolVersion")]
+    pub protocol_version: u8,
+    #[serde(rename = "requestId")]
+    pub request_id: String,
+    pub snapshot: NativeSnapshot,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NativeSimulationResult {
     #[serde(rename = "protocolVersion")]
     pub protocol_version: u8,
@@ -193,6 +204,14 @@ pub fn execute_native(
     request: NativeSimulationRequest,
     cancel: Arc<AtomicBool>,
 ) -> Result<NativeSimulationResult, NativeSimulationError> {
+    execute_native_with_progress(request, cancel, |_| Ok(()))
+}
+
+pub fn execute_native_with_progress(
+    request: NativeSimulationRequest,
+    cancel: Arc<AtomicBool>,
+    mut emit: impl FnMut(NativeSimulationProgress) -> Result<(), NativeSimulationError>,
+) -> Result<NativeSimulationResult, NativeSimulationError> {
     let (request, limits) = validate_request(request)?;
     let watch = if request.watch.is_empty() {
         request
@@ -205,6 +224,14 @@ pub fn execute_native(
     };
     let mut simulator = NativeSimulator::new(&request.components, watch, limits)?;
     let mut snapshots = vec![simulator.snapshot()];
+    let total_ticks: u64 = request
+        .steps
+        .iter()
+        .map(|step| step.ticks.unwrap_or(1))
+        .sum();
+    let progress_stride =
+        (total_ticks.max(1) + MAX_NATIVE_PROGRESS_MESSAGES - 1) / MAX_NATIVE_PROGRESS_MESSAGES;
+    let mut completed_ticks = 0u64;
 
     for step in &request.steps {
         for (id, value) in &step.set {
@@ -213,6 +240,14 @@ pub fn execute_native(
         for _ in 0..step.ticks.unwrap_or(1) {
             simulator.tick(&cancel)?;
             snapshots.push(simulator.snapshot());
+            completed_ticks += 1;
+            if completed_ticks % progress_stride == 0 || completed_ticks == total_ticks {
+                emit(NativeSimulationProgress {
+                    protocol_version: NATIVE_PROTOCOL_VERSION,
+                    request_id: request.request_id.clone(),
+                    snapshot: simulator.snapshot(),
+                })?;
+            }
         }
     }
 
@@ -865,6 +900,52 @@ mod tests {
         let result = execute_native(fixture.request, Arc::new(AtomicBool::new(false)))
             .expect("shared fixture should execute");
         assert_eq!(result.snapshots, fixture.expected_snapshots);
+    }
+
+    #[test]
+    fn emits_bounded_progress_with_matching_request_id() {
+        let mut request = dff_request();
+        request.steps = vec![NativeStep {
+            set: BTreeMap::new(),
+            ticks: Some(1_000),
+        }];
+        let mut progress = Vec::new();
+        let result =
+            execute_native_with_progress(request, Arc::new(AtomicBool::new(false)), |event| {
+                progress.push(event);
+                Ok(())
+            })
+            .expect("request should execute");
+        assert_eq!(
+            result.snapshots.last().map(|snapshot| snapshot.tick),
+            Some(1_000)
+        );
+        assert!(!progress.is_empty());
+        assert!(progress.len() <= MAX_NATIVE_PROGRESS_MESSAGES as usize);
+        assert!(progress
+            .iter()
+            .all(|event| event.request_id == "native-dff"));
+        assert_eq!(
+            progress.last().map(|event| event.snapshot.tick),
+            Some(1_000)
+        );
+    }
+
+    #[test]
+    fn cancels_between_progress_callbacks() {
+        let mut request = dff_request();
+        request.steps = vec![NativeStep {
+            set: BTreeMap::new(),
+            ticks: Some(1_000),
+        }];
+        let cancel = Arc::new(AtomicBool::new(false));
+        let callback_cancel = cancel.clone();
+        let result = execute_native_with_progress(request, cancel, move |_| {
+            callback_cancel.store(true, Ordering::Relaxed);
+            Ok(())
+        })
+        .expect_err("callback cancellation should stop execution");
+        assert_eq!(result.code, "cancelled");
     }
 
     #[test]

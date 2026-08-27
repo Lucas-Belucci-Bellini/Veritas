@@ -10,7 +10,7 @@ A validação deve ocorrer no host e ser repetida no lado Rust antes de criar o 
 
 ## Comando e cancelamento
 
-O primeiro slice implementado expõe `simulate_circuit_native` como comando Tauri assíncrono com retorno final tipado e execução em `spawn_blocking`. O registro host-side associa um token cancelável a cada `requestId` e rejeita ids duplicados. Ainda não existe canal de eventos bounded para progresso; portanto o comando não deve ser descrito como integração desktop completa.
+O primeiro slice implementado expõe `simulate_circuit_native` como comando Tauri assíncrono com retorno final tipado e execução em `spawn_blocking`. O registro host-side associa um token cancelável a cada `requestId` e rejeita ids duplicados. O engine agora emite progresso no máximo 64 vezes por request, pelo evento `veritas://simulation-progress`, e o adapter frontend filtra `protocolVersion`/`requestId`; a UI ainda não liga esse caminho ao fluxo canônico e nenhum evento foi observado em runtime desktop.
 
 O cancelamento implementado é uma operação explícita associada ao `requestId`, com estado idempotente. O lado Rust deve observar o cancelamento entre tiques e durante yields controlados, devolver uma classificação equivalente a `cancelled` e liberar o runtime em `Drop`/guarda equivalente. Timeout do host e fechamento da janela devem encerrar a operação sem deixar thread, canal ou reserva pendente. A UI não deve tratar o cancelamento cooperativo como prova de interrupção física instantânea da thread.
 
@@ -28,7 +28,7 @@ A implementação Rust só poderá ser considerada runtime quando houver compara
 |---|---|---|
 | Contrato de dados TypeScript | Tipos, parser e serializer bounded | `PASSED` isolado para checkpoint Worker; não integrado |
 | Comando Tauri | Comando async, resposta tipada, erro versionado e registro de cancelamento | `BUILD VERIFIED`/`PASSED` no crate Linux; UI ainda não integrada |
-| Canal de progresso | Eventos bounded por `requestId`, teardown e cancelamento | `NOT IMPLEMENTED` |
+| Canal de progresso | Eventos bounded por `requestId`, filtragem host-side, teardown e cancelamento | `PASSED` em testes Rust/TypeScript; emissão Tauri e teardown em runtime desktop `NOT VERIFIED` |
 | Engine Rust | Execução determinística escalar, budgets e snapshots finais | `PASSED` em testes Rust Linux; runtime interativo não verificado |
 | Paridade TypeScript/Rust | Golden fixtures e primeira divergência diagnóstica | `PASSED` para fixture DFF escalar compartilhada em testes TypeScript/Rust; cobertura ampla e runtime interativo `NOT VERIFIED` |
 | Windows/macOS/Linux | Build e smoke nativo proporcional por alvo | `NOT VERIFIED` |

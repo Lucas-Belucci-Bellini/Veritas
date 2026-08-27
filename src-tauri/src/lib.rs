@@ -11,15 +11,17 @@ pub struct NativeCancellationRegistry {
 pub mod commands {
     use super::{Arc, AtomicBool, NativeCancellationRegistry};
     use crate::simulation::{
-        execute_native, NativeSimulationError, NativeSimulationRequest, NativeSimulationResult,
+        execute_native_with_progress, NativeSimulationError, NativeSimulationRequest,
+        NativeSimulationResult, NATIVE_SIMULATION_PROGRESS_EVENT,
     };
     use std::sync::atomic::Ordering;
-    use tauri::State;
+    use tauri::{Emitter, State};
 
     #[tauri::command]
     pub async fn simulate_circuit_native(
         request: NativeSimulationRequest,
         registry: State<'_, NativeCancellationRegistry>,
+        app: tauri::AppHandle,
     ) -> Result<NativeSimulationResult, NativeSimulationError> {
         let cancel = Arc::new(AtomicBool::new(false));
         {
@@ -39,14 +41,25 @@ pub mod commands {
         }
 
         let request_id = request.request_id.clone();
-        let result = tauri::async_runtime::spawn_blocking(move || execute_native(request, cancel))
-            .await
-            .map_err(|_| {
-                NativeSimulationError::new(
-                    "execution",
-                    "A execução nativa foi encerrada inesperadamente.",
-                )
-            })?;
+        let app = app.clone();
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            execute_native_with_progress(request, cancel, |progress| {
+                app.emit(NATIVE_SIMULATION_PROGRESS_EVENT, progress)
+                    .map_err(|error| {
+                        NativeSimulationError::new(
+                            "execution",
+                            format!("Falha ao emitir progresso nativo: {error}"),
+                        )
+                    })
+            })
+        })
+        .await
+        .map_err(|_| {
+            NativeSimulationError::new(
+                "execution",
+                "A execução nativa foi encerrada inesperadamente.",
+            )
+        })?;
         if let Ok(mut requests) = registry.requests.lock() {
             requests.remove(&request_id);
         }
