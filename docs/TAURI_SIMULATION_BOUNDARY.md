@@ -27,8 +27,8 @@ A implementação Rust só poderá ser considerada runtime quando houver compara
 | Camada | Evidência necessária | Estado atual |
 |---|---|---|
 | Contrato de dados TypeScript | Tipos, parser e serializer bounded | `PASSED` isolado para checkpoint Worker; não integrado |
-| Comando Tauri | Comando async, resposta tipada, erro versionado, registro de cancelamento e cleanup RAII | `BUILD VERIFIED`/`PASSED` no crate Linux; cleanup em retorno antecipado/join failure coberto por guarda; UI ainda não integrada |
-| Canal de progresso | Eventos bounded por `requestId`, filtragem host-side, teardown e cancelamento cooperativo por `yieldEvery` | `PASSED` em testes Rust/TypeScript, incluindo cancelamento observado por outra thread; emissão Tauri e teardown em runtime desktop `NOT VERIFIED` |
+| Comando Tauri | Comando async, resposta tipada, erro versionado, registro de cancelamento e cleanup RAII | `PASSED` no crate Linux e em harness IPC `MockRuntime`: `invoke` de sucesso retornou snapshots/requestId e payload desconhecido foi rejeitado fail-closed; cleanup em retorno antecipado/join failure coberto por guarda; UI ainda não integrada |
+| Canal de progresso | Eventos bounded por `requestId`, filtragem host-side, teardown e cancelamento cooperativo por `yieldEvery` | `PASSED` em testes Rust/TypeScript e no harness IPC `MockRuntime`, que recebeu evento bounded com versão/requestId; emissão/teardown em runtime desktop real `NOT VERIFIED` |
 | Engine Rust | Execução determinística escalar, budgets e snapshots finais | `PASSED` em testes Rust Linux; runtime interativo não verificado |
 | Paridade TypeScript/Rust | Golden fixtures e primeira divergência diagnóstica | `PASSED` para fixtures DFF, TFF, JK, SR, delay e feedback escalares compartilhadas em testes TypeScript/Rust; cobertura ampla e runtime interativo `NOT VERIFIED` |
 | Windows/macOS/Linux | Build e smoke nativo proporcional por alvo | `BUILD VERIFIED` para Linux x86-64 com `deb`/`AppImage`; `SMOKE VERIFIED` limitado para instalar/iniciar/remover o `.deb` sob Xvfb. Windows/macOS têm artifacts `BUILD VERIFIED`; runtime/instalação nesses alvos permanecem `NOT VERIFIED` |

@@ -90,18 +90,16 @@ pub mod commands {
         }
     }
 
-    #[tauri::command]
-    pub async fn simulate_circuit_native(
+    pub(crate) async fn simulate_circuit_native_for_runtime<R: tauri::Runtime>(
         request: NativeSimulationRequest,
         registry: State<'_, NativeCancellationRegistry>,
-        app: tauri::AppHandle,
+        app: tauri::AppHandle<R>,
     ) -> Result<NativeSimulationResult, NativeSimulationError> {
         let cancel = Arc::new(AtomicBool::new(false));
         let _cleanup = registry
             .register(&request.request_id, cancel.clone())
             .map_err(map_registry_error)?;
 
-        let app = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
             execute_native_with_progress(request, cancel, |progress| {
                 app.emit(NATIVE_SIMULATION_PROGRESS_EVENT, progress)
@@ -123,6 +121,15 @@ pub mod commands {
     }
 
     #[tauri::command]
+    pub async fn simulate_circuit_native(
+        request: NativeSimulationRequest,
+        registry: State<'_, NativeCancellationRegistry>,
+        app: tauri::AppHandle,
+    ) -> Result<NativeSimulationResult, NativeSimulationError> {
+        simulate_circuit_native_for_runtime(request, registry, app).await
+    }
+
+    #[tauri::command]
     pub fn cancel_circuit_native(
         request_id: String,
         registry: State<'_, NativeCancellationRegistry>,
@@ -133,8 +140,132 @@ pub mod commands {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Arc, AtomicBool, NativeCancellationRegistry, NativeRegistryError};
+    use crate::simulation::{
+        NativeSimulationError, NativeSimulationRequest, NativeSimulationResult,
+        NATIVE_SIMULATION_PROGRESS_EVENT,
+    };
+    use serde_json::{json, Value};
     use std::sync::atomic::Ordering;
+    use std::sync::mpsc::sync_channel;
+    use std::time::Duration;
+    use tauri::test::{get_ipc_response, mock_builder, mock_context, noop_assets};
+    use tauri::webview::InvokeRequest;
+    use tauri::{ipc::InvokeBody, Listener, Manager, State, WebviewWindowBuilder};
+
+    fn mock_native_window() -> (
+        tauri::App<tauri::test::MockRuntime>,
+        tauri::WebviewWindow<tauri::test::MockRuntime>,
+    ) {
+        let app = mock_builder()
+            .manage(NativeCancellationRegistry::default())
+            .invoke_handler(tauri::generate_handler![
+                crate::tests::simulate_circuit_native,
+                crate::commands::cancel_circuit_native
+            ])
+            .build(mock_context(noop_assets()))
+            .expect("mock Tauri app should build");
+        let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("mock Tauri window should build");
+        (app, window)
+    }
+
+    fn invoke_request(command: &str, body: Value) -> InvokeRequest {
+        InvokeRequest {
+            cmd: command.to_owned(),
+            callback: tauri::ipc::CallbackFn(0),
+            error: tauri::ipc::CallbackFn(1),
+            url: "tauri://localhost".parse().expect("mock URL should parse"),
+            body: InvokeBody::Json(body),
+            headers: Default::default(),
+            invoke_key: tauri::test::INVOKE_KEY.to_owned(),
+        }
+    }
+
+    #[tauri::command]
+    async fn simulate_circuit_native(
+        request: NativeSimulationRequest,
+        registry: State<'_, NativeCancellationRegistry>,
+        app: tauri::AppHandle<tauri::test::MockRuntime>,
+    ) -> Result<NativeSimulationResult, NativeSimulationError> {
+        crate::commands::simulate_circuit_native_for_runtime(request, registry, app).await
+    }
+
+    fn scalar_dff_invoke_body(request_id: &str) -> Value {
+        json!({
+            "request": {
+                "protocolVersion": 1,
+                "requestId": request_id,
+                "components": [
+                    { "id": "d", "type": "input" },
+                    { "id": "clk", "type": "clock", "options": { "period": 1 } },
+                    { "id": "ff", "type": "dff", "inputs": [
+                        { "node": "d" },
+                        { "node": "clk" }
+                    ] },
+                ],
+                "steps": [
+                    { "set": { "d": true }, "ticks": 1 },
+                    { "ticks": 1 }
+                ],
+                "watch": ["d", "clk", "ff"],
+                "yieldEvery": 1,
+                "timeoutMs": 30000
+            }
+        })
+    }
+
+    #[test]
+    fn invoke_executes_native_command_and_emits_bounded_progress() {
+        let (app, window) = mock_native_window();
+        let (progress_tx, progress_rx) = sync_channel(4);
+        let listener_id = app.listen(NATIVE_SIMULATION_PROGRESS_EVENT, move |event| {
+            let _ = progress_tx.send(event.payload().to_owned());
+        });
+
+        let response = get_ipc_response(
+            &window,
+            invoke_request(
+                "simulate_circuit_native",
+                scalar_dff_invoke_body("ipc-success"),
+            ),
+        )
+        .expect("invoke should return a successful response")
+        .deserialize::<Value>()
+        .expect("response should be valid JSON");
+
+        app.unlisten(listener_id);
+        assert_eq!(
+            app.state::<NativeCancellationRegistry>()
+                .cancel("ipc-success"),
+            Err(NativeRegistryError::Missing)
+        );
+        assert_eq!(response["protocolVersion"], 1);
+        assert_eq!(response["requestId"], "ipc-success");
+        assert_eq!(response["snapshots"].as_array().map(Vec::len), Some(3));
+        let progress_payload = progress_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("invoke should emit at least one bounded progress event");
+        let progress: Value =
+            serde_json::from_str(&progress_payload).expect("progress should be JSON");
+        assert_eq!(progress["protocolVersion"], 1);
+        assert_eq!(progress["requestId"], "ipc-success");
+    }
+
+    #[test]
+    fn invoke_rejects_unknown_native_request_fields_fail_closed() {
+        let (_app, window) = mock_native_window();
+        let mut body = scalar_dff_invoke_body("ipc-invalid");
+        body["request"]["unknown"] = json!(true);
+
+        let error = get_ipc_response(&window, invoke_request("simulate_circuit_native", body))
+            .expect_err("invoke should reject unknown fields");
+
+        let message = error.as_str().unwrap_or_default();
+        assert!(!message.is_empty());
+        assert!(message.contains("unknown") || message.contains("desconhecido"));
+    }
 
     #[test]
     fn registry_rejects_duplicate_request_ids_and_cleans_on_drop() {
