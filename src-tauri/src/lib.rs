@@ -105,11 +105,16 @@ pub mod commands {
         app: tauri::AppHandle<R>,
     ) -> Result<NativeSimulationResult, NativeSimulationError> {
         let cancel = Arc::new(AtomicBool::new(false));
+        let native_cancel_smoke_enabled =
+            std::env::args().any(|argument| argument == "--native-smoke-cancel");
         let _cleanup = registry
             .register(&request.request_id, cancel.clone())
             .map_err(map_registry_error)?;
 
         tauri::async_runtime::spawn_blocking(move || {
+            if native_cancel_smoke_enabled {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
             execute_native_with_progress(request, cancel, |progress| {
                 app.emit(NATIVE_SIMULATION_PROGRESS_EVENT, progress)
                     .map_err(|error| {
@@ -159,6 +164,23 @@ pub mod commands {
     }
 
     #[derive(Serialize)]
+    struct NativeSmokeCancelMarker {
+        #[serde(rename = "protocolVersion")]
+        protocol_version: u8,
+        #[serde(rename = "requestId")]
+        request_id: String,
+        status: &'static str,
+        #[serde(rename = "cancelResult")]
+        cancel_result: String,
+        #[serde(rename = "outcomeCode")]
+        outcome_code: String,
+        #[serde(rename = "progressEvents")]
+        progress_events: u64,
+        #[serde(rename = "lateProgressEvents")]
+        late_progress_events: u64,
+    }
+
+    #[derive(Serialize)]
     struct NativeSmokeFailureMarker {
         #[serde(rename = "protocolVersion")]
         protocol_version: u8,
@@ -183,8 +205,19 @@ pub mod commands {
     }
 
     #[tauri::command]
+    pub fn native_smoke_mode() -> &'static str {
+        if std::env::args().any(|argument| argument == "--native-smoke-cancel") {
+            "cancel"
+        } else if std::env::args().any(|argument| argument == "--native-smoke") {
+            "success"
+        } else {
+            "disabled"
+        }
+    }
+
+    #[tauri::command]
     pub fn is_native_smoke_enabled() -> bool {
-        std::env::args().any(|argument| argument == "--native-smoke")
+        native_smoke_mode() != "disabled"
     }
 
     #[tauri::command]
@@ -220,6 +253,50 @@ pub mod commands {
         })?;
         write_native_smoke_marker(bytes)?;
         Ok(())
+    }
+
+    #[tauri::command]
+    pub fn finish_native_cancel_smoke(
+        request_id: String,
+        cancel_result: String,
+        outcome_code: String,
+        progress_events: u64,
+        late_progress_events: u64,
+    ) -> Result<(), NativeSimulationError> {
+        if request_id != NATIVE_SMOKE_REQUEST_ID {
+            return Err(NativeSimulationError::new(
+                "invalid-request",
+                "requestId inválido para o smoke nativo.",
+            ));
+        }
+        if cancel_result != "ok"
+            || outcome_code != "cancelled"
+            || progress_events > crate::simulation::MAX_NATIVE_PROGRESS_MESSAGES
+            || late_progress_events != 0
+        {
+            return Err(NativeSimulationError::new(
+                "invalid-request",
+                format!(
+                    "O smoke de cancelamento não comprovou cancelamento cooperativo: cancelResult={cancel_result}, outcomeCode={outcome_code}, progressEvents={progress_events}, lateProgressEvents={late_progress_events}.",
+                ),
+            ));
+        }
+        let marker = NativeSmokeCancelMarker {
+            protocol_version: crate::simulation::NATIVE_PROTOCOL_VERSION,
+            request_id,
+            status: "success",
+            cancel_result,
+            outcome_code,
+            progress_events,
+            late_progress_events,
+        };
+        let bytes = serde_json::to_vec_pretty(&marker).map_err(|error| {
+            NativeSimulationError::new(
+                "execution",
+                format!("Falha ao serializar o marcador de cancelamento: {error}"),
+            )
+        })?;
+        write_native_smoke_marker(bytes)
     }
 
     #[tauri::command]
@@ -446,7 +523,8 @@ mod tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let native_smoke_enabled = std::env::args().any(|argument| argument == "--native-smoke");
+    let native_smoke_enabled = std::env::args()
+        .any(|argument| argument == "--native-smoke" || argument == "--native-smoke-cancel");
     tauri::Builder::default()
         .manage(NativeCancellationRegistry::default())
         .setup(move |app| {
@@ -473,8 +551,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::simulate_circuit_native,
             commands::cancel_circuit_native,
+            commands::native_smoke_mode,
             commands::is_native_smoke_enabled,
             commands::finish_native_smoke,
+            commands::finish_native_cancel_smoke,
             commands::record_native_smoke_failure
         ])
         .run(tauri::generate_context!())
