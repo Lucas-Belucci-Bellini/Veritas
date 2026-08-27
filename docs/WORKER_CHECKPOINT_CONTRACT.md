@@ -4,7 +4,7 @@ Este documento define o contrato mínimo para uma futura continuidade de execuç
 
 ## Estado atual
 
-O Worker v1 executa uma sequência completa dentro de um único request e devolve snapshots. A UI mantém `Step`/`Run` no runtime canônico direto. A regressão `workerSequentialParity.test.ts` prova apenas que uma fixture DFF escalar produz os mesmos snapshots no Worker e no `Simulator` dentro de um request. Nenhum campo de checkpoint é aceito pelo protocolo v1 e nenhum componente da UI deve enviar ou restaurar checkpoint até a versão do protocolo, parser e gates deste documento estarem implementados.
+O Worker v1 executa uma sequência completa dentro de um único request e devolve snapshots. A UI mantém `Step`/`Run` no runtime canônico direto. Este contrato também é distinto do `runtimeCheckpoint` existente para persistência local do estado do Simulator/documento: o checkpoint Worker é um envelope de transporte versionado para futura troca segura de runtime e não altera o armazenamento local já existente. A regressão `workerSequentialParity.test.ts` prova apenas que uma fixture DFF escalar produz os mesmos snapshots no Worker e no `Simulator` dentro de um request. Nenhum campo de checkpoint é aceito pelo protocolo v1 e nenhum componente da UI deve enviar ou restaurar checkpoint até a versão do protocolo, parser e gates deste documento estarem implementados.
 
 ## Envelope versionado
 
