@@ -34,6 +34,19 @@ const cancelComponents: SimulationWorkerRunRequest['components'] = [
   })),
 ]
 
+const nativeErrorSmokeRequest: SimulationWorkerRunRequest = {
+  type: 'run',
+  protocolVersion: 1,
+  requestId: NATIVE_SMOKE_REQUEST_ID,
+  components: [
+    { id: 'n', type: 'not', inputs: [{ node: 'missing' }] },
+  ],
+  steps: [{ ticks: 1 }],
+  watch: ['n'],
+  yieldEvery: 1,
+  timeoutMs: 30_000,
+}
+
 const nativeCancelSmokeRequest: SimulationWorkerRunRequest = {
   type: 'run',
   protocolVersion: 1,
@@ -84,7 +97,7 @@ export function installNativeSmokeTrigger(): void {
     window.addEventListener('hashchange', run, { once: true })
     void invoke<string>('native_smoke_mode')
       .then((mode) => {
-        enabled = mode === 'success' || mode === 'cancel'
+        enabled = mode === 'success' || mode === 'cancel' || mode === 'error'
         if (!enabled) return
         if (window.location.hash !== NATIVE_SMOKE_HASH) window.location.hash = NATIVE_SMOKE_HASH
         run()
@@ -102,6 +115,10 @@ async function runNativeSmoke(): Promise<void> {
   const mode = await invoke<string>('native_smoke_mode')
   if (mode === 'cancel') {
     await runNativeCancelSmoke()
+    return
+  }
+  if (mode === 'error') {
+    await runNativeErrorSmoke()
     return
   }
   if (mode !== 'success') throw new Error(`Modo smoke inesperado: ${mode}`)
@@ -126,6 +143,45 @@ async function runNativeSuccessSmoke(): Promise<void> {
     requestId: NATIVE_SMOKE_REQUEST_ID,
     progressEvents,
     snapshotCount: outcome.snapshots.length,
+  })
+}
+
+async function runNativeErrorSmoke(): Promise<void> {
+  let progressEvents = 0
+  let finished = false
+  let lateProgressEvents = 0
+  const unlisten = await listen<NativeSimulationProgressPayload>(NATIVE_SIMULATION_PROGRESS_EVENT, (event) => {
+    const progress = event.payload
+    if (progress.protocolVersion !== 1 || progress.requestId !== NATIVE_SMOKE_REQUEST_ID) return
+    if (finished) lateProgressEvents += 1
+    else progressEvents += 1
+  })
+
+  let outcomeCode = 'completed'
+  try {
+    await invoke<NativeSimulationResultPayload>(NATIVE_SIMULATION_COMMAND, {
+      request: toNativeRequest(nativeErrorSmokeRequest),
+    })
+  } catch (error) {
+    outcomeCode = nativeErrorCode(error)
+  } finally {
+    finished = true
+  }
+
+  let cleanupResult = 'ok'
+  try {
+    await invoke<void>(NATIVE_SIMULATION_CANCEL_COMMAND, { requestId: NATIVE_SMOKE_REQUEST_ID })
+  } catch (error) {
+    cleanupResult = nativeErrorCode(error)
+  }
+  await new Promise<void>((resolve) => window.setTimeout(resolve, NATIVE_SMOKE_SETTLE_MS))
+  unlisten()
+  await invoke<void>('finish_native_error_smoke', {
+    requestId: NATIVE_SMOKE_REQUEST_ID,
+    outcomeCode,
+    cleanupResult,
+    progressEvents,
+    lateProgressEvents,
   })
 }
 
