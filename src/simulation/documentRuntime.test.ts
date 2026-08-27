@@ -94,6 +94,42 @@ describe('documentRuntime', () => {
     expect(simulator.read('out')).toBe(false)
   })
 
+  it('encaminha o budget de operações e preserva rollback do documento', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'Budget cross-layer',
+      nodes: [
+        { id: 'a', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'b', type: 'input', position: { x: 0, y: 80 } },
+        { id: 'and', type: 'and', position: { x: 160, y: 40 } },
+      ],
+      connections: [
+        { source: { node: 'a' }, target: { node: 'and', port: 0 } },
+        { source: { node: 'b' }, target: { node: 'and', port: 1 } },
+      ],
+    }
+    const simulator = createDocumentRuntime(document, { maxOperationsPerTick: 2 })
+    simulator.setInput('a', true)
+    simulator.setInput('b', true)
+
+    expect(() => simulator.tick()).toThrow('orçamento de 2 operações')
+    expect(simulator.tickCount).toBe(0)
+    expect(simulator.operationCount).toBe(0)
+    expect(simulator.read('and')).toBe(false)
+  })
+
+  it('encaminha AbortSignal e encerra o runtime sem reter nós', () => {
+    const controller = new AbortController()
+    const simulator = createDocumentRuntime(clockDocument(), { signal: controller.signal })
+    controller.abort()
+
+    expect(() => simulator.tick()).toThrow('execução do simulador foi abortada')
+    simulator.shutdown()
+    simulator.shutdown()
+    expect(simulator.nodeCount).toBe(0)
+  })
+
   it('detecta ciclo de clock no documento e aplica budget total configurado', () => {
     const simulator = createDocumentRuntime(clockDocument(), { maxTotalTicks: 4 })
 

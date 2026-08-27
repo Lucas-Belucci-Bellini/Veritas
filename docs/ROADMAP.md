@@ -1068,6 +1068,14 @@ O `TestbenchPanel` apresenta o diagnóstico por caso com status acessível, sem 
 
 A implementação foi validada com 25 testes do domínio de testbench, 51 testes MCP, typecheck e lint. A validação visual interativa do painel, o smoke nativo e a release `v2.6.0` continuam pendentes; este registro é um marco `Unreleased`, não uma tag ou GitHub Release.
 
+## Implementação v2.7.0 — primeiro slice de Execution Safety — Unreleased
+
+O primeiro slice de v2.7 adiciona ao `Simulator` budgets de operações por tique e acumulado por runtime. A avaliação e a propagação contabilizam operações; quando o limite é excedido, o tique sofre rollback atômico, sem deixar `tickCount`, estado ou contagem de operações parcialmente avançados.
+
+Também foram adicionados cancelamento cooperativo por `simulator.cancel()`, suporte a `AbortSignal`, `reset()` que limpa o cancelamento e `shutdown()` idempotente que libera nós e ordem interna. A ponte `documentRuntime` encaminha esses controles para o caminho real `CircuitDocument → Simulator`. O contrato e os limites estão em [`docs/FEEDBACK_HARDENING.md`](./FEEDBACK_HARDENING.md).
+
+Este é um incremento técnico publicado como `Unreleased`. A fase v2.7 ainda não está concluída: classificação estática de ciclos, budgets de memória, worker/desktop, cancelamento assíncrono de operações longas, smoke visual e QA nativo permanecem pendentes. Nenhuma tag ou GitHub Release foi criada.
+
 ## 11. Modelo comercial planejado para Steam
 
 O Veritas será planejado para distribuição futura na Steam em duas edições: uma **demo/teste gratuita**, para avaliação controlada, e uma **versão final paga**, que será a edição completa e oficial do produto. Demo e edição final terão sistema de login planejado; a edição final exigirá licença/entitlement válido. Login não significa upload automático dos projetos nem torna a nuvem obrigatória para simulação local.

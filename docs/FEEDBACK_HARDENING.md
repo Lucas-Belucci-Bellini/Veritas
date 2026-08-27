@@ -8,6 +8,10 @@ O orçamento padrão de `settle()` continua em `200` tiques. Para impedir config
 
 Além disso, cada instância possui um orçamento total acumulado padrão de `100.000` tiques, configurável entre `1` e `1.000.000`. `tick(count)` rejeita contagens fracionárias, negativas ou não finitas e falha antes de ultrapassar o orçamento restante. `restoreState()` rejeita estados cujo `tickCount` exceda o orçamento da instância, sem mutar o runtime.
 
+O primeiro slice de v2.7 adiciona um orçamento de operações de componentes por tique e acumulado por runtime. Os limites padrão são `1.000.000` operações por tique e `1.000.000.000` operações totais, com tetos configuráveis de `10.000.000` e `10.000.000.000`. Cada fase de avaliação e propagação contabiliza operações; ao exceder um limite, o tique inteiro sofre rollback e o erro é classificado como `operation-budget`.
+
+A execução também aceita `AbortSignal` e cancelamento explícito por `simulator.cancel()`. O cancelamento é cooperativo, verificável antes de cada tique e não transforma uma execução parcialmente mutada em estado aceito. `reset()` limpa o cancelamento e os contadores. `shutdown()` limpa nós e ordem interna de forma idempotente; chamadas posteriores falham de modo explícito, sem manter o runtime em memória.
+
 A ponte `documentRuntime` encaminha esses limites por `DocumentRuntimeOptions` e expõe `diagnoseDocumentRuntime(simulator, maxTicks?)` como um adaptador fino para o diagnóstico do mesmo `Simulator`. Essa função é explicitamente operacional: o diagnóstico avança o runtime recebido e, portanto, não deve ser tratado como uma inspeção pura ou conectado à UI ativa sem uma cópia/preview isolada.
 
 Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`. O helper cria um runtime novo com o mesmo caminho de elaboração/netlist, restaura opcionalmente um `SimulatorState`, aplica as entradas fornecidas apenas na cópia, executa o diagnóstico limitado e devolve diagnóstico, snapshot e estado final. Assim, o chamador pode apresentar uma prévia sem alterar o runtime ativo.
@@ -25,6 +29,10 @@ Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`
 | Budget total zero, fracionário, infinito ou acima de 1.000.000 | rejeição `RangeError` fail-closed |
 | `tick(count)` que excede o orçamento restante | rejeição antes de executar parcialmente |
 | `restoreState()` acima do orçamento da instância | rejeição antes de mutar nós |
+| Budget de operações por tique ou total inválido | rejeição `RangeError` fail-closed |
+| Budget de operações excedido | rollback do tique, sem incrementar `tickCount` ou manter operações cobradas |
+| `AbortSignal` abortado ou `cancel()` chamado | rejeição cooperativa antes de executar |
+| `shutdown()` repetido | operação idempotente; nós são limpos uma única vez |
 | Opção de construtor inválida | rejeição antes de iniciar o runtime |
 | Sequenciais com clock manual | usam `tick()`/pulsos controlados, não `settle()` como mecanismo de captura |
 | `diagnoseSettle()` em circuito combinacional | retorna `stabilized` e quantidade de tiques executados |
@@ -35,4 +43,4 @@ Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`
 
 ## Limites do marco
 
-Este marco protege o custo da operação de acomodação, o total de tiques de uma instância e oferece diagnóstico básico de repetição de estado. Ainda são trabalhos futuros a classificação de ciclos no grafo antes da execução, budgets de operações/memória por documento, avaliação incremental/compilada, validação visual/desktop da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.
+Este marco protege o custo da operação de acomodação, o total de tiques de uma instância, o custo de operações do runtime, cancelamento cooperativo e limpeza explícita, além de oferecer diagnóstico básico de repetição de estado. Ainda são trabalhos futuros a classificação de ciclos no grafo antes da execução, budgets de memória, limites de operações específicos por documento/worker, avaliação incremental/compilada, validação visual/desktop da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.

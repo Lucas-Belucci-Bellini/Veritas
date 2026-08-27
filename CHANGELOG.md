@@ -16,6 +16,12 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - Casos combinacionais multi-bit podem declarar `vectors`, com valores normalizados em binário MSB → LSB. A UI e o MCP expõem o resumo de observações sem converter `cycle-detected` ou `budget-exhausted` em falha lógica.
 - A cobertura focal passou para 25 testes de domínio e 5 testes MCP do caminho `run_testbench`, incluindo register-4bit, counter-4bit, JK, SR, feedback, custom-chip, multi-bit e rejeição fail-closed de literal inválido. A release/tag v2.6.0 ainda não foi criada.
 
+### Execution Safety — v2.7.0 em desenvolvimento
+
+- O `Simulator` passou a contabilizar budgets de operações por tique e acumulados por runtime, com rollback atômico quando o limite é excedido; a ponte `documentRuntime` encaminha as opções sem duplicar a engine.
+- Adicionados cancelamento cooperativo por `simulator.cancel()`, `AbortSignal`, `reset()` que limpa cancelamento e `shutdown()` idempotente que libera o estado interno. Os testes focados de `simulator` e `documentRuntime` passaram: 44/44.
+- A fase v2.7 permanece `Unreleased`: classificação estática de ciclos, budgets de memória, worker/desktop, cancelamento assíncrono de operações longas, smoke visual e QA nativo ainda não foram concluídos.
+
 ### Trajetória de plataforma
 
 - A trajetória de continuidade foi ampliada de v2.5.0 para v5.0.0. `docs/VERITAS_V3_V5_ROADMAP.md` define os marcos pós-v2.5.0 — verification, segurança de execução, migrações, modularidade, plugins, workspace profissional, reprodutibilidade, distribuição e o gate final de Digital Logic Platform — sem promover qualquer versão automaticamente.

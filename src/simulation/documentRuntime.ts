@@ -25,6 +25,12 @@ export interface DocumentRuntimeOptions {
   maxSettleTicks?: number
   /** Teto acumulado de tiques para este runtime de documento. */
   maxTotalTicks?: number
+  /** Teto de operações de componentes dentro de um tique. */
+  maxOperationsPerTick?: number
+  /** Teto acumulado de operações para este runtime de documento. */
+  maxTotalOperations?: number
+  /** Sinal externo para cancelar a execução cooperativa. */
+  signal?: AbortSignal
 }
 
 export interface DocumentRuntimeState {
@@ -58,6 +64,9 @@ export function createDocumentRuntime(document: CircuitDocument, options: Docume
   const simulator = new Simulator(toNetlist(executableDocument), {
     maxSettleTicks: options.maxSettleTicks,
     maxTotalTicks: options.maxTotalTicks,
+    maxOperationsPerTick: options.maxOperationsPerTick,
+    maxTotalOperations: options.maxTotalOperations,
+    signal: options.signal,
   })
   for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {

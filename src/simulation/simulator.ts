@@ -28,6 +28,12 @@ export interface SimulatorOptions {
   maxSettleTicks?: number
   /** Teto acumulado de tiques deste runtime, incluindo chamadas anteriores. */
   maxTotalTicks?: number
+  /** Teto de operações de componentes dentro de um único tique. */
+  maxOperationsPerTick?: number
+  /** Teto acumulado de operações deste runtime, incluindo chamadas anteriores. */
+  maxTotalOperations?: number
+  /** Sinal externo para cancelar entre tiques ou antes de uma execução. */
+  signal?: AbortSignal
 }
 
 export interface SimulatorNodeState {
@@ -55,10 +61,26 @@ export interface SettleDiagnostic {
   cyclePeriod?: number
 }
 
+export type SimulatorExecutionErrorCode = 'aborted' | 'cancelled' | 'shutdown' | 'operation-budget'
+
+export class SimulatorExecutionError extends Error {
+  readonly code: SimulatorExecutionErrorCode
+
+  constructor(code: SimulatorExecutionErrorCode, message: string) {
+    super(message)
+    this.name = 'SimulatorExecutionError'
+    this.code = code
+  }
+}
+
 export const DEFAULT_MAX_SETTLE_TICKS = 200
 export const MAX_SETTLE_TICKS = 10_000
 export const DEFAULT_MAX_TOTAL_TICKS = 100_000
 export const MAX_TOTAL_TICKS = 1_000_000
+export const DEFAULT_MAX_OPERATIONS_PER_TICK = 1_000_000
+export const MAX_OPERATIONS_PER_TICK = 10_000_000
+export const DEFAULT_MAX_TOTAL_OPERATIONS = 1_000_000_000
+export const MAX_TOTAL_OPERATIONS = 10_000_000_000
 
 /**
  * Simulador de circuitos por tiques.
@@ -74,11 +96,20 @@ export class Simulator {
   private readonly order: string[] = []
   private readonly maxSettleTicks: number
   private readonly maxTotalTicks: number
+  private readonly maxOperationsPerTick: number
+  private readonly maxTotalOperations: number
+  private readonly signal?: AbortSignal
   private ticks = 0
+  private operations = 0
+  private cancelled = false
+  private shutdownState = false
 
   constructor(netlist: Netlist, options: SimulatorOptions = {}) {
     this.maxSettleTicks = normalizeSettleBudget(options.maxSettleTicks ?? DEFAULT_MAX_SETTLE_TICKS, false)
     this.maxTotalTicks = normalizeTotalTickBudget(options.maxTotalTicks ?? DEFAULT_MAX_TOTAL_TICKS)
+    this.maxOperationsPerTick = normalizeOperationBudget(options.maxOperationsPerTick ?? DEFAULT_MAX_OPERATIONS_PER_TICK, MAX_OPERATIONS_PER_TICK, 'por tique')
+    this.maxTotalOperations = normalizeOperationBudget(options.maxTotalOperations ?? DEFAULT_MAX_TOTAL_OPERATIONS, MAX_TOTAL_OPERATIONS, 'total')
+    this.signal = options.signal
 
     for (const spec of netlist.components) {
       if (this.nodes.has(spec.id)) {
@@ -112,8 +143,33 @@ export class Simulator {
     return this.ticks
   }
 
+  /** Quantas operações de componentes foram contabilizadas neste runtime. */
+  get operationCount(): number {
+    return this.operations
+  }
+
+  /** Quantos componentes permanecem ativos neste runtime. */
+  get nodeCount(): number {
+    return this.nodes.size
+  }
+
+  /** Permite ao chamador cancelar uma execução futura de modo idempotente. */
+  cancel(): void {
+    if (!this.shutdownState) this.cancelled = true
+  }
+
+  /** Libera o estado interno; chamadas repetidas permanecem seguras. */
+  shutdown(): void {
+    if (this.shutdownState) return
+    this.shutdownState = true
+    this.cancelled = true
+    this.nodes.clear()
+    this.order.length = 0
+  }
+
   /** Muda o valor de um pino de entrada. Vale a partir do próximo tique. */
   setInput(id: string, value: boolean): void {
+    this.ensureRunnable()
     const node = this.require(id)
     if (node.spec.type !== 'input') {
       throw new Error(`"${id}" não é um pino de entrada.`)
@@ -123,17 +179,20 @@ export class Simulator {
   }
 
   read(id: string, port = 0): boolean {
+    this.ensureRunnable()
     return this.require(id).outputs[port] ?? false
   }
 
   /** Valores de todas as saídas, útil para comparar dois instantes. */
   snapshot(): Record<string, boolean[]> {
+    this.ensureRunnable()
     const result: Record<string, boolean[]> = {}
     for (const [id, node] of this.nodes) result[id] = [...node.outputs]
     return result
   }
 
   exportState(): SimulatorState {
+    this.ensureRunnable()
     const nodes: Record<string, SimulatorNodeState> = {}
     for (const [id, node] of this.nodes) {
       nodes[id] = {
@@ -151,6 +210,7 @@ export class Simulator {
   }
 
   restoreState(state: SimulatorState): void {
+    this.ensureRunnable()
     if (!Number.isInteger(state.tickCount) || state.tickCount < 0) {
       throw new Error('O estado do simulador possui um contador de tiques inválido.')
     }
@@ -172,6 +232,14 @@ export class Simulator {
       if (!isBooleanArray(saved.outputs) || !isBooleanArray(saved.next) || !isBooleanArray(saved.queue) || !isBooleanArray(saved.nextQueue)) {
         throw new Error(`O estado do componente "${id}" contém valores inválidos.`)
       }
+    }
+
+    this.restoreStateUnchecked(state)
+  }
+
+  private restoreStateUnchecked(state: SimulatorState): void {
+    for (const [id, node] of this.nodes) {
+      const saved = state.nodes[id]
       node.outputs = [...saved.outputs]
       node.next = [...saved.next]
       node.lastClock = saved.lastClock
@@ -185,14 +253,33 @@ export class Simulator {
   }
 
   tick(count = 1): void {
+    this.ensureRunnable()
     const requested = normalizeTickCount(count)
+    if (requested === 0) return
     if (this.ticks + requested > this.maxTotalTicks) {
       throw new RangeError(`O simulador excederia o orçamento total de ${this.maxTotalTicks} tiques.`)
     }
-    for (let index = 0; index < requested; index += 1) {
-      this.evaluate()
-      this.propagate()
-      this.ticks += 1
+
+    const before = this.exportState()
+    const operationsBefore = this.operations
+    try {
+      for (let index = 0; index < requested; index += 1) {
+        this.ensureRunnable()
+        let operationsThisTick = 0
+        this.evaluate(() => {
+          operationsThisTick += 1
+          this.chargeOperation(operationsThisTick)
+        })
+        this.propagate(() => {
+          operationsThisTick += 1
+          this.chargeOperation(operationsThisTick)
+        })
+        this.ticks += 1
+      }
+    } catch (error) {
+      this.restoreStateUnchecked(before)
+      this.operations = operationsBefore
+      throw error
     }
   }
 
@@ -225,7 +312,14 @@ export class Simulator {
       }
       seen.set(before, this.ticks)
 
-      this.tick()
+      try {
+        this.tick()
+      } catch (error) {
+        if (error instanceof SimulatorExecutionError && error.code === 'operation-budget') {
+          return { status: 'budget-exhausted', ticksExecuted }
+        }
+        throw error
+      }
       ticksExecuted += 1
       const after = this.serializeRuntime()
       if (after === before) {
@@ -258,6 +352,8 @@ export class Simulator {
   }
 
   reset(): void {
+    this.ensureNotShutdown()
+    this.cancelled = false
     for (const node of this.nodes.values()) {
       const fresh = createState(node.spec)
       node.outputs = fresh.outputs
@@ -270,11 +366,13 @@ export class Simulator {
       node.nextCounter = fresh.nextCounter
     }
     this.ticks = 0
+    this.operations = 0
   }
 
   /** Fase 1: cada componente decide seu próximo valor, ninguém publica ainda. */
-  private evaluate(): void {
+  private evaluate(charge: () => void): void {
     for (const id of this.order) {
+      charge()
       const node = this.nodes.get(id)!
       const values = (node.spec.inputs ?? []).map((input) => this.valueOf(input))
       this.computeNext(node, values)
@@ -282,8 +380,9 @@ export class Simulator {
   }
 
   /** Fase 2: todo mundo publica ao mesmo tempo. */
-  private propagate(): void {
+  private propagate(charge: () => void): void {
     for (const id of this.order) {
+      charge()
       const node = this.nodes.get(id)!
       node.outputs = [...node.next]
       node.lastClock = node.nextLastClock
@@ -399,7 +498,41 @@ export class Simulator {
     return node.outputs[input.port ?? 0] ?? false
   }
 
+  private ensureNotShutdown(): void {
+    if (this.shutdownState) {
+      throw new SimulatorExecutionError('shutdown', 'O simulador já foi encerrado.')
+    }
+  }
+
+  private ensureRunnable(): void {
+    this.ensureNotShutdown()
+    if (this.cancelled) {
+      throw new SimulatorExecutionError('cancelled', 'A execução do simulador foi cancelada.')
+    }
+    if (this.signal?.aborted) {
+      throw new SimulatorExecutionError('aborted', 'A execução do simulador foi abortada.')
+    }
+  }
+
+  private chargeOperation(operationInTick: number): void {
+    this.ensureRunnable()
+    if (operationInTick > this.maxOperationsPerTick) {
+      throw new SimulatorExecutionError(
+        'operation-budget',
+        `O tique excederia o orçamento de ${this.maxOperationsPerTick} operações.`,
+      )
+    }
+    if (this.operations >= this.maxTotalOperations) {
+      throw new SimulatorExecutionError(
+        'operation-budget',
+        `O simulador excederia o orçamento total de ${this.maxTotalOperations} operações.`,
+      )
+    }
+    this.operations += 1
+  }
+
   private require(id: string): NodeState {
+    this.ensureRunnable()
     const node = this.nodes.get(id)
     if (!node) throw new Error(`Componente "${id}" não existe no circuito.`)
     return node
@@ -447,6 +580,13 @@ function normalizeTickCount(value: number): number {
 function normalizeTotalTickBudget(value: number): number {
   if (!Number.isInteger(value) || value < 1 || value > MAX_TOTAL_TICKS) {
     throw new RangeError(`O orçamento total deve ser um inteiro entre 1 e ${MAX_TOTAL_TICKS}.`)
+  }
+  return value
+}
+
+function normalizeOperationBudget(value: number, maximum: number, scope: string): number {
+  if (!Number.isInteger(value) || value < 1 || value > maximum) {
+    throw new RangeError(`O orçamento de operações ${scope} deve ser um inteiro entre 1 e ${maximum}.`)
   }
   return value
 }

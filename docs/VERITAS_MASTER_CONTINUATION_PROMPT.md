@@ -321,64 +321,63 @@ O que existe no branch experimental não deve ser descrito como parte da release
 
 ---
 
-## 6. PRÓXIMO BLOQUEIO TÉCNICO PRIORITÁRIO
+## 6. PRÓXIMO BLOQUEIO TÉCNICO PRIORITÁRIO — v2.7.0 EXECUTION SAFETY
 
-Após a preview diagnóstica visual, o próximo passo prioritário é integrar o diagnóstico ao **testbench declarativo**, sem misturar a semântica de acomodação automática com a semântica de pulsos manuais.
+O relatório estruturado do testbench v2.6.0 já foi integrado com snapshots, contraexemplos, primeira divergência, multi-bit e diagnóstico bounded. O próximo passo prioritário é completar **Execution Safety v2.7.0**, sem aumentar limites de circuitos prematuramente e sem confundir build verde com release.
 
 ### 6.1 Objetivo
 
-Fazer com que um caso de testbench possa informar não apenas PASS/FAIL/INVALID, mas também a causa operacional de uma execução limitada:
+Garantir que nenhum circuito, documento ou chip consiga congelar o processo, ultrapassar budgets ou permanecer em estado parcialmente mutado. O slice inicial já contabiliza operações por tique e total, faz rollback atômico, aceita cancelamento cooperativo e possui shutdown idempotente. A continuação deve expandir isso com classificação estática e limites por fronteira de execução.
+
+A fase deve continuar distinguindo:
 
 ```text
-stabilized
-cycle-detected
-budget-exhausted
+OPERATION BUDGET = o runtime parou com rollback antes de ultrapassar o limite
+CANCELLED        = o chamador solicitou parada cooperativa
+ABORTED          = o AbortSignal foi encerrado
+SHUTDOWN         = o runtime foi liberado e não aceita nova execução
+INVALID          = documento, estado ou opção não atende ao contrato
 ```
 
-O relatório deve continuar distinguindo:
-
-```text
-PASS  = expectativas observadas foram atendidas
-FAIL  = execução terminou, mas uma ou mais expectativas divergiram
-INVALID = formato, contrato, input ou budget inválido
-DIAGNOSTIC LIMIT = a execução bounded não estabilizou ou detectou ciclo
-```
-
-Não transformar automaticamente `cycle-detected` em erro lógico. Um circuito sequencial pode ter um ciclo temporal esperado. O relatório deve apresentar diagnóstico e resultado funcional separadamente.
+Não classificar automaticamente feedback temporal legítimo como ciclo combinacional inválido. A classificação deve ser determinística, explicável e separada do resultado funcional do testbench.
 
 ### 6.2 Requisitos do próximo incremento
 
-1. Reutilizar `createDocumentRuntime()`, `diagnoseDocumentRuntime()` ou `diagnoseDocumentRuntimePreview()`; não duplicar a lógica do `Simulator`.
-2. Manter cada caso isolado em runtime novo.
-3. Preservar as entradas, os ticks manuais, as expectativas e o comportamento atual do runner.
-4. Adicionar um campo opcional de diagnóstico ao resultado, sem quebrar consumidores existentes.
-5. Diferenciar falha de expectativa, ciclo detectado, budget esgotado e documento inválido.
-6. Definir um budget bounded e validá-lo fail-closed.
-7. Não alterar o runtime ativo do editor ou do workspace.
-8. Adicionar testes para estabilização, ciclo, budget, mismatch e estado isolado.
-9. Atualizar `ROADMAP.md`, `CHANGELOG.md`, `FEEDBACK_HARDENING.md` e `QA_MATRIX.md` somente com o que foi realmente verificado.
-10. Executar testes focados e gates completos antes de publicar.
+1. Preservar o slice já publicado: budgets por tique/total, rollback atômico, `cancel()`, `AbortSignal`, `reset()` e `shutdown()` idempotente.
+2. Encaminhar os limites pela ponte `createDocumentRuntime()` sem duplicar a lógica do `Simulator`.
+3. Adicionar classificação estática de ciclos combinacionais, feedback temporal e redes não classificáveis antes da execução, com rejeição fail-closed quando necessário.
+4. Definir budgets de memória e de execução por documento/worker, com limites explícitos e erros serializáveis.
+5. Garantir cancelamento, timeout, cleanup e shutdown idempotente nos caminhos UI, Worker, MCP e desktop quando forem implementados.
+6. Não alterar o runtime ativo do editor ao executar diagnóstico, preview ou cancelamento.
+7. Adicionar testes adversariais para documentos grandes, ciclos, budgets, AbortSignal, rollback, repetição e recursos liberados.
+8. Atualizar `ROADMAP.md`, `CHANGELOG.md`, `FEEDBACK_HARDENING.md` e `QA_MATRIX.md` somente com evidência real.
+9. Executar testes focados, suíte completa, typecheck, lint e build antes de publicar.
+10. Não criar tag, GitHub Release ou claim de produto pronto apenas por um build aprovado.
 
 ### 6.3 Critérios de aceitação
 
 O incremento só pode ser considerado concluído quando:
 
 ```text
-[ ] casos combinacionais antigos continuam iguais
-[ ] casos sequenciais antigos continuam iguais
-[ ] PASS/FAIL/INVALID continuam compatíveis
-[ ] diagnóstico aparece de forma estruturada quando aplicável
-[ ] ciclo não causa loop infinito
-[ ] budget inválido é rejeitado fail-closed
-[ ] runtime original não é mutado
-[ ] testes focados passam
-[ ] suíte completa passa
-[ ] typecheck passa
-[ ] lint passa
-[ ] build passa
-[ ] documentação registra limites reais
-[ ] código e docs são commitados
-[ ] branch remoto é atualizado
+[x] testbench combinacional e sequencial preservado
+[x] PASS/FAIL/INVALID separado do diagnóstico bounded
+[x] snapshots, contraexemplos e primeira divergência determinísticos
+[x] budgets de operações por tique e total com rollback atômico
+[x] cancelamento cooperativo, AbortSignal e shutdown idempotente no Simulator
+[x] ponte documentRuntime encaminha os controles
+[x] testes focados do slice passam
+[x] suíte completa passa
+[x] typecheck passa
+[x] lint passa
+[x] build passa
+[x] documentação registra limites reais
+[ ] classificação estática de ciclos
+[ ] budget de memória por documento/worker
+[ ] timeout/cancelamento assíncrono em todas as superfícies
+[ ] verificação UI, Worker, MCP e desktop
+[ ] QA nativo Windows/macOS/Linux
+[ ] commit do slice publicado
+[ ] tag/release v2.7.0 deliberada somente após todos os gates
 ```
 
 ---

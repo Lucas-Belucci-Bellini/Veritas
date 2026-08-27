@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { collectVariables, evaluate, parse } from '../engine'
 import { assignmentForRow } from '../engine/truthTable'
 import { netlistFromAst } from './fromAst'
-import { MAX_SETTLE_TICKS, MAX_TOTAL_TICKS, Simulator } from './simulator'
+import {
+  MAX_OPERATIONS_PER_TICK,
+  MAX_SETTLE_TICKS,
+  MAX_TOTAL_OPERATIONS,
+  MAX_TOTAL_TICKS,
+  Simulator,
+} from './simulator'
 import type { Netlist } from './components'
 
 describe('validação do circuito', () => {
@@ -111,6 +117,84 @@ describe('lógica combinacional', () => {
     })
 
     expect(sim.diagnoseSettle(1)).toEqual({ status: 'budget-exhausted', ticksExecuted: 1 })
+  })
+
+  it('valida budgets de operações por tique e total', () => {
+    expect(() => new Simulator(andCircuit, { maxOperationsPerTick: 0 })).toThrow('orçamento de operações')
+    expect(() => new Simulator(andCircuit, { maxOperationsPerTick: MAX_OPERATIONS_PER_TICK + 1 })).toThrow('orçamento de operações')
+    expect(() => new Simulator(andCircuit, { maxTotalOperations: 0 })).toThrow('orçamento de operações')
+    expect(() => new Simulator(andCircuit, { maxTotalOperations: MAX_TOTAL_OPERATIONS + 1 })).toThrow('orçamento de operações')
+  })
+
+  it('faz rollback atômico quando o budget de operações é excedido', () => {
+    const sim = new Simulator(andCircuit, { maxOperationsPerTick: 3 })
+    sim.setInput('a', true)
+    sim.setInput('b', true)
+
+    expect(() => sim.tick()).toThrow('orçamento de 3 operações')
+    expect(sim.tickCount).toBe(0)
+    expect(sim.operationCount).toBe(0)
+    expect(sim.read('a')).toBe(true)
+    expect(sim.read('b')).toBe(true)
+    expect(sim.read('g')).toBe(false)
+    expect(sim.read('out')).toBe(false)
+  })
+
+  it('faz rollback atômico quando o budget total de operações é excedido', () => {
+    const sim = new Simulator(andCircuit, { maxTotalOperations: 3 })
+    sim.setInput('a', true)
+    sim.setInput('b', true)
+
+    expect(() => sim.tick()).toThrow('orçamento total de 3 operações')
+    expect(sim.tickCount).toBe(0)
+    expect(sim.operationCount).toBe(0)
+    expect(sim.read('g')).toBe(false)
+  })
+
+  it('diagnostica budget de operações excedido sem mutar o runtime', () => {
+    const sim = new Simulator(andCircuit, { maxOperationsPerTick: 3 })
+    sim.setInput('a', true)
+    sim.setInput('b', true)
+
+    expect(sim.diagnoseSettle()).toEqual({ status: 'budget-exhausted', ticksExecuted: 0 })
+    expect(sim.tickCount).toBe(0)
+    expect(sim.operationCount).toBe(0)
+    expect(sim.read('g')).toBe(false)
+  })
+
+  it('cancela execução de forma idempotente e permite reset explícito', () => {
+    const sim = new Simulator(andCircuit)
+    sim.cancel()
+    sim.cancel()
+
+    expect(() => sim.tick()).toThrow('execução do simulador foi cancelada')
+    expect(sim.tickCount).toBe(0)
+
+    sim.reset()
+    sim.tick()
+    expect(sim.tickCount).toBe(1)
+  })
+
+  it('respeita AbortSignal antes de executar e não consome budget', () => {
+    const controller = new AbortController()
+    controller.abort()
+    const sim = new Simulator(andCircuit, { signal: controller.signal })
+
+    expect(() => sim.tick()).toThrow('execução do simulador foi abortada')
+    expect(sim.tickCount).toBe(0)
+    expect(sim.operationCount).toBe(0)
+  })
+
+  it('encerra e limpa o runtime de forma idempotente', () => {
+    const sim = new Simulator(andCircuit)
+    expect(sim.nodeCount).toBe(4)
+
+    sim.shutdown()
+    sim.shutdown()
+
+    expect(sim.nodeCount).toBe(0)
+    expect(() => sim.tick()).toThrow('simulador já foi encerrado')
+    expect(() => sim.read('out')).toThrow('simulador já foi encerrado')
   })
 
   it('limita o orçamento total de tiques e rejeita contagens inválidas', () => {
