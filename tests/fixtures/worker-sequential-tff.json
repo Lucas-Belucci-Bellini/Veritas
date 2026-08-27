@@ -1,0 +1,45 @@
+{
+  "request": {
+    "protocolVersion": 1,
+    "requestId": "shared-sequential-tff",
+    "components": [
+      { "id": "t", "type": "input" },
+      { "id": "clk", "type": "clock", "options": { "period": 1 } },
+      {
+        "id": "ff",
+        "type": "tff",
+        "inputs": [
+          { "node": "t" },
+          { "node": "clk" }
+        ]
+      },
+      {
+        "id": "qout",
+        "type": "output",
+        "inputs": [
+          { "node": "ff" }
+        ]
+      }
+    ],
+    "steps": [
+      { "set": { "t": true }, "ticks": 1 },
+      { "ticks": 1 },
+      { "ticks": 1 },
+      { "ticks": 1 },
+      { "set": { "t": false }, "ticks": 1 },
+      { "ticks": 1 }
+    ],
+    "watch": ["t", "clk", "ff", "qout"],
+    "yieldEvery": 1,
+    "timeoutMs": 30000
+  },
+  "expectedSnapshots": [
+    { "tick": 0, "values": { "t": [false], "clk": [false], "ff": [false], "qout": [false] } },
+    { "tick": 1, "values": { "t": [true], "clk": [true], "ff": [false], "qout": [false] } },
+    { "tick": 2, "values": { "t": [true], "clk": [false], "ff": [true], "qout": [false] } },
+    { "tick": 3, "values": { "t": [true], "clk": [true], "ff": [true], "qout": [true] } },
+    { "tick": 4, "values": { "t": [true], "clk": [false], "ff": [false], "qout": [true] } },
+    { "tick": 5, "values": { "t": [false], "clk": [true], "ff": [false], "qout": [false] } },
+    { "tick": 6, "values": { "t": [false], "clk": [false], "ff": [false], "qout": [false] } }
+  ]
+}

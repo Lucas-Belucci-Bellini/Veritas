@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import sharedFixture from '../../tests/fixtures/worker-sequential-dff.json'
+import dffFixture from '../../tests/fixtures/worker-sequential-dff.json'
+import tffFixture from '../../tests/fixtures/worker-sequential-tff.json'
 import { Simulator } from './simulator'
-import { applySequentialInputs, getSequentialDemo, snapshotSequentialSimulator } from './workspace'
+import { applySequentialInputs, snapshotSequentialSimulator } from './workspace'
 import {
   installSimulationWorker,
   type SimulationWorkerEndpoint,
@@ -32,18 +33,39 @@ class Endpoint implements SimulationWorkerEndpoint {
   }
 }
 
-const request = {
-  ...sharedFixture.request,
-  type: 'run' as const,
-  protocolVersion: 1 as const,
-  components: sharedFixture.request.components as SimulationWorkerRunRequest['components'],
-  steps: sharedFixture.request.steps as SimulationWorkerRunRequest['steps'],
-  watch: sharedFixture.request.watch as SimulationWorkerRunRequest['watch'],
-  timeoutMs: sharedFixture.request.timeoutMs,
-} satisfies SimulationWorkerRunRequest
+type SharedFixture = {
+  request: {
+    protocolVersion: number
+    requestId: string
+    components: SimulationWorkerRunRequest['components']
+    steps: SimulationWorkerRunRequest['steps']
+    watch: SimulationWorkerRunRequest['watch']
+    yieldEvery?: number
+    timeoutMs?: number
+  }
+  expectedSnapshots: readonly { tick: number; values: Record<string, boolean[]> }[]
+}
 
-function expectedSnapshots(): readonly { tick: number; values: Record<string, boolean[]> }[] {
-  const simulator = new Simulator(getSequentialDemo('dff-clock').netlist)
+const fixtures: readonly { name: string; fixture: SharedFixture }[] = [
+  { name: 'DFF', fixture: dffFixture as SharedFixture },
+  { name: 'TFF', fixture: tffFixture as SharedFixture },
+]
+
+function toRequest(fixture: SharedFixture): SimulationWorkerRunRequest {
+  return {
+    type: 'run',
+    protocolVersion: 1,
+    requestId: fixture.request.requestId,
+    components: fixture.request.components,
+    steps: fixture.request.steps,
+    watch: fixture.request.watch,
+    yieldEvery: fixture.request.yieldEvery,
+    timeoutMs: fixture.request.timeoutMs,
+  }
+}
+
+function expectedSnapshots(request: SimulationWorkerRunRequest): readonly { tick: number; values: Record<string, boolean[]> }[] {
+  const simulator = new Simulator({ components: [...request.components] })
   const snapshots = [snapshotSequentialSimulator(simulator)]
   for (const step of request.steps) {
     applySequentialInputs(simulator, step.set ?? {})
@@ -66,17 +88,19 @@ async function waitForResult(endpoint: Endpoint): Promise<Extract<SimulationWork
 }
 
 describe('paridade sequencial Worker versus Simulator', () => {
-  it('preserva snapshots e estado temporal de DFF com clock dentro de um request', async () => {
-    const endpoint = new Endpoint()
-    const dispose = installSimulationWorker(endpoint)
-    endpoint.emit(request)
+  for (const { name, fixture } of fixtures) {
+    it(`preserva snapshots e estado temporal de ${name} com clock dentro de um request`, async () => {
+      const request = toRequest(fixture)
+      const endpoint = new Endpoint()
+      const dispose = installSimulationWorker(endpoint)
+      endpoint.emit(request)
 
-    const result = await waitForResult(endpoint)
+      const result = await waitForResult(endpoint)
 
-    expect(expectedSnapshots()).toEqual(sharedFixture.expectedSnapshots)
-    expect(result.snapshots).toEqual(sharedFixture.expectedSnapshots)
-    expect(result.snapshots.map((snapshot) => snapshot.tick)).toEqual([0, 1, 2, 3, 4])
-    expect(endpoint.messages.filter((message) => message.type === 'result')).toHaveLength(1)
-    dispose()
-  })
+      expect(expectedSnapshots(request)).toEqual(fixture.expectedSnapshots)
+      expect(result.snapshots).toEqual(fixture.expectedSnapshots)
+      expect(endpoint.messages.filter((message) => message.type === 'result')).toHaveLength(1)
+      dispose()
+    })
+  }
 })
