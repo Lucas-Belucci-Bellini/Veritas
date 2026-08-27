@@ -47,8 +47,8 @@ A exportação recebe projetos de chips locais e inclui todas as dependências n
 
 ## Escopo deliberadamente excluído
 
-O formato não exporta algoritmos, testbenches, projetos de expressão, credenciais ou documentos externos. Ele também não promete compatibilidade direta com arquivos DLS. O pipeline DLS continua sendo uma entrada controlada separada, com seus limites e relatórios próprios. A UI de biblioteca só poderá oferecer exportação/importação desse envelope depois que parser, serializer, fixtures de rejeição, rollback e colisões estiverem aprovados.
+O formato não exporta algoritmos, testbenches, projetos de expressão, credenciais ou documentos externos. Ele também não promete compatibilidade direta com arquivos DLS. O pipeline DLS continua sendo uma entrada controlada separada, com seus limites e relatórios próprios. A UI de biblioteca agora oferece esse fluxo de forma opt-in e local, com os controles `Exportar local` e `Importar local`. O arquivo baixado usa o nome `veritas-chip-library-v1.json`; o seletor aceita JSON e o limite de 5.000.000 bytes é verificado antes da leitura e novamente pelo parser. O fluxo não envia chips para a nuvem, não conecta o engine Tauri/Rust e exibe a mensagem de erro sem gravar quando o parser ou a transação falham.
 
 ## Critérios de aceitação
 
-A implementação só será considerada verificada quando houver round-trip determinístico, dependência aninhada, dependência ausente, ciclo, refs duplicadas, nomes duplicados, campo desconhecido, documento inválido, limite de bytes, colisão local e rollback transacional cobertos por testes. Até lá, o contrato é **DESIGN RECORDED / NOT VERIFIED** para uso de produto.
+O contrato de storage e a UI opt-in foram exercitados por round-trip determinístico, dependência aninhada, dependência ausente, ciclo, refs duplicadas, nomes duplicados, campo desconhecido, documento inválido, limite de bytes, colisão local e rollback transacional. Isso é **PASSED** para a API e o fluxo local experimental; não é `RUNTIME VERIFIED` para Tauri, distribuição desktop, cloud, sincronização ou bibliotecas compartilhadas.

@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Cpu, Search } from 'lucide-react'
 import { catalogChipToCircuitDocument } from '../chips/catalogCircuit'
 import { catalogMultiBitChipToCircuitDocument, isCatalogMultiBitChipImportable } from '../chips/catalogVector'
 import { loadCatalog, type ChipCatalog, type ChipEntry } from '../chips/types'
-import { createCustomChipProject, listCustomChipProjects } from '../storage/customChips'
+import { useCustomChips } from '../hooks/useCustomChips'
+import {
+  createCustomChipProject,
+  importCustomChipLibraryFile,
+  listCustomChipProjects,
+  MAX_CUSTOM_CHIP_LIBRARY_FILE_BYTES,
+  serializeCustomChipLibrary,
+} from '../storage/customChips'
 
 interface ChipLibraryProps {
   onUseExpression: (expression: string) => void
@@ -27,6 +34,51 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
   const [limit, setLimit] = useState(PAGE_SIZE)
   const [importing, setImporting] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [fileBusy, setFileBusy] = useState(false)
+  const importFileInput = useRef<HTMLInputElement>(null)
+  const localChips = useCustomChips()
+
+  function exportLocalChipLibrary(): void {
+    if (localChips.chips.length === 0) {
+      setNotice('A biblioteca local ainda não tem chips para exportar.')
+      return
+    }
+    try {
+      const text = serializeCustomChipLibrary(
+        localChips.chips.map((chip) => ({ id: chip.id, definition: chip.definition })),
+      )
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'veritas-chip-library-v1.json'
+      document.body.append(anchor)
+      anchor.click()
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+      setNotice(`${localChips.chips.length} chip(s) exportado(s) para um arquivo local.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível exportar a biblioteca local.')
+    }
+  }
+
+  async function importLocalChipLibrary(file: File | undefined): Promise<void> {
+    if (!file) return
+    setFileBusy(true)
+    setNotice('')
+    try {
+      if (file.size > MAX_CUSTOM_CHIP_LIBRARY_FILE_BYTES) {
+        throw new Error(`Esse arquivo excede o limite de ${MAX_CUSTOM_CHIP_LIBRARY_FILE_BYTES} bytes.`)
+      }
+      const count = await importCustomChipLibraryFile(await file.text())
+      await localChips.refresh()
+      setNotice(`${count} chip(s) importado(s) na biblioteca local.`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível importar a biblioteca de chips.')
+    } finally {
+      setFileBusy(false)
+      if (importFileInput.current) importFileInput.current.value = ''
+    }
+  }
 
   async function importChip(chip: ChipEntry): Promise<void> {
     const document = catalogMultiBitChipToCircuitDocument(chip) ?? catalogChipToCircuitDocument(chip)
@@ -132,6 +184,32 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
             />
             Só com modelos prontos
           </label>
+          <div className="flex items-center gap-1" aria-label="Arquivo da biblioteca local">
+            <button
+              type="button"
+              className="key"
+              onClick={exportLocalChipLibrary}
+              disabled={!localChips.ready || Boolean(localChips.unavailable) || fileBusy}
+            >
+              Exportar local
+            </button>
+            <button
+              type="button"
+              className="key"
+              onClick={() => importFileInput.current?.click()}
+              disabled={!localChips.ready || Boolean(localChips.unavailable) || fileBusy}
+            >
+              {fileBusy ? 'Importando…' : 'Importar local'}
+            </button>
+            <input
+              ref={importFileInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              aria-label="Selecionar biblioteca local de chips"
+              onChange={(event) => void importLocalChipLibrary(event.target.files?.[0])}
+            />
+          </div>
         </div>
       </header>
 
@@ -177,6 +255,8 @@ export function ChipLibrary({ onUseExpression }: ChipLibraryProps) {
         <p className="mt-4 text-xs text-slate-400 dark:text-slate-600">
           Origem: {catalog.source}. Modelos escalares usam expressões derivadas;
           perfis multi-bit suportados preservam a estrutura vetorial no editor local.
+          A biblioteca local usa arquivos `veritas-chip-library` v1; importação e exportação
+          são locais e não enviam chips para a nuvem.
         </p>
       )}
     </section>
