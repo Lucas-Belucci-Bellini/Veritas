@@ -1065,3 +1065,13 @@ O contrato aceita `TestbenchOptions.diagnosticTicks`, com padrão de 64 tiques e
 O `TestbenchPanel` apresenta o diagnóstico por caso com status acessível, sem substituir os badges existentes de passou/falhou. A ferramenta MCP `run_testbench` serializa o diagnóstico bounded sem alterar a tabela de divergências. A especificação detalhada está em [`docs/VERIFICATION.md`](./VERIFICATION.md).
 
 A implementação foi validada com 22 testes do domínio de testbench, 51 testes MCP, typecheck e lint. A validação visual interativa do painel, o smoke nativo e a release `v2.6.0` continuam pendentes; este registro é um marco `Unreleased`, não uma tag ou GitHub Release.
+
+## 11. Modelo comercial planejado para Steam
+
+O Veritas será planejado para distribuição futura na Steam como um produto free-to-play com núcleo local gratuito. A versão base deve permitir criar, editar, simular, testar e salvar circuitos localmente sem conta obrigatória, sem nuvem obrigatória e sem conexão permanente.
+
+Módulos avançados locais poderão ser distribuídos como DLCs ou expansões opcionais, incluindo ferramentas profissionais de HDL, instrumentos, verification avançada, workspace de escala, conteúdos educacionais e backends controlados. Backup, sincronização, histórico remoto, colaboração hospedada e compute remoto serão serviços opcionais de nuvem, com limites transparentes e cobrança destinada a cobrir armazenamento, segurança, operação e manutenção. O modo local não será removido para forçar uma assinatura.
+
+Essa é uma decisão de produto planejada, não uma integração Steam implementada. A especificação detalhada está em [`COMMERCIAL_MODEL_STEAM.md`](./COMMERCIAL_MODEL_STEAM.md). DLC, ownership, microtransações, backend, refunds, privacidade, quotas e suporte somente serão implementados depois dos gates de segurança, formato, migration, distribuição e QA multiplataforma. O núcleo gratuito continuará sendo prioridade; correções de segurança, compatibilidade e integridade do formato não serão convertidas em paywall.
+
+A documentação oficial da Steamworks distingue DLC de compras dentro do jogo e exige que o produto trate ownership, atualização e transações de forma apropriada [5]. O Veritas ainda não possui app Steam, App IDs de DLC, integração de Steam Wallet, backend de entitlement ou serviço cloud comercial.

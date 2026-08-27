@@ -1327,3 +1327,16 @@ Ele será considerado uma plataforma 5.0 quando:
 > adicionar uma nova capacidade puder acontecer por meio de contratos, módulos, plugins ou extensões bem definidos, sem exigir uma reescrita arbitrária do Core ou comprometer a segurança, determinismo, compatibilidade e reprodutibilidade do sistema.
 
 Esse é o verdadeiro gate da V5.
+
+
+---
+
+# POLÍTICA COMERCIAL TRANSVERSAL — STEAM, DLC E CLOUD
+
+O Veritas poderá ser distribuído futuramente na Steam como Free-to-Play com um núcleo local gratuito. A base deve permitir criar, editar, simular, testar, salvar e reabrir circuitos localmente sem conta obrigatória, sem nuvem obrigatória e sem conexão permanente.
+
+Módulos avançados locais poderão ser comercializados como DLCs ou expansões opcionais, incluindo HDL, instrumentos, verification avançada, workspace de escala, conteúdos educacionais e backends controlados. Backup, sincronização, histórico remoto, colaboração hospedada e compute remoto poderão ser serviços cloud opt-in pagos para cobrir armazenamento, segurança, operação e manutenção.
+
+O modo local não pode virar paywall. O usuário não deve perder projetos locais quando um serviço expirar e não deve pagar para abrir, exportar ou continuar usando a simulação básica. Correções de segurança, compatibilidade e integridade do formato pertencem ao núcleo gratuito.
+
+Antes de uma etapa comercial, ler `docs/COMMERCIAL_MODEL_STEAM.md`. Steamworks, ownership, DLC App IDs, Steam Wallet, backend de entitlements, cloud comercial, pricing e suporte permanecem `PLANNED / NOT IMPLEMENTED` até cumprir gates de segurança, privacidade, formatos, QA, plataforma e distribuição. A política comercial não altera a ordem técnica das fases e não promove nenhuma release automaticamente.

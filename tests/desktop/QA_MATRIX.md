@@ -76,3 +76,21 @@ A `0.5.0` só será aberta quando houver builds por plataforma e um conjunto de 
 ## Promoção estável — desktop `1.0.0`
 
 A `1.0.0` não será criada por calendário nem porque um instalador existe. Ela exige estabilidade comprovada em todos os alvos suportados, zero defeitos críticos abertos, regressão do núcleo, acessibilidade, desempenho dentro dos limites publicados, instalação/atualização/remoção verificadas, assinatura de distribuição configurada e documentação final. Se um alvo não atender ao gate, a promoção deve ser bloqueada ou o alvo deve ser explicitamente retirado da matriz suportada.
+
+
+## Modelo comercial planejado — Steam, DLC e cloud
+
+| Área | Estado atual | Gate futuro |
+|---|---|---|
+| Núcleo local gratuito | **PLANNED POLICY** | Criar, editar, simular, testar, salvar e reabrir sem conta ou nuvem obrigatória |
+| DLC local | **NOT IMPLEMENTED** | Entitlement, conteúdo versionado, checksum, allowlist, fallback e execução verificados por plataforma |
+| Ownership Steam | **NOT IMPLEMENTED** | Testes nativos com licença presente, ausente, expirada e atualização |
+| Steam Wallet/microtransações | **NOT IMPLEMENTED** | API oficial, reconciliação, refund/chargeback e auditoria de transações |
+| Backup e sincronização cloud | **NOT IMPLEMENTED** | Quotas, criptografia, retenção, exportação, exclusão, conflitos e recovery |
+| Colaboração hospedada | **NOT IMPLEMENTED** | Papéis, permissões, auditoria, resolução de conflito e desligamento sem perda local |
+| Offline após serviço expirado | **NOT VERIFIED** | Projetos locais continuam simuláveis e exportáveis sem serviço ativo |
+| Windows/Steam | **NOT VERIFIED** | `Veritas-Setup.exe`, ownership, DLC, atualização e rollback reais |
+| macOS/Steam | **NOT VERIFIED** | App bundle, ownership, DLC, assinatura/notarização e rollback reais |
+| Linux/Steam | **NOT VERIFIED** | Pacote, ownership, DLC, assinatura e rollback reais |
+
+A política completa está em [`docs/COMMERCIAL_MODEL_STEAM.md`](../../docs/COMMERCIAL_MODEL_STEAM.md). A presença desta seção não significa que cobrança, Steamworks ou nuvem comercial estejam implementadas.

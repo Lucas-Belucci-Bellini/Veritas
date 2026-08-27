@@ -4,6 +4,11 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 
 ## [Unreleased]
 
+### Modelo comercial planejado
+
+- Definido o modelo futuro para a Steam: núcleo local Free-to-Play gratuito, com criação, simulação, testbench e save/reopen local sem conta ou nuvem obrigatória; módulos avançados locais poderão ser DLCs/expansões pagos e backup, sincronização, histórico remoto, colaboração hospedada e compute remoto poderão ser serviços cloud opt-in pagos.
+- Registrada a política em `docs/COMMERCIAL_MODEL_STEAM.md`: não transformar o modo local em paywall, não cobrar por correções/segurança/compatibilidade, preservar exportação e recuperação local e manter Steamworks, entitlements, pagamentos, backend cloud e pricing como `PLANNED / NOT IMPLEMENTED` até existirem integração, QA e políticas de privacidade.
+
 ### Trajetória de plataforma
 
 - A trajetória de continuidade foi ampliada de v2.5.0 para v5.0.0. `docs/VERITAS_V3_V5_ROADMAP.md` define os marcos pós-v2.5.0 — verification, segurança de execução, migrações, modularidade, plugins, workspace profissional, reprodutibilidade, distribuição e o gate final de Digital Logic Platform — sem promover qualquer versão automaticamente.

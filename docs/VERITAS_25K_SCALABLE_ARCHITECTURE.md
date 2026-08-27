@@ -565,3 +565,14 @@ A validação de 25 mil chips só pode ser anunciada quando todos esses itens es
 [13]: https://v2.tauri.app/develop/calling-rust/ "Tauri 2 — commands, async e channels"
 [14]: https://yosyshq.readthedocs.io/projects/yosys/en/stable/appendix/primer.html "Yosys — primer de síntese digital"
 [15]: https://verilator.org/guide/latest/ "Verilator — documentação oficial"
+
+
+## 15. Fronteira comercial: base gratuita, DLC e nuvem opt-in
+
+A escala de 25 mil chips continua sendo uma capacidade técnica do produto, não um motivo para bloquear o núcleo local. O Veritas base deve continuar funcionando offline, com edição, simulação, testbench e persistência local. Uma eventual expansão `Scale Lab` poderá empacotar o compiler/IR, viewport e profiling avançados como DLC local, mas a ausência desse DLC não pode corromper ou apagar projetos base.
+
+Serviços de nuvem, incluindo backup, sincronização, histórico remoto, colaboração hospedada e compute remoto, ficam fora da autoridade do `CompiledNetlist` e do `Runtime`. Eles devem ser adaptadores opcionais com autenticação, quotas, entitlements, criptografia, exclusão/exportação e política de retenção. O documento estrutural e o arquivo local continuam sendo a fonte recuperável pelo usuário.
+
+A integração futura com Steam deverá ficar em um `EntitlementProvider`, sem espalhar chamadas de Steamworks pelo domínio. Ownership habilita um módulo; não transforma conteúdo baixado em código confiável. Todos os DLCs e arquivos remotos continuam sujeitos a versão, checksum, schema, allowlist e budgets.
+
+O modelo comercial detalhado, incluindo Free-to-Play, DLC, Steam Wallet, cloud opt-in, privacidade e critérios de implementação, está em [`COMMERCIAL_MODEL_STEAM.md`](./COMMERCIAL_MODEL_STEAM.md).

@@ -333,3 +333,12 @@ Esses itens só podem entrar mediante proposta específica, caso de uso verific�
 - `docs/LARGE_CIRCUITS.md` — limites e decisão sobre circuitos grandes.
 - `tests/desktop/QA_MATRIX.md` — evidência por plataforma.
 - `CHANGELOG.md` — histórico de mudanças e releases.
+
+
+## Política comercial transversal — Steam, DLC e serviços cloud
+
+A distribuição futura do Veritas poderá usar a Steam como Free-to-Play com um núcleo local gratuito. A base deve permitir criar, editar, simular, testar, salvar e reabrir circuitos localmente sem conta obrigatória, nuvem obrigatória ou conexão permanente.
+
+Módulos avançados locais poderão ser DLCs ou expansões pagos, incluindo HDL, instrumentos, verification profissional, workspace de escala, conteúdos educacionais e backends controlados. Backup, sincronização, histórico remoto, colaboração hospedada e compute remoto poderão ser serviços cloud opt-in pagos para cobrir armazenamento, segurança, operação e manutenção. O modo local não pode virar paywall e o usuário não pode perder seus arquivos locais ao cancelar um serviço.
+
+Esta política é um plano de produto, não uma integração Steamworks implementada. Steam ownership, DLC App IDs, Steam Wallet, backend de entitlements, cobrança, refunds, cloud comercial, pricing e suporte permanecem `PLANNED / NOT IMPLEMENTED` até os gates de segurança, privacidade, formatos, plataforma e distribuição. A especificação normativa está em [`COMMERCIAL_MODEL_STEAM.md`](./COMMERCIAL_MODEL_STEAM.md).

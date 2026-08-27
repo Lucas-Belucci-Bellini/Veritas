@@ -1581,3 +1581,12 @@ Construa corretamente até a **Veritas Digital Logic Platform v5.0.0**, sem ante
 [2]: https://github.com/Lucas-Belucci-Bellini/Veritas/releases/tag/desktop-v0.1.0-alpha.1 "Release desktop histórica"
 
 [3]: https://github.com/Lucas-Belucci-Bellini/Veritas/actions/runs/32922086872 "Workflow desktop histórico"
+
+
+## Direção comercial planejada — Steam, DLC e serviços de nuvem
+
+O Veritas poderá ser distribuído futuramente na Steam como Free-to-Play com núcleo local gratuito. A base deve permitir criar, editar, simular, testar e salvar circuitos localmente sem conta obrigatória, nuvem obrigatória ou conexão permanente. Módulos avançados locais podem ser comercializados como DLCs/expansões opcionais; backup, sincronização, histórico remoto, colaboração hospedada e compute remoto são serviços cloud opt-in pagos para cobrir armazenamento, segurança, operação e manutenção.
+
+Não transformar o modo local em paywall. O usuário não perde arquivos locais quando um serviço expira, não deve pagar para abrir projetos próprios e não deve depender de nuvem para a simulação básica. Correções de segurança, compatibilidade e integridade do formato pertencem ao núcleo gratuito.
+
+Antes de implementar qualquer monetização, ler `docs/COMMERCIAL_MODEL_STEAM.md`. Manter Steam/entitlements/cloud fora do domínio do `Simulator`, usando adapters e capabilities com ownership verificável, schema/checksum, quotas, privacidade, exportação, recovery, refunds/chargebacks e testes com rede/Steam indisponíveis. O estado atual é `PLANNED / NOT IMPLEMENTED`; não há Steam App ID, DLC App ID, Steam Wallet, backend comercial ou cloud comercial implementados.
