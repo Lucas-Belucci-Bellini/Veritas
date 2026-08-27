@@ -97,6 +97,7 @@ export function customChipDocument(definition: CustomChipDefinition): CircuitDoc
 export const CUSTOM_CHIP_LIBRARY_FILE_FORMAT = 'veritas-chip-library' as const
 export const CUSTOM_CHIP_LIBRARY_FILE_VERSION = 1 as const
 export const MAX_CUSTOM_CHIP_LIBRARY_FILE_BYTES = 5_000_000
+export const MAX_CUSTOM_CHIP_LIBRARY_CHIPS = 256
 
 export interface PortableCustomChipNodeOptions {
   period?: number
@@ -143,6 +144,9 @@ export function serializeCustomChipLibrary(
   chips: readonly CustomChipLibraryEntry[],
   exportedAt = new Date().toISOString(),
 ): string {
+  if (chips.length === 0 || chips.length > MAX_CUSTOM_CHIP_LIBRARY_CHIPS) {
+    throw new Error(`A biblioteca de chips deve conter de 1 a ${MAX_CUSTOM_CHIP_LIBRARY_CHIPS} chips.`)
+  }
   const byId = new Map<number, CustomChipLibraryEntry>()
   const byName = new Set<string>()
   for (const entry of chips) {
@@ -217,15 +221,16 @@ export async function importCustomChipLibraryFile(text: string): Promise<number>
     const ordered = orderPortableChips(file.chips, byRef)
     const localIds = new Map<string, number>()
     const library = [...existing]
+    const now = Date.now()
     for (const chip of ordered) {
       const document = toLocalDocument(chip.document, localIds)
       const definition = buildCustomChipDefinition(document, chip.name, { customChips: library })
-      const now = Date.now()
+      const timestamp = now + importedCount
       const id = await db.customChipProjects.add({
         name: definition.name,
         definition,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: timestamp,
+        updatedAt: timestamp,
       } as CustomChipProject)
       localIds.set(chip.ref, id)
       library.push({ id, definition })
@@ -265,8 +270,12 @@ export function parseCustomChipLibraryFile(text: string): VeritasCustomChipLibra
   if (data.version < CUSTOM_CHIP_LIBRARY_FILE_VERSION) {
     throw new Error('Esse arquivo de chips usa uma versão antiga sem migração disponível.')
   }
-  if (!Array.isArray(data.chips) || data.chips.length === 0) {
-    throw new Error('O arquivo de chips não tem nenhuma definição.')
+  if (
+    !Array.isArray(data.chips) ||
+    data.chips.length === 0 ||
+    data.chips.length > MAX_CUSTOM_CHIP_LIBRARY_CHIPS
+  ) {
+    throw new Error(`O arquivo de chips deve conter de 1 a ${MAX_CUSTOM_CHIP_LIBRARY_CHIPS} definições.`)
   }
 
   const chips = data.chips.map((value, index) => {

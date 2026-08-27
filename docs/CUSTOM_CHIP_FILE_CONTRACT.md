@@ -4,7 +4,7 @@
 
 Este documento define o primeiro envelope portátil para uma biblioteca de chips customizados do Veritas. Ele é uma especificação de implementação da fase v2.8; não cria uma release, não altera a biblioteca local automaticamente e não transforma a importação do Digital Logic Sim em um formato nativo do Veritas.
 
-O envelope proposto é `format: "veritas-chip-library"`, `version: 1`, com limite máximo de **5.000.000 bytes**. A implementação deve permanecer local-first/offline-first e rejeitar a entrada inteira quando qualquer chip, dependência ou documento for inválido.
+O envelope proposto é `format: "veritas-chip-library"`, `version: 1`, com limite máximo de **5.000.000 bytes** e no máximo **256 chips** por arquivo. A implementação deve permanecer local-first/offline-first e rejeitar a entrada inteira quando qualquer chip, dependência ou documento for inválido.
 
 ## Shape canônico
 

@@ -11,6 +11,7 @@ import {
   createCustomChipProject,
   importCustomChipLibraryFile,
   listCustomChipProjects,
+  MAX_CUSTOM_CHIP_LIBRARY_CHIPS,
   MAX_CUSTOM_CHIP_LIBRARY_FILE_BYTES,
   parseCustomChipLibraryFile,
   serializeCustomChipLibrary,
@@ -98,6 +99,16 @@ describe('arquivo portátil de biblioteca de chips', () => {
 
     await expect(importCustomChipLibraryFile(JSON.stringify(invalid))).rejects.toBeDefined()
     expect(await listCustomChipProjects()).toHaveLength(0)
+  })
+
+  it('mantém o limite de quantidade simétrico no serializer', () => {
+    expect(() => serializeCustomChipLibrary([])).toThrow('1 a 256')
+    const [base] = library()
+    const tooMany = Array.from({ length: MAX_CUSTOM_CHIP_LIBRARY_CHIPS + 1 }, (_, index) => ({
+      id: index + 1,
+      definition: base.definition,
+    }))
+    expect(() => serializeCustomChipLibrary(tooMany)).toThrow('1 a 256')
   })
 
   it('recusa dependência local ausente durante a serialização', () => {

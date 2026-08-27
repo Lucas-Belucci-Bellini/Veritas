@@ -82,6 +82,9 @@ export function serializeTestbenchProjects(
   projects: readonly TestbenchProject[],
   circuitName: string,
 ): string {
+  if (projects.length === 0 || projects.length > MAX_TESTBENCH_FILE_PROJECTS) {
+    throw new Error(`O arquivo de testbench deve conter de 1 a ${MAX_TESTBENCH_FILE_PROJECTS} documentos.`)
+  }
   const file: VeritasTestbenchFile = {
     format: TESTBENCH_FILE_FORMAT,
     version: TESTBENCH_FILE_VERSION,

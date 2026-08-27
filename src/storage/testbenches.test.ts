@@ -239,6 +239,19 @@ describe('arquivo de testbench', () => {
     ).toThrow('documento 1')
   })
 
+  it('mantém o limite de quantidade simétrico no serializer', () => {
+    expect(() => serializeTestbenchProjects([], 'c')).toThrow('1 a 256')
+    const tooMany = Array.from({ length: MAX_TESTBENCH_FILE_PROJECTS + 1 }, (_, index) => ({
+      id: index + 1,
+      circuitId: 1,
+      name: `T${index}`,
+      document: document(`d${index}`),
+      createdAt: index,
+      updatedAt: index,
+    }))
+    expect(() => serializeTestbenchProjects(tooMany, 'c')).toThrow('1 a 256')
+  })
+
   it('recusa nomes duplicados e lote acima do limite bounded', () => {
     const duplicate = {
       format: 'veritas-testbenches',
