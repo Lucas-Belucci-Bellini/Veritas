@@ -4,6 +4,7 @@ import tffFixture from '../../tests/fixtures/worker-sequential-tff.json'
 import jkFixture from '../../tests/fixtures/worker-sequential-jk.json'
 import srFixture from '../../tests/fixtures/worker-sequential-sr.json'
 import delayFixture from '../../tests/fixtures/worker-sequential-delay.json'
+import feedbackFixture from '../../tests/fixtures/worker-sequential-feedback.json'
 import { Simulator } from './simulator'
 import { applySequentialInputs, snapshotSequentialSimulator } from './workspace'
 import {
@@ -55,6 +56,7 @@ const fixtures: readonly { name: string; fixture: SharedFixture }[] = [
   { name: 'JK', fixture: jkFixture as SharedFixture },
   { name: 'SR', fixture: srFixture as SharedFixture },
   { name: 'DELAY', fixture: delayFixture as SharedFixture },
+  { name: 'FEEDBACK', fixture: feedbackFixture as SharedFixture },
 ]
 
 function toRequest(fixture: SharedFixture): SimulationWorkerRunRequest {

@@ -1,0 +1,44 @@
+{
+  "request": {
+    "protocolVersion": 1,
+    "requestId": "shared-sequential-feedback",
+    "components": [
+      { "id": "clk", "type": "input" },
+      {
+        "id": "ff",
+        "type": "dff",
+        "inputs": [
+          { "node": "ff", "port": 1 },
+          { "node": "clk" }
+        ]
+      },
+      {
+        "id": "out",
+        "type": "output",
+        "inputs": [
+          { "node": "ff" }
+        ]
+      }
+    ],
+    "steps": [
+      { "set": { "clk": true }, "ticks": 1 },
+      { "set": { "clk": false }, "ticks": 1 },
+      { "set": { "clk": true }, "ticks": 1 },
+      { "set": { "clk": false }, "ticks": 1 },
+      { "set": { "clk": true }, "ticks": 1 },
+      { "set": { "clk": false }, "ticks": 1 }
+    ],
+    "watch": ["clk", "ff", "out"],
+    "yieldEvery": 1,
+    "timeoutMs": 30000
+  },
+  "expectedSnapshots": [
+    { "tick": 0, "values": { "clk": [false], "ff": [false], "out": [false] } },
+    { "tick": 1, "values": { "clk": [true], "ff": [true], "out": [false] } },
+    { "tick": 2, "values": { "clk": [false], "ff": [true], "out": [true] } },
+    { "tick": 3, "values": { "clk": [true], "ff": [false], "out": [true] } },
+    { "tick": 4, "values": { "clk": [false], "ff": [false], "out": [false] } },
+    { "tick": 5, "values": { "clk": [true], "ff": [true], "out": [false] } },
+    { "tick": 6, "values": { "clk": [false], "ff": [true], "out": [true] } }
+  ]
+}
