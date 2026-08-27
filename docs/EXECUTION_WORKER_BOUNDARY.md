@@ -1,6 +1,6 @@
 # Fronteira de execução Worker/Desktop
 
-**Status:** protocolo Worker, entrypoint, cliente hospedeiro, ponte documental e executor opt-in implementados; o painel temporal expõe `Preview Worker` sem substituir o runtime direto. Continuidade de estado para `Step`/`Run`, Worker no Tauri e simulação Rust ainda não implementados.
+**Status:** protocolo Worker, entrypoint, cliente hospedeiro, ponte documental, executor opt-in e supervisor bounded do host implementados; o painel temporal expõe `Preview Worker` sem substituir o runtime direto. Continuidade de estado para `Step`/`Run`, Worker no Tauri e simulação Rust ainda não implementados.
 
 **Marco:** v2.7.0 — Execution Safety.
 
@@ -47,8 +47,9 @@ O contrato mínimo do supervisor deverá distinguir:
 | Memória | Reserva estimada antes de alocar; liberação após `shutdown()` ou encerramento confirmado | Dois runtimes, falha de reserva e cleanup |
 | Tempo | Timeout monotônico bounded; ausência de resposta não é sucesso | Teste de timeout e classificação `forced-termination` |
 | Progresso | Frequência limitada e payload bounded | Teste de backpressure e tamanho máximo |
+| Host supervisor | Concorrência/fila bounded, requestId único e reserva declarativa liberada no lifecycle | Testes de fila cheia, cancelamento enfileirado/ativo, quota e dispose |
 
-A quota atual por documento é uma API do mesmo processo e os budgets declarativos são transportados pelo protocolo Worker v1; isso ainda não fecha os gates de supervisor cross-worker, backpressure ou medição de heap real.
+A quota atual por documento é uma API do mesmo processo e os budgets declarativos são transportados pelo protocolo Worker v1. `SimulationWorkerSupervisor` mantém no host reservas agregadas conservadoras, concorrência e fila bounded; essa contabilidade não mede consumo efetivo dentro de cada Worker e não substitui backpressure sob carga ou medição de heap real.
 
 ## Paridade e segurança
 
@@ -58,13 +59,13 @@ O caminho de circuitos grandes permanece fora do contrato editorial atual. O doc
 
 ## Gates para integração de produto
 
-O slice implementado prova por testes que uma execução normal devolve snapshots determinísticos, um abort antes do primeiro tique e um abort entre yields devolvem `cancelled`, timeout e budget devolvem erro controlado, mensagens tardias são ignoradas e dois requests não misturam `requestId`. O painel temporal também expõe um preview opt-in que usa a ponte documental e preserva o runtime direto; a integração ainda não fornece continuidade de estado para `Step`/`Run` nem supervisor de múltiplos requests.
+O slice implementado prova por testes que uma execução normal devolve snapshots determinísticos, um abort antes do primeiro tique e um abort entre yields devolvem `cancelled`, timeout e budget devolvem erro controlado, mensagens tardias são ignoradas e dois requests não misturam `requestId`. O painel temporal também expõe um preview opt-in que usa a ponte documental e preserva o runtime direto; o supervisor bounded limita concorrência/fila e reservas declarativas no host. A integração ainda não fornece continuidade de estado para `Step`/`Run` nem medição efetiva de consumo entre múltiplos Workers.
 
-O caminho web já passou por build explícito do Worker, smoke local em Chromium, paridade de uma fixture direta versus Worker real, cancelamento real via cliente Worker e um preview documental acionado pela UI. O próximo passo é repetir isso em preview de produção e sob carga medida, incluindo backpressure, múltiplos requests e comportamento com circuitos sequenciais. A ponte Tauri só poderá ser iniciada com comando Rust equivalente, teste de contrato, build nos três alvos e evidência separada de `BUILD VERIFIED`, `ARTIFACT VERIFIED`, `RUNTIME VERIFIED` e `SMOKE VERIFIED`. CI verde continuará sendo apenas evidência do workflow executado.
+O caminho web já passou por build explícito do Worker, smoke local em Chromium, paridade de uma fixture direta versus Worker real, cancelamento real via cliente Worker, um preview documental acionado pela UI e testes do supervisor bounded com handles fake. O próximo passo é repetir isso em preview de produção e sob carga medida, incluindo backpressure real, múltiplos requests concorrentes e comportamento com circuitos sequenciais. A ponte Tauri só poderá ser iniciada com comando Rust equivalente, teste de contrato, build nos três alvos e evidência separada de `BUILD VERIFIED`, `ARTIFACT VERIFIED`, `RUNTIME VERIFIED` e `SMOKE VERIFIED`. CI verde continuará sendo apenas evidência do workflow executado.
 
 ## Estado atual e próximos passos
 
-Neste slice, o repositório possui `workerProtocol.ts`, `simulation.worker.ts`, `workerClient.ts`, `documentWorker.ts` e `documentWorkerExecutor.ts`, além da factory `createSimulationWorker()`, testes de endpoint fake e o `Preview Worker` opt-in no painel temporal. Um smoke adicional executou o Worker, o cliente e a ponte documental reais no Chromium local, incluindo paridade do snapshot final, cancelamento após progresso, preflight `acyclic`, imutabilidade do documento e preview isolado da UI. Essa evidência é limitada a fixtures pequenas; `Step`/`Run` continuam diretos, não há supervisor cross-worker, não há canais Tauri nem simulação Tauri/Rust, e a memória real continua não medida sob carga. Execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
+Neste slice, o repositório possui `workerProtocol.ts`, `simulation.worker.ts`, `workerClient.ts`, `documentWorker.ts`, `documentWorkerExecutor.ts` e `workerSupervisor.ts`, além da factory `createSimulationWorker()`, testes de endpoint fake e o `Preview Worker` opt-in no painel temporal. Um smoke adicional executou o Worker, o cliente e a ponte documental reais no Chromium local, incluindo paridade do snapshot final, cancelamento após progresso, preflight `acyclic`, imutabilidade do documento e preview isolado da UI. O supervisor tem cobertura determinística para concorrência, fila, backpressure, reservas declarativas, cancelamento e dispose, mas ainda não há medição efetiva de consumo entre Workers. Essa evidência é limitada a fixtures pequenas; `Step`/`Run` continuam diretos, não há canais Tauri nem simulação Tauri/Rust, e a memória real continua não medida sob carga. Execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
 
 ## Referências
 

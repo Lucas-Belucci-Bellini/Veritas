@@ -185,7 +185,7 @@ export function parseSimulationWorkerRequest(input: unknown): ParsedRequest | Pa
   }
 }
 
-/** Cria o Worker de simulação sob demanda; a UI ainda precisa orquestrar requests. */
+/** Cria o Worker de simulação sob demanda; Step/Run canônicos ainda usam o runtime direto. */
 export function createSimulationWorker(): SimulationWorkerHandle {
   type WorkerConstructor = new (url: string, options: { type: 'module' }) => SimulationWorkerHandle
   const WorkerClass = (globalThis as typeof globalThis & { Worker?: WorkerConstructor }).Worker
