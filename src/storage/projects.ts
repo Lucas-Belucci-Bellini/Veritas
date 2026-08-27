@@ -72,6 +72,12 @@ export function parseVeritasFile(text: string): NewProject[] {
   if (!isRecord(data) || data.format !== 'veritas') {
     throw new Error('Esse arquivo não é um projeto do Veritas.')
   }
+  if (
+    !hasOnlyKeys(data, ['format', 'version', 'exportedAt', 'projects']) ||
+    (data.exportedAt !== undefined && typeof data.exportedAt !== 'string')
+  ) {
+    throw new Error('O envelope do arquivo contém campos desconhecidos ou inválidos.')
+  }
 
   if (typeof data.version !== 'number' || !Number.isInteger(data.version) || data.version < 1) {
     throw new Error('Esse arquivo tem uma versão inválida.')
@@ -122,6 +128,11 @@ export async function importProjects(projects: readonly NewProject[]): Promise<n
   return rows.length
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedKeys = new Set(allowed)
+  return Object.keys(value).every((key) => allowedKeys.has(key))
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -131,6 +142,7 @@ function isProjectLike(
 ): value is { name: string; expression: string; notation: unknown } {
   return (
     isRecord(value) &&
+    hasOnlyKeys(value, ['name', 'expression', 'notation']) &&
     typeof value.name === 'string' &&
     typeof value.expression === 'string' &&
     value.expression.trim().length > 0

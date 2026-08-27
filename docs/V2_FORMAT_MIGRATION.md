@@ -10,8 +10,8 @@ Este documento inicia o inventário de formatos da fase **v2.8.0 — compatibili
 
 | Área | Implementação atual | Versão observada | Estado de compatibilidade |
 |---|---|---:|---|
-| Projetos de expressão | IndexedDB `projects`, com `name`, `expression`, `notation` e timestamps | Banco Dexie v5; envelope de arquivo `veritas` v1 | Parser v1 rejeita versão não inteira/antiga/futura e coleção com projeto inválido; migração retroativa e shape fechado ainda pendentes |
-| Circuitos visuais | IndexedDB `circuitProjects`, com `CircuitDocument` validado e normalizado | Envelope de arquivo `veritas-circuits` v1; documento `veritas-circuit` v1 | Parser v1 exige versão inteira atual, rejeita versão antiga sem migrador, rejeita versão futura e não filtra projeto inválido silenciosamente |
+| Projetos de expressão | IndexedDB `projects`, com `name`, `expression`, `notation` e timestamps | Banco Dexie v5; envelope de arquivo `veritas` v1 | Parser v1 rejeita versão não inteira/antiga/futura, campos desconhecidos e coleção com projeto inválido; migração retroativa ainda pendente |
+| Circuitos visuais | IndexedDB `circuitProjects`, com `CircuitDocument` validado e normalizado | Envelope de arquivo `veritas-circuits` v1; documento `veritas-circuit` v1 | Parser v1 exige versão inteira atual, rejeita versão antiga sem migrador, versão futura, campos desconhecidos e projeto inválido sem filtragem silenciosa |
 | Chips customizados | IndexedDB `customChipProjects`, definição derivada de circuito local | Banco Dexie v5 | Não há envelope de arquivo independente fechado no inventário atual; exportação/migração explícita permanece pendente |
 | Testbenches | IndexedDB `testbenchProjects`, associado a `circuitId` | Banco Dexie v5 | Não há envelope de arquivo independente fechado no inventário atual; associação por id precisa de política de importação |
 | Algoritmos | IndexedDB `algorithmProjects`, com documento de fluxograma | Banco Dexie v5 | Não há envelope de arquivo independente fechado no inventário atual |
@@ -42,7 +42,7 @@ Cada formato persistente deverá possuir um envelope com identificador estável,
 
 ## Próximos incrementos v2.8
 
-O próximo gate deve completar a disciplina estrutural do envelope `veritas` e de `veritas-circuits`, incluindo chaves permitidas, limites de bytes e tratamento de campos desconhecidos. Depois, cada formato que ganhar exportação deverá receber uma fixture atual, uma fixture de JSON quebrado, uma fixture de versão futura, uma fixture de versão antiga e uma fixture de shape semântico inválido. A migração de IndexedDB deve ser documentada separadamente da migração de arquivos, pois abrir uma versão de banco e importar um arquivo são operações com riscos e rollback diferentes.
+A disciplina estrutural inicial dos envelopes `veritas` e `veritas-circuits` está implementada no escopo de chaves permitidas e tipos básicos, com rejeição de campos desconhecidos e sem filtragem silenciosa. O próximo gate deve adicionar limites de bytes e tratamento de arquivos excessivamente grandes. Depois, cada formato que ganhar exportação deverá receber uma fixture atual, uma fixture de JSON quebrado, uma fixture de versão futura, uma fixture de versão antiga e uma fixture de shape semântico inválido. A migração de IndexedDB deve ser documentada separadamente da migração de arquivos, pois abrir uma versão de banco e importar um arquivo são operações com riscos e rollback diferentes.
 
 A associação entre circuito, chip customizado e testbench deve usar referências declaradas e validar dependências antes da escrita. Um arquivo de circuito não deve carregar uma definição de chip arbitrária por caminho, URL ou script; quando a dependência não estiver no envelope permitido, a importação deve parar e explicar o que falta. O checkpoint nativo continuará isolado até existir uma política de identidade, linhagem, budget e restore transacional.
 

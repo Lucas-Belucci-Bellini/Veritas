@@ -67,6 +67,10 @@ export function parseCircuitFile(text: string): NewCircuitProject[] {
   if (!isRecord(data) || data.format !== 'veritas-circuits') {
     throw new Error('Esse arquivo não é uma coleção de circuitos do Veritas.')
   }
+  if (!hasOnlyKeys(data, ['format', 'version', 'exportedAt', 'projects']) ||
+      (data.exportedAt !== undefined && typeof data.exportedAt !== 'string')) {
+    throw new Error('O envelope do arquivo de circuitos contém campos desconhecidos ou inválidos.')
+  }
 
   if (typeof data.version !== 'number' || !Number.isInteger(data.version) || data.version < 1) {
     throw new Error('Esse arquivo de circuitos tem uma versão inválida.')
@@ -124,10 +128,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isCircuitProjectLike(
   value: unknown,
 ): value is { name: string; document: CircuitDocument } {
-  if (!isRecord(value) || typeof value.name !== 'string' || !isRecord(value.document)) {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ['name', 'document']) ||
+    typeof value.name !== 'string' ||
+    !isRecord(value.document)
+  ) {
     return false
   }
   if (
+    !hasOnlyKeys(value.document, ['format', 'version', 'name', 'nodes', 'connections']) ||
     value.document.format !== 'veritas-circuit' ||
     value.document.version !== 1 ||
     typeof value.document.name !== 'string' ||
@@ -156,28 +166,52 @@ function isCircuitProjectLike(
 function isNodeLike(value: unknown): value is CircuitDocument['nodes'][number] {
   if (
     !isRecord(value) ||
+    !hasOnlyKeys(value, ['id', 'type', 'position', 'label', 'options']) ||
     typeof value.id !== 'string' ||
     typeof value.type !== 'string' ||
     !isEditorComponentType(value.type as ComponentType)
   ) {
     return false
   }
-  if (!isRecord(value.position) || !isFiniteNumber(value.position.x) || !isFiniteNumber(value.position.y)) {
+  if (
+    !isRecord(value.position) ||
+    !hasOnlyKeys(value.position, ['x', 'y']) ||
+    !isFiniteNumber(value.position.x) ||
+    !isFiniteNumber(value.position.y)
+  ) {
     return false
   }
   if (value.label !== undefined && typeof value.label !== 'string') return false
   if (value.options !== undefined) {
-    if (!isRecord(value.options)) return false
+    if (!isRecord(value.options) || !hasOnlyKeys(value.options, [
+      'period', 'ticks', 'value', 'initial', 'width', 'widths', 'channel',
+      'customChipId', 'customChipBoundary',
+    ])) return false
+    if (value.options.period !== undefined && !isPositiveInteger(value.options.period)) return false
+    if (value.options.ticks !== undefined && !isPositiveInteger(value.options.ticks)) return false
     if (value.options.value !== undefined && typeof value.options.value !== 'boolean') return false
     if (value.options.initial !== undefined && typeof value.options.initial !== 'boolean') return false
     const width = value.options.width
-    if (width !== undefined && (typeof width !== 'number' || !Number.isInteger(width) || width < 1 || width > MAX_BUS_WIDTH)) return false
+    if (width !== undefined && !isCircuitWidth(width)) return false
+    if (value.options.widths !== undefined && (
+      !Array.isArray(value.options.widths) || value.options.widths.some((part) => !isCircuitWidth(part))
+    )) return false
+    if (value.options.channel !== undefined && typeof value.options.channel !== 'string') return false
+    if (value.options.customChipId !== undefined && !isPositiveInteger(value.options.customChipId)) return false
+    if (value.options.customChipBoundary !== undefined && value.options.customChipBoundary !== 'internal') return false
   }
   return true
 }
 
 function isConnectionLike(value: unknown): value is CircuitDocument['connections'][number] {
-  if (!isRecord(value) || !isRecord(value.source) || !isRecord(value.target)) return false
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ['source', 'target']) ||
+    !isRecord(value.source) ||
+    !isRecord(value.target) ||
+    !hasOnlyKeys(value.source, ['node', 'port']) ||
+    !hasOnlyKeys(value.target, ['node', 'port'])
+  ) return false
   return (
     typeof value.source.node === 'string' &&
     (value.source.port === undefined || Number.isInteger(value.source.port)) &&
@@ -186,6 +220,19 @@ function isConnectionLike(value: unknown): value is CircuitDocument['connections
   )
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedKeys = new Set(allowed)
+  return Object.keys(value).every((key) => allowedKeys.has(key))
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+}
+
+function isCircuitWidth(value: unknown): value is number {
+  return isPositiveInteger(value) && value <= MAX_BUS_WIDTH
 }

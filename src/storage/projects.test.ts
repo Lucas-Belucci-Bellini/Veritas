@@ -94,6 +94,21 @@ describe('arquivo .veritas', () => {
     ).toThrow('versão inválida')
   })
 
+  it('recusa campos desconhecidos no envelope e no projeto', () => {
+    expect(() => parseVeritasFile(JSON.stringify({
+      format: 'veritas',
+      version: 1,
+      projects: [{ name: 'x', expression: 'A', notation: 'math' }],
+      unknown: true,
+    }))).toThrow('envelope')
+
+    expect(() => parseVeritasFile(JSON.stringify({
+      format: 'veritas',
+      version: 1,
+      projects: [{ name: 'x', expression: 'A', notation: 'math', unknown: true }],
+    }))).toThrow('projeto 1')
+  })
+
   it('rejeita coleção com entrada inválida sem importação parcial', () => {
     expect(() => parseVeritasFile(JSON.stringify({
       format: 'veritas',

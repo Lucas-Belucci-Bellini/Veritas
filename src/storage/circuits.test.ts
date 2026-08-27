@@ -169,6 +169,27 @@ describe('arquivo de circuitos', () => {
     ).toThrow('versão inválida')
   })
 
+  it('recusa campos desconhecidos no envelope e no documento', () => {
+    expect(() => parseCircuitFile(JSON.stringify({
+      format: 'veritas-circuits',
+      version: 1,
+      projects: [{ name: 'x', document }],
+      unknown: true,
+    }))).toThrow('envelope')
+
+    expect(() => parseCircuitFile(JSON.stringify({
+      format: 'veritas-circuits',
+      version: 1,
+      projects: [{
+        name: 'x',
+        document: {
+          ...document,
+          nodes: document.nodes.map((node) => ({ ...node, unknown: true })),
+        },
+      }],
+    }))).toThrow('projeto 1')
+  })
+
   it('não filtra silenciosamente projeto inválido durante a importação', () => {
     const file = JSON.stringify({
       format: 'veritas-circuits',
