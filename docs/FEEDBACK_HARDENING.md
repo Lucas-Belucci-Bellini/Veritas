@@ -14,6 +14,8 @@ A execução também aceita `AbortSignal` e cancelamento explícito por `simulat
 
 A ponte `documentRuntime` encaminha esses limites por `DocumentRuntimeOptions` e expõe `diagnoseDocumentRuntime(simulator, maxTicks?)` como um adaptador fino para o diagnóstico do mesmo `Simulator`. Essa função é explicitamente operacional: o diagnóstico avança o runtime recebido e, portanto, não deve ser tratado como uma inspeção pura ou conectado à UI ativa sem uma cópia/preview isolada.
 
+O preflight `preflightDocumentRuntime(document, options?)` usa `analyzeCircuitExecutionSafety()` antes de criar o runtime. A análise iterativa de componentes fortemente conectados classifica ciclos como `combinational-cycle`, `temporal-feedback` ou `unclassified-cycle`; erros adicionais mantêm o status `invalid`. A ordem dos IDs e dos componentes é normalizada para que o relatório seja determinístico, inclusive em grafos que futuramente excedam a profundidade segura de recursão.
+
 Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`. O helper cria um runtime novo com o mesmo caminho de elaboração/netlist, restaura opcionalmente um `SimulatorState`, aplica as entradas fornecidas apenas na cópia, executa o diagnóstico limitado e devolve diagnóstico, snapshot e estado final. Assim, o chamador pode apresentar uma prévia sem alterar o runtime ativo.
 
 > Um `settle()` que retorna `false` é uma evidência de que o circuito não estabilizou dentro do orçamento observado; não é uma falha automática do circuito nem uma autorização para aumentar o limite sem diagnóstico.
@@ -43,4 +45,4 @@ Para esse uso seguro existe `diagnoseDocumentRuntimePreview(document, options?)`
 
 ## Limites do marco
 
-Este marco protege o custo da operação de acomodação, o total de tiques de uma instância, o custo de operações do runtime, cancelamento cooperativo e limpeza explícita, além de oferecer diagnóstico básico de repetição de estado. Ainda são trabalhos futuros a classificação de ciclos no grafo antes da execução, budgets de memória, limites de operações específicos por documento/worker, avaliação incremental/compilada, validação visual/desktop da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.
+Este marco protege o custo da operação de acomodação, o total de tiques de uma instância, o custo de operações do runtime, cancelamento cooperativo, limpeza explícita e classificação estática de ciclos no domínio, além de oferecer diagnóstico básico de repetição de estado. Ainda são trabalhos futuros budgets de memória, limites de operações específicos por documento/worker, integração do preflight em todas as superfícies UI/Worker/MCP/desktop, avaliação incremental/compilada, validação visual/desktop da preview e um contrato de waveform exportável. A validação visual e o smoke nativo permanecem dependentes de execução interativa em cada plataforma.

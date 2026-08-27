@@ -9,6 +9,7 @@ import {
   diagnoseDocumentRuntime,
   diagnoseDocumentRuntimePreview,
   documentInputIds,
+  preflightDocumentRuntime,
   documentWatches,
   runtimeValue,
   snapshotDocumentRuntime,
@@ -61,6 +62,13 @@ function feedbackDocument(): CircuitDocument {
 }
 
 describe('documentRuntime', () => {
+  it('classifica a topologia no preflight sem criar um runtime mutável', () => {
+    const report = preflightDocumentRuntime(feedbackDocument())
+
+    expect(report.status).toBe('temporal-feedback')
+    expect(report.cycles).toEqual([{ kind: 'temporal-feedback', nodeIds: ['ff'] }])
+  })
+
   it('converte um documento visual e aplica entradas iniciais', () => {
     const document = feedbackDocument()
     const simulator = createDocumentRuntime(document)

@@ -19,8 +19,8 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 ### Execution Safety — v2.7.0 em desenvolvimento
 
 - O `Simulator` passou a contabilizar budgets de operações por tique e acumulados por runtime, com rollback atômico quando o limite é excedido; a ponte `documentRuntime` encaminha as opções sem duplicar a engine.
-- Adicionados cancelamento cooperativo por `simulator.cancel()`, `AbortSignal`, `reset()` que limpa cancelamento e `shutdown()` idempotente que libera o estado interno. Os testes focados de `simulator` e `documentRuntime` passaram: 44/44.
-- A fase v2.7 permanece `Unreleased`: classificação estática de ciclos, budgets de memória, worker/desktop, cancelamento assíncrono de operações longas, smoke visual e QA nativo ainda não foram concluídos.
+- Adicionados cancelamento cooperativo por `simulator.cancel()`, `AbortSignal`, `reset()` que limpa cancelamento e `shutdown()` idempotente que libera o estado interno. O preflight `documentRuntime` encaminha a análise estática de SCCs. Os testes focados passaram: 51/51, incluindo 44 de Simulator/documentRuntime e 7 de análise estática/preflight.
+- A fase v2.7 permanece `Unreleased`: budgets de memória, integração completa do preflight em UI/Worker/MCP/desktop, cancelamento assíncrono de operações longas, smoke visual e QA nativo ainda não foram concluídos.
 
 ### Trajetória de plataforma
 

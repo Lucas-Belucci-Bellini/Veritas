@@ -107,6 +107,8 @@ export { assertCustomChipDepth, MAX_CUSTOM_CHIP_DEPTH, resolveCustomChipDefiniti
 export type { CustomChipInstanceOptions } from './customChipInstance'
 export { documentSerializedBytes, getCircuitDocumentBoundIssues, isCircuitDocumentShape, normalizeCircuitDocument } from './documentContract'
 export type { CircuitDocumentBoundIssue, CircuitDocumentBoundIssueCode } from './documentContract'
+export { analyzeCircuitExecutionSafety } from './executionSafety'
+export type { CircuitCycleComponent, CircuitCycleKind, CircuitExecutionSafetyReport, CircuitExecutionSafetyStatus } from './executionSafety'
 export { MAX_CIRCUIT_CONNECTIONS, MAX_CIRCUIT_LABEL_LENGTH, MAX_CIRCUIT_NAME_LENGTH, MAX_CIRCUIT_NODES, MAX_CIRCUIT_SERIALIZED_BYTES, MAX_WIRELESS_CHANNEL_LENGTH } from './documentLimits'
 export { topologicalOrder } from './topology'
 export type { TopologyInput, TopologyNode } from './topology'

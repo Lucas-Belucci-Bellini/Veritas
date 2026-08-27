@@ -1,7 +1,9 @@
 import {
+  analyzeCircuitExecutionSafety,
   elaborateCustomChipDocument,
   toNetlist,
   type CircuitDocument,
+  type CircuitExecutionSafetyReport,
   type CustomChipLibraryEntry,
 } from '../circuit'
 import { Simulator, type SettleDiagnostic, type SimulatorState } from './simulator'
@@ -54,6 +56,21 @@ export interface DocumentRuntimeDiagnosticPreview {
   diagnostic: SettleDiagnostic
   snapshot: DocumentRuntimeSnapshot
   simulatorState: SimulatorState
+}
+
+/**
+ * Faz a classificação estática de segurança sem criar ou avançar um Simulator.
+ * Larguras são aceitas aqui para que o preflight não confunda topologia com o
+ * contrato posterior de execução vetorial.
+ */
+export function preflightDocumentRuntime(
+  document: CircuitDocument,
+  options: Pick<DocumentRuntimeOptions, 'customChips'> = {},
+): CircuitExecutionSafetyReport {
+  return analyzeCircuitExecutionSafety(document, {
+    allowBuses: true,
+    customChips: options.customChips,
+  })
 }
 
 export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
