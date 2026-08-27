@@ -16,6 +16,7 @@ import {
   importTestbenchProjects,
   listTestbenchProjects,
   MAX_TESTBENCH_FILE_BYTES,
+  MAX_TESTBENCH_FILE_PROJECTS,
   parseTestbenchFile,
   serializeTestbenchProjects,
   updateTestbenchProject,
@@ -238,7 +239,30 @@ describe('arquivo de testbench', () => {
     ).toThrow('documento 1')
   })
 
-  it('recusa arquivo acima do limite bounded', () => {
+  it('recusa nomes duplicados e lote acima do limite bounded', () => {
+    const duplicate = {
+      format: 'veritas-testbenches',
+      version: 1,
+      testbenches: [
+        { name: 'Mesmo', circuitName: 'c', document: document('a') },
+        { name: ' mesmo ', circuitName: 'c', document: document('b') },
+      ],
+    }
+    expect(() => parseTestbenchFile(JSON.stringify(duplicate))).toThrow('aparece mais de uma vez')
+
+    const tooMany = {
+      format: 'veritas-testbenches',
+      version: 1,
+      testbenches: Array.from({ length: MAX_TESTBENCH_FILE_PROJECTS + 1 }, (_, index) => ({
+        name: `T${index}`,
+        circuitName: 'c',
+        document: document(`d${index}`),
+      })),
+    }
+    expect(() => parseTestbenchFile(JSON.stringify(tooMany))).toThrow('1 a 256')
+  })
+
+  it('recusa arquivo acima do limite de bytes', () => {
     const oversized = JSON.stringify({
       format: 'veritas-testbenches',
       version: 1,

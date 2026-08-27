@@ -12,6 +12,7 @@ import { db, type NewTestbenchProject, type TestbenchProject } from './db'
 export const TESTBENCH_FILE_FORMAT = 'veritas-testbenches'
 export const TESTBENCH_FILE_VERSION = 1 as const
 export const MAX_TESTBENCH_FILE_BYTES = 5_000_000
+export const MAX_TESTBENCH_FILE_PROJECTS = 256
 
 export interface VeritasTestbenchFile {
   format: typeof TESTBENCH_FILE_FORMAT
@@ -131,8 +132,12 @@ export function parseTestbenchFile(text: string): Array<{
       'Esse arquivo de testbench foi salvo por uma versão mais nova do Veritas.',
     )
   }
-  if (!Array.isArray(data.testbenches)) {
-    throw new Error('O arquivo de testbench não tem documentos dentro.')
+  if (
+    !Array.isArray(data.testbenches) ||
+    data.testbenches.length === 0 ||
+    data.testbenches.length > MAX_TESTBENCH_FILE_PROJECTS
+  ) {
+    throw new Error(`O arquivo de testbench deve conter de 1 a ${MAX_TESTBENCH_FILE_PROJECTS} documentos.`)
   }
 
   const projects = data.testbenches.map((project, index) => {
@@ -146,8 +151,11 @@ export function parseTestbenchFile(text: string): Array<{
     }
   })
 
-  if (projects.length === 0) {
-    throw new Error('O arquivo de testbench não tem nenhum documento.')
+  const names = new Set<string>()
+  for (const project of projects) {
+    const key = project.name.trim().toLowerCase()
+    if (names.has(key)) throw new Error(`O nome de testbench "${project.name}" aparece mais de uma vez.`)
+    names.add(key)
   }
   return projects
 }
@@ -157,13 +165,26 @@ export async function importTestbenchProjects(
   projects: readonly { name: string; document: TestbenchDocument }[],
   expectedCircuitName?: string,
 ): Promise<number> {
+  if (projects.length === 0 || projects.length > MAX_TESTBENCH_FILE_PROJECTS) {
+    throw new Error(`A importação de testbench deve conter de 1 a ${MAX_TESTBENCH_FILE_PROJECTS} documentos.`)
+  }
+  const normalizedProjects = projects.map((project) => ({
+    name: normalizeName(project.name, project.document),
+    document: normalizeTestbenchDocument(project.document),
+  }))
+  const names = new Set<string>()
+  for (const project of normalizedProjects) {
+    const key = project.name.trim().toLowerCase()
+    if (names.has(key)) throw new Error(`O nome de testbench "${project.name}" aparece mais de uma vez.`)
+    names.add(key)
+  }
   const now = Date.now()
-  const rows = projects.map(
+  const rows = normalizedProjects.map(
     (project, index) =>
       ({
         circuitId,
-        name: normalizeName(project.name, project.document),
-        document: normalizeTestbenchDocument(project.document),
+        name: project.name,
+        document: project.document,
         createdAt: now + index,
         updatedAt: now + index,
       }) as TestbenchProject,
