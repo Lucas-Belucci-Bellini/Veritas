@@ -30,7 +30,7 @@ A implementação Rust só poderá ser considerada runtime quando houver compara
 | Comando Tauri | Comando async, resposta tipada, erro versionado e registro de cancelamento | `BUILD VERIFIED`/`PASSED` no crate Linux; UI ainda não integrada |
 | Canal de progresso | Eventos bounded por `requestId`, teardown e cancelamento | `NOT IMPLEMENTED` |
 | Engine Rust | Execução determinística escalar, budgets e snapshots finais | `PASSED` em testes Rust Linux; runtime interativo não verificado |
-| Paridade TypeScript/Rust | Golden fixtures e primeira divergência diagnóstica | `NOT VERIFIED` |
+| Paridade TypeScript/Rust | Golden fixtures e primeira divergência diagnóstica | `PASSED` para fixture DFF escalar compartilhada em testes TypeScript/Rust; cobertura ampla e runtime interativo `NOT VERIFIED` |
 | Windows/macOS/Linux | Build e smoke nativo proporcional por alvo | `NOT VERIFIED` |
 | Instalador Windows | `Veritas-Setup.exe` produzido e testado | `NOT VERIFIED` |
 

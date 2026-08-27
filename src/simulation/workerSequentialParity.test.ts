@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import sharedFixture from '../../tests/fixtures/worker-sequential-dff.json'
 import { Simulator } from './simulator'
 import { applySequentialInputs, getSequentialDemo, snapshotSequentialSimulator } from './workspace'
 import {
@@ -31,21 +32,15 @@ class Endpoint implements SimulationWorkerEndpoint {
   }
 }
 
-const request: SimulationWorkerRunRequest = {
-  type: 'run',
-  protocolVersion: 1,
-  requestId: 'sequential-parity-dff',
-  components: getSequentialDemo('dff-clock').netlist.components,
-  steps: [
-    { set: { d: true }, ticks: 1 },
-    { ticks: 1 },
-    { set: { d: false }, ticks: 1 },
-    { ticks: 1 },
-  ],
-  watch: ['d', 'clk', 'ff', 'qout'],
-  yieldEvery: 1,
-  timeoutMs: 30_000,
-}
+const request = {
+  ...sharedFixture.request,
+  type: 'run' as const,
+  protocolVersion: 1 as const,
+  components: sharedFixture.request.components as SimulationWorkerRunRequest['components'],
+  steps: sharedFixture.request.steps as SimulationWorkerRunRequest['steps'],
+  watch: sharedFixture.request.watch as SimulationWorkerRunRequest['watch'],
+  timeoutMs: sharedFixture.request.timeoutMs,
+} satisfies SimulationWorkerRunRequest
 
 function expectedSnapshots(): readonly { tick: number; values: Record<string, boolean[]> }[] {
   const simulator = new Simulator(getSequentialDemo('dff-clock').netlist)
@@ -78,7 +73,8 @@ describe('paridade sequencial Worker versus Simulator', () => {
 
     const result = await waitForResult(endpoint)
 
-    expect(result.snapshots).toEqual(expectedSnapshots())
+    expect(expectedSnapshots()).toEqual(sharedFixture.expectedSnapshots)
+    expect(result.snapshots).toEqual(sharedFixture.expectedSnapshots)
     expect(result.snapshots.map((snapshot) => snapshot.tick)).toEqual([0, 1, 2, 3, 4])
     expect(endpoint.messages.filter((message) => message.type === 'result')).toHaveLength(1)
     dispose()

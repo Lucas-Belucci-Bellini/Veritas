@@ -99,6 +99,8 @@ pub struct NativeSimulationRequest {
     pub watch: Vec<String>,
     #[serde(default)]
     pub budget: NativeBudget,
+    #[serde(rename = "yieldEvery", default)]
+    pub yield_every: Option<u64>,
     #[serde(rename = "timeoutMs", default)]
     pub timeout_ms: Option<u64>,
 }
@@ -346,6 +348,14 @@ fn validate_request(
         }
     }
 
+    if request
+        .yield_every
+        .is_some_and(|yield_every| !(1..=1_000).contains(&yield_every))
+    {
+        return Err(NativeSimulationError::invalid(
+            "yieldEvery deve estar entre 1 e 1000.",
+        ));
+    }
     if request.watch.len() > MAX_WATCHES {
         return Err(NativeSimulationError::invalid(format!(
             "watch deve conter no máximo {MAX_WATCHES} itens."
@@ -834,8 +844,27 @@ mod tests {
                 "qout".to_string(),
             ],
             budget: NativeBudget::default(),
+            yield_every: Some(1),
             timeout_ms: Some(30_000),
         }
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct SharedFixture {
+        request: NativeSimulationRequest,
+        #[serde(rename = "expectedSnapshots")]
+        expected_snapshots: Vec<NativeSnapshot>,
+    }
+
+    #[test]
+    fn matches_shared_typescript_golden_fixture() {
+        let fixture: SharedFixture = serde_json::from_str(include_str!(
+            "../../tests/fixtures/worker-sequential-dff.json"
+        ))
+        .expect("shared fixture should parse");
+        let result = execute_native(fixture.request, Arc::new(AtomicBool::new(false)))
+            .expect("shared fixture should execute");
+        assert_eq!(result.snapshots, fixture.expected_snapshots);
     }
 
     #[test]
