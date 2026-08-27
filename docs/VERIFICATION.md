@@ -241,8 +241,12 @@ um sandbox.
 ```ts
 interface TestbenchCase {
   name?: string
-  inputs?: Record<string, boolean>   // modo combinacional
+  inputs?: Record<string, boolean>   // modo combinacional escalar
   expect?: Record<string, boolean>
+  vectors?: {                       // modo combinacional multi-bit
+    inputs?: Record<string, string | number>
+    expect?: Record<string, string | number>
+  }
   steps?: TestbenchStep[]            // modo sequencial
 }
 
@@ -253,8 +257,9 @@ interface TestbenchStep {
 }
 ```
 
-Um caso é combinacional **ou** sequencial. Misturar `steps` com
-`inputs`/`expect` torna a intenção ambígua e é recusado (`mixed-case-mode`).
+Um caso é combinacional escalar, combinacional multi-bit **ou** sequencial. Misturar
+`steps`, `inputs`/`expect` e `vectors` torna a intenção ambígua e é recusado
+(`mixed-case-mode`).
 
 ### Um caso sem expectativa não é um teste
 
@@ -290,6 +295,27 @@ da interface. O budget padrão é `MAX_TESTBENCH_DIAGNOSTIC_TICKS` (64 tiques), 
 o chamador pode fornecer um valor inteiro entre 1 e 64 por meio de
 `TestbenchOptions.diagnosticTicks`.
 
+### Relatório observável e contraexemplo
+
+Cada caso que declara uma expectativa produz um snapshot serializável no ponto de
+observação. O snapshot contém o índice do caso, o passo quando aplicável, o tique
+e os valores dos componentes em ordem canônica. O relatório agrega esses
+snapshots em `report.snapshots` e mantém também os snapshots por caso.
+
+Quando uma expectativa diverge, `mismatches` continua listando todas as saídas
+que falharam, enquanto `firstDivergence` registra somente o primeiro sinal
+observado na ordem canônica, com valor esperado, valor obtido, passo e tique.
+`counterexample` preserva a atribuição de entradas e o snapshot correspondente à
+primeira divergência; para casos multi-bit, os valores são normalizados em
+binário MSB → LSB. O resultado funcional `passed`/`failed` continua separado do
+diagnóstico operacional `stabilized`/`cycle-detected`/`budget-exhausted`. Um ciclo
+sequencial esperado não é convertido automaticamente em falha.
+
+A ordem do relatório é determinística: casos seguem a ordem do documento,
+saídas seguem a ordem canônica por nome e os valores vetoriais têm largura
+explícita. Casos inválidos retornam listas vazias de snapshots e contraexemplos,
+sem executar o roteiro.
+
 | | VERIFY-001 | VERIFY-002 | VERIFY-003 |
 | --- | --- | --- | --- |
 | compara | circuito × circuito | circuito × circuito | circuito × intenção |
@@ -314,23 +340,22 @@ temporal recebe a biblioteca e achata os chips antes de simular.
 
 | Camada | Entrada |
 | --- | --- |
-| Domínio | `runTestbench` em `src/circuit/testbench.ts`; casos sequenciais retornam diagnóstico bounded |
-| Interface | painel “Testes do circuito” (`src/components/TestbenchPanel.tsx`) — a tabela **é** o documento de teste e apresenta o diagnóstico por caso |
-| MCP | ferramenta `run_testbench`, com o diagnóstico serializado em texto |
+| Domínio | `runTestbench` em `src/circuit/testbench.ts`; retorna snapshots, contraexemplos, primeira divergência e diagnóstico bounded |
+| Interface | painel “Testes do circuito” (`src/components/TestbenchPanel.tsx`) — a tabela **é** o documento de teste e apresenta observações e diagnóstico por caso |
+| MCP | ferramenta `run_testbench`, com snapshots observados, primeira divergência, contraexemplo e diagnóstico serializados em texto |
 
 ### Cobertura
 
-- `src/circuit/testbench.test.ts` — 19 casos: meio somador aprovado, meio
-  somador com o vai-um errado apontando caso/saída/valores, execução de todos os
-  casos sem parar no primeiro, nomeação por posição, caso sequencial com
-  expectativa por passo, tique e passo no relatório de falha sequencial, mistura
-  de modos, caso sem expectativa (combinacional e sequencial), portas
-  inexistentes, formato inválido, sem casos, limite de casos, limite de tiques,
-  rótulo duplicado, guarda de custom-chip sequencial, passo sem `ticks`,
-  determinismo e ordem canônica das divergências.
-- `mcp/src/tools.test.ts` — golden aprovado (incluindo o aviso sobre o que não
-  prova), golden reprovado tabulado, documento inválido, circuito fora do
-  formato e diagnóstico bounded de ciclo no resultado headless.
+- `src/circuit/testbench.test.ts` — 25 casos: meio somador aprovado e reprovado
+  com contraexemplo, snapshots e primeira divergência, execução de todos os casos
+  sem parar no primeiro, nomeação por posição, roteiro sequencial com expectativa
+  por passo/tique, ciclo e budget bounded, budget inválido, caso multi-bit,
+  register-4bit, counter-4bit, JK, SR, feedback, custom-chip sequencial, mistura
+  de modos, casos sem expectativa, literal vetorial inválido, portas inexistentes, formato inválido, limites,
+  rótulo duplicado, passo sem `ticks`, determinismo e ordem canônica.
+- `mcp/src/tools.test.ts` — 5 testes focados: golden aprovado com contagem de
+  snapshots, golden reprovado tabulado com primeira divergência/contraexemplo,
+  documento inválido, diagnóstico bounded de ciclo e circuito fora do formato.
 - `scripts/mcp-acceptance.mjs` — `MCP-TB-001` e `MCP-TB-002` pelo transporte
   stdio real.
 

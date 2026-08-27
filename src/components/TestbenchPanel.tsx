@@ -876,6 +876,30 @@ function DiagnosticStatus({
   )
 }
 
+function ObservationSummary({ report }: { report: TestbenchReport }) {
+  if (!report.firstDivergence) {
+    return (
+      <p className="mt-3 text-xs text-slate-600 dark:text-slate-300" role="status">
+        Snapshots observados: {report.snapshots.length}.
+      </p>
+    )
+  }
+
+  const divergence = report.firstDivergence
+  const expected = divergence.vector?.expected ?? (divergence.expected === undefined ? '—' : divergence.expected ? '1' : '0')
+  const actual = divergence.vector?.actual ?? (divergence.actual === undefined ? '—' : divergence.actual ? '1' : '0')
+  return (
+    <div className="mt-3 rounded-lg border border-rose-200 bg-white/60 p-3 text-xs text-rose-800 dark:border-rose-800 dark:bg-slate-950/20 dark:text-rose-200" role="status">
+      <p>
+        Snapshots observados: {report.snapshots.length}. Primeiro sinal divergente:{' '}
+        <strong>{divergence.signal}</strong> no tique {divergence.tick}
+        {divergence.step === undefined ? '' : `, passo ${divergence.step + 1}`}
+        {' '}({expected} esperado, {actual} obtido).
+      </p>
+    </div>
+  )
+}
+
 function DiagnosticSummary({ report }: { report: TestbenchReport }) {
   const diagnostics = report.cases.filter((item) => item.diagnostic && item.diagnostic.status !== 'stabilized')
   if (diagnostics.length === 0) return null
@@ -942,6 +966,7 @@ function TestbenchSummary({ report }: { report: TestbenchReport }) {
           casos — para uma prova sobre todas as combinações possíveis, use a
           equivalência entre circuitos.
         </p>
+        <ObservationSummary report={report} />
         <DiagnosticSummary report={report} />
       </div>
     )
@@ -957,6 +982,7 @@ function TestbenchSummary({ report }: { report: TestbenchReport }) {
         As linhas e passos marcados mostram, ao lado da saída esperada, o valor
         que o circuito realmente produziu.
       </p>
+      <ObservationSummary report={report} />
       <DiagnosticSummary report={report} />
     </div>
   )

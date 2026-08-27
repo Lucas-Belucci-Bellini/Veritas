@@ -720,6 +720,7 @@ function formatTestbenchReport(report: TestbenchReport): string {
     report.status === 'passed' ? 'Resultado: todos os casos passaram' : 'Resultado: há casos falhando',
     '',
     `Casos: ${report.passed} de ${report.total} passaram`,
+    `Snapshots observados: ${report.snapshots.length}`,
   ]
 
   if (report.status === 'passed') {
@@ -736,14 +737,48 @@ function formatTestbenchReport(report: TestbenchReport): string {
   for (const item of report.cases) {
     if (item.status === 'passed') continue
     for (const mismatch of item.mismatches) {
+      const expected = mismatch.vector?.expected ?? (mismatch.expected === undefined ? '—' : mismatch.expected ? '1' : '0')
+      const actual = mismatch.vector?.actual ?? (mismatch.actual === undefined ? '—' : mismatch.actual ? '1' : '0')
       lines.push(
-        `| ${item.name} | ${mismatch.output} | ${mismatch.expected ? 1 : 0} | ${mismatch.actual ? 1 : 0} | ` +
+        `| ${item.name} | ${mismatch.output} | ${expected} | ${actual} | ` +
         `${mismatch.tick === undefined ? '—' : mismatch.tick} |`,
       )
     }
   }
+  appendObservations(lines, report)
   appendDiagnostics(lines, report)
   return lines.join('\n')
+}
+
+function appendObservations(lines: string[], report: TestbenchReport): void {
+  if (!report.firstDivergence && report.counterexamples.length === 0) return
+
+  if (report.firstDivergence) {
+    lines.push('', `Primeira divergência: ${formatDivergence(report.firstDivergence)}`)
+  }
+  if (report.counterexamples.length === 0) return
+
+  lines.push('', 'Contraexemplos determinísticos:')
+  for (const counterexample of report.counterexamples) {
+    const inputs = Object.entries(counterexample.inputs)
+      .map(([name, value]) => `${name}=${value ? 1 : 0}`)
+    const vectors = Object.entries(counterexample.vectorInputs ?? {})
+      .map(([name, value]) => `${name}=${value}`)
+    const assignment = [...inputs, ...vectors].join(', ')
+    lines.push(
+      `- caso ${counterexample.caseIndex + 1}: entradas [${assignment || 'nenhuma'}]; ` +
+      `snapshot no tique ${counterexample.snapshot.tick}` +
+      `${counterexample.snapshot.step === undefined ? '' : `, passo ${counterexample.snapshot.step + 1}`}; ` +
+      formatDivergence(counterexample.divergence),
+    )
+  }
+}
+
+function formatDivergence(divergence: NonNullable<TestbenchReport['firstDivergence']>): string {
+  const value = divergence.vector
+    ? `esperado ${divergence.vector.expected}, obtido ${divergence.vector.actual}`
+    : `esperado ${divergence.expected ? 1 : 0}, obtido ${divergence.actual ? 1 : 0}`
+  return `${divergence.signal} no tique ${divergence.tick} (${value})`
 }
 
 function appendDiagnostics(lines: string[], report: TestbenchReport): void {

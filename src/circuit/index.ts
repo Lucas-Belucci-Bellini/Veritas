@@ -79,13 +79,17 @@ export type {
   TestbenchCaseResult,
   TestbenchDocument,
   TestbenchCaseDiagnostic,
+  TestbenchCounterexample,
+  TestbenchFirstDivergence,
   TestbenchIssue,
   TestbenchIssueCode,
   TestbenchMismatch,
   TestbenchOptions,
   TestbenchReport,
+  TestbenchSnapshot,
   TestbenchStatus,
   TestbenchStep,
+  TestbenchVectorCase,
 } from './testbench'
 export { circuitPortName, collectCircuitPorts, compareCircuitText, duplicatePortMessage } from './portIdentity'
 export type { CircuitPort, CircuitPortDuplicate, CircuitPortIdentity } from './portIdentity'

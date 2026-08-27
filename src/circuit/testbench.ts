@@ -1,9 +1,11 @@
+import { bitVector, BitVectorError, toBinary, type BitVector } from '../bus'
 import {
   createDocumentRuntime,
   diagnoseDocumentRuntimePreview,
+  snapshotDocumentRuntime,
 } from '../simulation/documentRuntime'
 import type { SettleDiagnostic } from '../simulation/simulator'
-import { evaluateCircuit } from './evaluate'
+import { evaluateCircuit, evaluateCircuitVectors } from './evaluate'
 import { CircuitValidationError, type CircuitDocument } from './editorModel'
 import { normalizeCircuitDocument } from './documentContract'
 import {
@@ -35,14 +37,22 @@ export interface TestbenchStep {
   expect?: Readonly<Record<string, boolean>>
 }
 
+/** Caso combinacional com entradas e expectativas em barramentos. */
+export interface TestbenchVectorCase {
+  inputs?: Readonly<Record<string, string | number>>
+  expect?: Readonly<Record<string, string | number>>
+}
+
 /**
- * Um caso de teste. Ou é combinacional (`inputs` + `expect`) ou é sequencial
- * (`steps`); misturar os dois torna a intenção ambígua e é recusado.
+ * Um caso de teste. Pode ser combinacional escalar (`inputs` + `expect`),
+ * combinacional multi-bit (`vectors`) ou sequencial (`steps`); misturar modos
+ * torna a intenção ambígua e é recusado.
  */
 export interface TestbenchCase {
   name?: string
   inputs?: Readonly<Record<string, boolean>>
   expect?: Readonly<Record<string, boolean>>
+  vectors?: TestbenchVectorCase
   steps?: readonly TestbenchStep[]
 }
 
@@ -66,6 +76,7 @@ export type TestbenchIssueCode =
   | 'cases-exceeded'
   | 'ticks-exceeded'
   | 'diagnostic-budget-invalid'
+  | 'vector-invalid'
 
 export interface TestbenchIssue {
   code: TestbenchIssueCode
@@ -76,12 +87,54 @@ export interface TestbenchIssue {
 
 export interface TestbenchMismatch {
   output: string
-  expected: boolean
-  actual: boolean
+  /** Valores escalares; ficam ausentes quando `vector` descreve a divergência. */
+  expected?: boolean
+  actual?: boolean
+  /** Valores canônicos MSB → LSB de uma divergência multi-bit. */
+  vector?: {
+    width: number
+    expected: string
+    actual: string
+  }
   /** Tique em que a expectativa falhou; ausente no modo combinacional. */
   tick?: number
   /** Passo do roteiro; ausente no modo combinacional. */
   step?: number
+}
+
+/** Estado observável capturado em uma expectativa do testbench. */
+export interface TestbenchSnapshot {
+  caseIndex: number
+  /** Para casos combinacionais, o tique 0 representa a avaliação instantânea. */
+  tick: number
+  /** Passo do roteiro que produziu a observação; ausente no modo combinacional. */
+  step?: number
+  /** Valores de saída dos componentes, em ordem canônica por ID. */
+  values: Record<string, boolean[]>
+}
+
+/** Primeiro sinal que divergiu na ordem de execução e na ordem canônica de saídas. */
+export interface TestbenchFirstDivergence {
+  caseIndex: number
+  signal: string
+  expected?: boolean
+  actual?: boolean
+  vector?: {
+    width: number
+    expected: string
+    actual: string
+  }
+  tick: number
+  step?: number
+}
+
+/** Contraexemplo mínimo reproduzível para a primeira divergência de um caso. */
+export interface TestbenchCounterexample {
+  caseIndex: number
+  inputs: Record<string, boolean>
+  vectorInputs?: Record<string, string>
+  snapshot: TestbenchSnapshot
+  divergence: TestbenchFirstDivergence
 }
 
 export interface TestbenchCaseResult {
@@ -91,6 +144,12 @@ export interface TestbenchCaseResult {
   status: 'passed' | 'failed'
   /** Somente as saídas que não bateram, em ordem canônica. */
   mismatches: TestbenchMismatch[]
+  /** Snapshots das etapas que declararam expectativas. */
+  snapshots: TestbenchSnapshot[]
+  /** Primeira divergência deste caso, ou nulo quando o caso passou. */
+  firstDivergence: TestbenchFirstDivergence | null
+  /** Contraexemplo deste caso, ou nulo quando o caso passou. */
+  counterexample: TestbenchCounterexample | null
   /** Diagnóstico bounded do estado final, somente para casos sequenciais. */
   diagnostic?: SettleDiagnostic
 }
@@ -102,6 +161,12 @@ export interface TestbenchReport {
   failed: number
   cases: TestbenchCaseResult[]
   issues: TestbenchIssue[]
+  /** Todos os snapshots observados, preservando o índice do caso. */
+  snapshots: TestbenchSnapshot[]
+  /** Um contraexemplo por caso que falhou. */
+  counterexamples: TestbenchCounterexample[]
+  /** Primeira divergência global na ordem dos casos. */
+  firstDivergence: TestbenchFirstDivergence | null
 }
 
 export interface TestbenchOptions {
@@ -147,12 +212,17 @@ export function runTestbench(
   const referenceIssues = validateReferences(testbench, identity.inputIds, identity.outputIds)
   if (referenceIssues.length > 0) return invalid(referenceIssues)
 
+  const vectorIssues = validateVectorValues(testbench, identity)
+  if (vectorIssues.length > 0) return invalid(vectorIssues)
+
   const results: TestbenchCaseResult[] = []
   for (const [index, testCase] of testbench.cases.entries()) {
     results.push(
       testCase.steps
         ? runSequentialCase(normalized, testCase, index, identity, options)
-        : runCombinationalCase(normalized, testCase, index, identity, options),
+        : testCase.vectors
+          ? runVectorCase(normalized, testCase, index, identity, options)
+          : runCombinationalCase(normalized, testCase, index, identity, options),
     )
   }
 
@@ -164,10 +234,65 @@ export function runTestbench(
     failed: results.length - passed,
     cases: results,
     issues: [],
+    snapshots: results.flatMap((result) => result.snapshots),
+    counterexamples: results.flatMap((result) => result.counterexample ? [result.counterexample] : []),
+    firstDivergence: results.find((result) => result.firstDivergence)?.firstDivergence ?? null,
   }
 }
 
 type PortIdentity = ReturnType<typeof collectCircuitPorts>
+
+function runVectorCase(
+  document: CircuitDocument,
+  testCase: TestbenchCase,
+  index: number,
+  identity: PortIdentity,
+  options: TestbenchOptions,
+): TestbenchCaseResult {
+  const vectorCase = testCase.vectors!
+  const inputs: Record<string, string | number> = {}
+  for (const [name, value] of Object.entries(vectorCase.inputs ?? {})) {
+    inputs[identity.inputIds.get(name)!] = value
+  }
+
+  const evaluation = evaluateCircuitVectors(document, inputs, { customChips: options.customChips })
+  const snapshot: TestbenchSnapshot = {
+    caseIndex: index,
+    tick: 0,
+    values: canonicalVectorValues(evaluation.values),
+  }
+  const mismatches: TestbenchMismatch[] = []
+  let firstDivergence: TestbenchFirstDivergence | null = null
+  for (const output of sortedNames(vectorCase.expect ?? {})) {
+    const width = portWidth(identity, output, 'output')
+    const expected = toBinary(bitVector(width, vectorCase.expect![output]))
+    const actual = toBinary(evaluation.outputs[identity.outputIds.get(output)!] ?? bitVector(width, 0))
+    if (actual !== expected) {
+      const vector = { width, expected, actual }
+      mismatches.push({ output, vector })
+      firstDivergence ??= { caseIndex: index, signal: output, vector, tick: 0 }
+    }
+  }
+
+  return {
+    index,
+    name: caseName(testCase, index),
+    mode: 'combinational',
+    status: mismatches.length === 0 ? 'passed' : 'failed',
+    mismatches,
+    snapshots: [snapshot],
+    firstDivergence,
+    counterexample: firstDivergence
+      ? {
+          caseIndex: index,
+          inputs: {},
+          vectorInputs: vectorInputValuesFromSnapshot(snapshot, identity),
+          snapshot,
+          divergence: firstDivergence,
+        }
+      : null,
+  }
+}
 
 function runCombinationalCase(
   document: CircuitDocument,
@@ -182,11 +307,20 @@ function runCombinationalCase(
   }
 
   const evaluation = evaluate(document, inputs, options)
+  const snapshot: TestbenchSnapshot = {
+    caseIndex: index,
+    tick: 0,
+    values: canonicalValues(evaluation.values),
+  }
   const mismatches: TestbenchMismatch[] = []
+  let firstDivergence: TestbenchFirstDivergence | null = null
   for (const output of sortedNames(testCase.expect ?? {})) {
     const expected = testCase.expect![output]
     const actual = evaluation.outputs[identity.outputIds.get(output)!] ?? false
-    if (actual !== expected) mismatches.push({ output, expected, actual })
+    if (actual !== expected) {
+      mismatches.push({ output, expected, actual })
+      firstDivergence ??= { caseIndex: index, signal: output, expected, actual, tick: 0 }
+    }
   }
 
   return {
@@ -195,6 +329,16 @@ function runCombinationalCase(
     mode: 'combinational',
     status: mismatches.length === 0 ? 'passed' : 'failed',
     mismatches,
+    snapshots: [snapshot],
+    firstDivergence,
+    counterexample: firstDivergence
+      ? {
+          caseIndex: index,
+          inputs: inputValuesFromSnapshot(snapshot, identity),
+          snapshot,
+          divergence: firstDivergence,
+        }
+      : null,
   }
 }
 
@@ -207,6 +351,9 @@ function runSequentialCase(
 ): TestbenchCaseResult {
   const runtime = buildRuntime(document, options)
   const mismatches: TestbenchMismatch[] = []
+  const snapshots: TestbenchSnapshot[] = []
+  let firstDivergence: TestbenchFirstDivergence | null = null
+  let counterexample: TestbenchCounterexample | null = null
 
   ;(testCase.steps ?? []).forEach((step, stepIndex) => {
     for (const [name, value] of Object.entries(step.set ?? {})) {
@@ -214,11 +361,38 @@ function runSequentialCase(
     }
     runtime.tick(normalizeTicks(step.ticks))
 
-    for (const output of sortedNames(step.expect ?? {})) {
+    const expectedNames = sortedNames(step.expect ?? {})
+    const runtimeSnapshot = snapshotDocumentRuntime(runtime, document, options.customChips)
+    const snapshot: TestbenchSnapshot = {
+      caseIndex: index,
+      tick: runtimeSnapshot.tick,
+      step: stepIndex,
+      values: canonicalValues(runtimeSnapshot.values),
+    }
+    if (expectedNames.length > 0) snapshots.push(snapshot)
+
+    for (const output of expectedNames) {
       const expected = step.expect![output]
       const actual = runtime.read(identity.outputIds.get(output)!)
       if (actual !== expected) {
-        mismatches.push({ output, expected, actual, tick: runtime.tickCount, step: stepIndex })
+        const mismatch = { output, expected, actual, tick: runtime.tickCount, step: stepIndex }
+        mismatches.push(mismatch)
+        firstDivergence ??= {
+          caseIndex: index,
+          signal: output,
+          expected,
+          actual,
+          tick: runtime.tickCount,
+          step: stepIndex,
+        }
+        if (!counterexample) {
+          counterexample = {
+            caseIndex: index,
+            inputs: inputValuesFromSnapshot(snapshot, identity),
+            snapshot,
+            divergence: firstDivergence,
+          }
+        }
       }
     }
   })
@@ -230,6 +404,9 @@ function runSequentialCase(
     mode: 'sequential',
     status: mismatches.length === 0 ? 'passed' : 'failed',
     mismatches,
+    snapshots,
+    firstDivergence,
+    counterexample,
     diagnostic,
   }
 }
@@ -274,9 +451,81 @@ function diagnoseSequentialCase(
   }
 }
 
+function canonicalValues(
+  values: Readonly<Record<string, readonly boolean[]>>,
+): Record<string, boolean[]> {
+  const result: Record<string, boolean[]> = {}
+  for (const id of Object.keys(values).sort(compareCircuitText)) result[id] = [...(values[id] ?? [])]
+  return result
+}
+
+function canonicalVectorValues(
+  values: Readonly<Record<string, BitVector>>,
+): Record<string, boolean[]> {
+  const result: Record<string, boolean[]> = {}
+  for (const id of Object.keys(values).sort(compareCircuitText)) result[id] = [...(values[id]?.bits ?? [])]
+  return result
+}
+
+function inputValuesFromSnapshot(
+  snapshot: TestbenchSnapshot,
+  identity: PortIdentity,
+): Record<string, boolean> {
+  const result: Record<string, boolean> = {}
+  for (const name of [...identity.inputIds.keys()].sort(compareCircuitText)) {
+    const id = identity.inputIds.get(name)!
+    result[name] = snapshot.values[id]?.[0] ?? false
+  }
+  return result
+}
+
+function vectorInputValuesFromSnapshot(
+  snapshot: TestbenchSnapshot,
+  identity: PortIdentity,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const port of identity.inputs) {
+    const id = identity.inputIds.get(port.name)!
+    result[port.name] = toBinary(bitVector(port.width, snapshot.values[id] ?? []))
+  }
+  return result
+}
+
+function portWidth(identity: PortIdentity, name: string, direction: 'input' | 'output'): number {
+  const port = (direction === 'input' ? identity.inputs : identity.outputs).find((item) => item.name === name)
+  return port?.width ?? 1
+}
+
 function describe(error: unknown): string {
   if (error instanceof CircuitValidationError) return error.issues[0]?.message ?? error.message
   return error instanceof Error ? error.message : 'motivo desconhecido'
+}
+
+function validateVectorValues(testbench: TestbenchDocument, identity: PortIdentity): TestbenchIssue[] {
+  const issues: TestbenchIssue[] = []
+  for (const [caseIndex, testCase] of testbench.cases.entries()) {
+    if (!testCase.vectors) continue
+    for (const [direction, values] of [
+      ['entrada', testCase.vectors.inputs],
+      ['saída', testCase.vectors.expect],
+    ] as const) {
+      for (const [name, value] of Object.entries(values ?? {})) {
+        const width = portWidth(identity, name, direction === 'entrada' ? 'input' : 'output')
+        try {
+          bitVector(width, value as string | number)
+        } catch (error) {
+          issues.push({
+            code: 'vector-invalid',
+            caseIndex,
+            message:
+              `O valor da ${direction} vetorial "${name}" no caso ${caseName(testCase, caseIndex)} é inválido: ` +
+              `${error instanceof BitVectorError || error instanceof Error ? error.message : 'motivo desconhecido'}`,
+          })
+        }
+      }
+    }
+  }
+  return issues
 }
 
 function validateTestbenchOptions(options: TestbenchOptions): TestbenchIssue[] {
@@ -333,15 +582,16 @@ function validateTestbenchShape(testbench: TestbenchDocument): TestbenchIssue[] 
 
   for (const [index, testCase] of testbench.cases.entries()) {
     const hasSteps = Array.isArray(testCase.steps)
-    const hasVector = testCase.inputs !== undefined || testCase.expect !== undefined
+    const hasScalar = testCase.inputs !== undefined || testCase.expect !== undefined
+    const hasVectors = testCase.vectors !== undefined
 
-    if (hasSteps && hasVector) {
+    if ((hasSteps && (hasScalar || hasVectors)) || (hasScalar && hasVectors)) {
       issues.push({
         code: 'mixed-case-mode',
         caseIndex: index,
         message:
-          `O caso ${caseName(testCase, index)} usa "steps" e também "inputs"/"expect". ` +
-          'Um caso é combinacional ou sequencial, nunca os dois.',
+          `O caso ${caseName(testCase, index)} mistura modos de execução ("steps", "inputs"/"expect" ou "vectors"). ` +
+          'Um caso é escalar, multi-bit ou sequencial, nunca mais de um.',
       })
       continue
     }
@@ -367,6 +617,19 @@ function validateTestbenchShape(testbench: TestbenchDocument): TestbenchIssue[] 
         continue
       }
       for (const step of steps) totalTicks += normalizeTicks(step.ticks)
+      continue
+    }
+
+    if (hasVectors) {
+      if (!testCase.vectors?.expect || Object.keys(testCase.vectors.expect).length === 0) {
+        issues.push({
+          code: 'missing-expectation',
+          caseIndex: index,
+          message:
+            `O caso multi-bit ${caseName(testCase, index)} não declara nenhuma saída esperada. ` +
+            'Um caso sem expectativa não pode falhar, então não testa nada.',
+        })
+      }
       continue
     }
 
@@ -401,16 +664,18 @@ function validateReferences(
   const unknownInputs = new Set<string>()
   const unknownOutputs = new Set<string>()
 
-  const checkInputs = (record: Readonly<Record<string, boolean>> | undefined) => {
+  const checkInputs = (record: Readonly<Record<string, unknown>> | undefined) => {
     for (const name of Object.keys(record ?? {})) if (!inputIds.has(name)) unknownInputs.add(name)
   }
-  const checkOutputs = (record: Readonly<Record<string, boolean>> | undefined) => {
+  const checkOutputs = (record: Readonly<Record<string, unknown>> | undefined) => {
     for (const name of Object.keys(record ?? {})) if (!outputIds.has(name)) unknownOutputs.add(name)
   }
 
   for (const testCase of testbench.cases) {
     checkInputs(testCase.inputs)
     checkOutputs(testCase.expect)
+    checkInputs(testCase.vectors?.inputs)
+    checkOutputs(testCase.vectors?.expect)
     for (const step of testCase.steps ?? []) {
       checkInputs(step.set)
       checkOutputs(step.expect)
@@ -433,7 +698,7 @@ function validateReferences(
   return issues
 }
 
-function sortedNames(record: Readonly<Record<string, boolean>>): string[] {
+function sortedNames(record: Readonly<Record<string, unknown>>): string[] {
   return Object.keys(record).sort(compareCircuitText)
 }
 
@@ -448,5 +713,15 @@ function normalizeTicks(ticks: number | undefined): number {
 }
 
 function invalid(issues: TestbenchIssue[]): TestbenchReport {
-  return { status: 'invalid', total: 0, passed: 0, failed: 0, cases: [], issues }
+  return {
+    status: 'invalid',
+    total: 0,
+    passed: 0,
+    failed: 0,
+    cases: [],
+    issues,
+    snapshots: [],
+    counterexamples: [],
+    firstDivergence: null,
+  }
 }

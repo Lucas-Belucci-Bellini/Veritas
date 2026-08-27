@@ -53,6 +53,89 @@ function bench(cases: TestbenchDocument['cases'], name = 'meio somador'): Testbe
   return { format: TESTBENCH_FORMAT, version: TESTBENCH_VERSION, name, cases }
 }
 
+function vectorAnd(width = 4): CircuitDocument {
+  return doc(
+    'and multi-bit',
+    [
+      node('a', 'input', 'A', { width }),
+      node('b', 'input', 'B', { width }),
+      node('gate', 'and', undefined, { width }),
+      node('out', 'output', 'OUT', { width }),
+    ],
+    [link('a', 'gate', 0), link('b', 'gate', 1), link('gate', 'out')],
+  )
+}
+
+function jkDocument(): CircuitDocument {
+  return doc(
+    'jk',
+    [node('j', 'input', 'J'), node('k', 'input', 'K'), node('clk', 'input', 'CLK'), node('ff', 'jk'), node('q', 'output', 'Q')],
+    [link('j', 'ff', 0), link('k', 'ff', 1), link('clk', 'ff', 2), link('ff', 'q')],
+  )
+}
+
+function srDocument(): CircuitDocument {
+  return doc(
+    'sr',
+    [node('s', 'input', 'S'), node('r', 'input', 'R'), node('clk', 'input', 'CLK'), node('ff', 'sr'), node('q', 'output', 'Q')],
+    [link('s', 'ff', 0), link('r', 'ff', 1), link('clk', 'ff', 2), link('ff', 'q')],
+  )
+}
+
+function register4Document(): CircuitDocument {
+  const data = ['0', '1', '2', '3'].map((id) => node(`d${id}`, 'input', `D${id}`))
+  const flipFlops = ['0', '1', '2', '3'].map((id) => node(`ff${id}`, 'dff'))
+  const outputs = ['0', '1', '2', '3'].map((id) => node(`q${id}`, 'output', `Q${id}`))
+  return doc(
+    'register-4bit',
+    [...data, node('clk', 'input', 'CLK'), ...flipFlops, ...outputs],
+    [
+      ...['0', '1', '2', '3'].flatMap((id) => [link(`d${id}`, `ff${id}`, 0), link('clk', `ff${id}`, 1), link(`ff${id}`, `q${id}`)]),
+    ],
+  )
+}
+
+function counter4Document(): CircuitDocument {
+  return doc(
+    'counter-4bit',
+    [
+      node('one', 'constant', undefined, { value: true }),
+      node('clk', 'input', 'CLK'),
+      node('carry1', 'and'),
+      node('carry2', 'and'),
+      node('carry3a', 'and'),
+      node('carry3', 'and'),
+      node('ff0', 'tff'),
+      node('ff1', 'tff'),
+      node('ff2', 'tff'),
+      node('ff3', 'tff'),
+      node('q0', 'output', 'Q0'),
+      node('q1', 'output', 'Q1'),
+      node('q2', 'output', 'Q2'),
+      node('q3', 'output', 'Q3'),
+    ],
+    [
+      link('ff0', 'carry1', 0), link('one', 'carry1', 1),
+      link('ff0', 'carry2', 0), link('ff1', 'carry2', 1),
+      link('ff0', 'carry3a', 0), link('ff1', 'carry3a', 1),
+      link('carry3a', 'carry3', 0), link('ff2', 'carry3', 1),
+      link('one', 'ff0', 0), link('clk', 'ff0', 1),
+      link('carry1', 'ff1', 0), link('clk', 'ff1', 1),
+      link('carry2', 'ff2', 0), link('clk', 'ff2', 1),
+      link('carry3', 'ff3', 0), link('clk', 'ff3', 1),
+      link('ff0', 'q0'), link('ff1', 'q1'), link('ff2', 'q2'), link('ff3', 'q3'),
+    ],
+  )
+}
+
+function feedbackDocument(): CircuitDocument {
+  return doc(
+    'feedback',
+    [node('clk', 'input', 'CLK'), node('ff', 'dff'), node('out', 'output', 'OUT')],
+    [link('ff', 'ff', 0, 1), link('clk', 'ff', 1), link('ff', 'out')],
+  )
+}
+
 const HALF_ADDER_TABLE = bench([
   { name: '0+0', inputs: { A: false, B: false }, expect: { SOMA: false, VAIUM: false } },
   { name: '0+1', inputs: { A: false, B: true }, expect: { SOMA: true, VAIUM: false } },
@@ -69,6 +152,10 @@ describe('runTestbench', () => {
     expect(report.passed).toBe(4)
     expect(report.failed).toBe(0)
     expect(report.cases.every((item) => item.mode === 'combinational')).toBe(true)
+    expect(report.snapshots).toHaveLength(4)
+    expect(report.snapshots[0]).toMatchObject({ caseIndex: 0, tick: 0 })
+    expect(report.counterexamples).toEqual([])
+    expect(report.firstDivergence).toBeNull()
     expect(report.issues).toEqual([])
   })
 
@@ -83,6 +170,19 @@ describe('runTestbench', () => {
     const failed = report.cases.filter((item) => item.status === 'failed')
     expect(failed.map((item) => item.name)).toEqual(['0+1', '1+0'])
     expect(failed[0]?.mismatches).toEqual([{ output: 'VAIUM', expected: false, actual: true }])
+    expect(report.firstDivergence).toEqual({
+      caseIndex: 1,
+      signal: 'VAIUM',
+      expected: false,
+      actual: true,
+      tick: 0,
+    })
+    expect(report.counterexamples[0]).toMatchObject({
+      caseIndex: 1,
+      inputs: { A: false, B: true },
+      divergence: report.firstDivergence,
+      snapshot: { caseIndex: 1, tick: 0 },
+    })
   })
 
   it('roda todos os casos, sem parar no primeiro que falha', () => {
@@ -125,6 +225,9 @@ describe('runTestbench', () => {
     expect(report.status).toBe('passed')
     expect(report.cases[0]?.mode).toBe('sequential')
     expect(report.cases[0]?.diagnostic).toMatchObject({ status: 'stabilized' })
+    expect(report.cases[0]?.snapshots.map((snapshot) => snapshot.tick)).toEqual([2, 4])
+    expect(report.cases[0]?.firstDivergence).toBeNull()
+    expect(report.cases[0]?.counterexample).toBeNull()
   })
 
   it('anexa diagnóstico de ciclo ao caso sequencial sem alterar PASS/FAIL', () => {
@@ -205,6 +308,119 @@ describe('runTestbench', () => {
     expect(mismatch?.actual).toBe(false)
     expect(mismatch?.step).toBe(0)
     expect(mismatch?.tick).toBe(2)
+    expect(report.firstDivergence).toEqual({
+      caseIndex: 0,
+      signal: 'Q',
+      expected: true,
+      actual: false,
+      tick: 2,
+      step: 0,
+    })
+    expect(report.counterexamples[0]).toMatchObject({
+      inputs: { D: true },
+      snapshot: { tick: 2, step: 0 },
+    })
+  })
+
+  it('avalia um caso multi-bit e normaliza o snapshot para bits MSB → LSB', () => {
+    const report = runTestbench(vectorAnd(), bench([
+      {
+        name: '1010 AND 0110',
+        vectors: { inputs: { A: '0b1010', B: '0b0110' }, expect: { OUT: '0b0010' } },
+      },
+    ], 'multi-bit'))
+
+    expect(report.status).toBe('passed')
+    expect(report.cases[0]?.mode).toBe('combinational')
+    expect(report.cases[0]?.snapshots[0]?.values.gate).toEqual([false, false, true, false])
+    expect(report.cases[0]?.firstDivergence).toBeNull()
+  })
+
+  it('recusa literal multi-bit inválido antes da execução', () => {
+    const report = runTestbench(vectorAnd(), bench([
+      { vectors: { inputs: { A: '0b1020', B: '0b0001' }, expect: { OUT: '0b0000' } } },
+    ], 'multi-bit inválido'))
+
+    expect(report.status).toBe('invalid')
+    expect(report.issues).toEqual([
+      {
+        code: 'vector-invalid',
+        caseIndex: 0,
+        message: expect.stringContaining('Literal binário inválido'),
+      },
+    ])
+    expect(report.snapshots).toEqual([])
+    expect(report.counterexamples).toEqual([])
+  })
+
+  it('cobre registrador, contador, JK, SR e feedback no mesmo runner', () => {
+    const scenarios: Array<{ name: string; document: CircuitDocument; testbench: TestbenchDocument }> = [
+      {
+        name: 'register-4bit',
+        document: register4Document(),
+        testbench: bench([{
+          steps: [
+            { set: { D0: true, D1: false, D2: true, D3: true, CLK: false }, ticks: 1, expect: { Q0: false, Q1: false, Q2: false, Q3: false } },
+            { set: { CLK: true }, ticks: 3, expect: { Q0: true, Q1: false, Q2: true, Q3: true } },
+          ],
+        }], 'register-4bit'),
+      },
+      {
+        name: 'counter-4bit',
+        document: counter4Document(),
+        testbench: bench([{
+          steps: [
+            { set: { CLK: true }, ticks: 1 },
+            { set: { CLK: false }, ticks: 2, expect: { Q0: true, Q1: false, Q2: false, Q3: false } },
+            { set: { CLK: true }, ticks: 1 },
+            { set: { CLK: false }, ticks: 2, expect: { Q0: false, Q1: true, Q2: false, Q3: false } },
+          ],
+        }], 'counter-4bit'),
+      },
+      {
+        name: 'jk',
+        document: jkDocument(),
+        testbench: bench([{
+          steps: [
+            { set: { J: false, K: false, CLK: false }, ticks: 1, expect: { Q: false } },
+            { set: { J: true, K: false, CLK: true }, ticks: 3, expect: { Q: true } },
+            { set: { J: false, K: true, CLK: false }, ticks: 1 },
+            { set: { CLK: true }, ticks: 3, expect: { Q: false } },
+          ],
+        }], 'jk'),
+      },
+      {
+        name: 'sr',
+        document: srDocument(),
+        testbench: bench([{
+          steps: [
+            { set: { S: true, R: false, CLK: false }, ticks: 1, expect: { Q: false } },
+            { set: { CLK: true }, ticks: 3, expect: { Q: true } },
+            { set: { S: false, R: true, CLK: false }, ticks: 1 },
+            { set: { CLK: true }, ticks: 3, expect: { Q: false } },
+          ],
+        }], 'sr'),
+      },
+      {
+        name: 'feedback',
+        document: feedbackDocument(),
+        testbench: bench([{
+          steps: [
+            { set: { CLK: true }, ticks: 1 },
+            { set: { CLK: false }, ticks: 1, expect: { OUT: true } },
+            { set: { CLK: true }, ticks: 1 },
+            { set: { CLK: false }, ticks: 1, expect: { OUT: false } },
+          ],
+        }], 'feedback'),
+      },
+    ]
+
+    for (const scenario of scenarios) {
+      const report = runTestbench(scenario.document, scenario.testbench)
+      expect(report.status, scenario.name).toBe('passed')
+      expect(report.cases[0]?.mode, scenario.name).toBe('sequential')
+      expect(report.cases[0]?.firstDivergence, scenario.name).toBeNull()
+    }
   })
 
   it('recusa caso que mistura os dois modos', () => {

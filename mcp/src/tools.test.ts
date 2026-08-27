@@ -469,6 +469,7 @@ describe('run_testbench', () => {
     expect(result.isError).not.toBe(true)
     expect(result.text).toContain('Resultado: todos os casos passaram')
     expect(result.text).toContain('Casos: 2 de 2 passaram')
+    expect(result.text).toContain('Snapshots observados: 2')
     // O resultado positivo precisa dizer o que ele NÃO prova.
     expect(result.text).toContain('circuit_equivalence')
   })
@@ -480,6 +481,9 @@ describe('run_testbench', () => {
     expect(result.text).toContain('Resultado: há casos falhando')
     expect(result.text).toContain('Casos: 1 de 2 passaram')
     expect(result.text).toContain('| 0+1 | VAIUM | 0 | 1 | — |')
+    expect(result.text).toContain('Primeira divergência: VAIUM no tique 0')
+    expect(result.text).toContain('Contraexemplos determinísticos:')
+    expect(result.text).toContain('A=0, B=1')
   })
 
   it('recusa documento de teste inválido sem executar nada', () => {
