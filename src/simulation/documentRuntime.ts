@@ -6,6 +6,7 @@ import {
   type CircuitExecutionSafetyReport,
   type CustomChipLibraryEntry,
 } from '../circuit'
+import type { Netlist } from './components'
 import {
   Simulator,
   type SettleDiagnostic,
@@ -83,12 +84,20 @@ export function preflightDocumentRuntime(
   })
 }
 
-export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
+export function buildDocumentRuntimeNetlist(
+  document: CircuitDocument,
+  options: Pick<DocumentRuntimeOptions, 'clockPeriods' | 'customChips'> = {},
+): Netlist {
   const runtimeDocument = applyClockPeriods(document, options.clockPeriods)
   const executableDocument = runtimeDocument.nodes.some((node) => node.type === 'custom-chip')
     ? elaborateCustomChipDocument(runtimeDocument, { customChips: options.customChips })
     : runtimeDocument
-  const simulator = new Simulator(toNetlist(executableDocument), {
+  return toNetlist(executableDocument)
+}
+
+export function createDocumentRuntime(document: CircuitDocument, options: DocumentRuntimeOptions = {}): Simulator {
+  const runtimeDocument = applyClockPeriods(document, options.clockPeriods)
+  const simulator = new Simulator(buildDocumentRuntimeNetlist(document, options), {
     maxSettleTicks: options.maxSettleTicks,
     maxTotalTicks: options.maxTotalTicks,
     maxOperationsPerTick: options.maxOperationsPerTick,
