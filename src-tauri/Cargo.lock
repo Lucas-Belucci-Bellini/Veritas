@@ -3707,6 +3707,8 @@ dependencies = [
 name = "veritas-desktop"
 version = "0.1.0-alpha.1"
 dependencies = [
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
 ]
