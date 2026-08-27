@@ -5,6 +5,7 @@ import {
   getSequentialDemo,
   outputValue,
   pulseClock,
+  pulseClockAsync,
   snapshotSequentialSimulator,
 } from './workspace'
 
@@ -154,6 +155,16 @@ describe('workspace sequencial', () => {
     expect(snapshots).toHaveLength(2)
     expect(snapshots[0].tick).toBe(1)
     expect(snapshots[1].tick).toBe(2)
+    expect(outputValue(snapshots[0], { nodeId: 'ff' })).toBe(true)
+    expect(outputValue(snapshots[1], { nodeId: 'ff' })).toBe(true)
+  })
+
+  it('produz o mesmo pulso manual de forma assíncrona', async () => {
+    const simulator = createSequentialSimulator('feedback-counter')
+    const snapshots = await pulseClockAsync(simulator, 'clk', 0, { yieldEvery: 1, timeoutMs: 5_000 })
+
+    expect(snapshots).toHaveLength(2)
+    expect(snapshots.map((snapshot) => snapshot.tick)).toEqual([1, 2])
     expect(outputValue(snapshots[0], { nodeId: 'ff' })).toBe(true)
     expect(outputValue(snapshots[1], { nodeId: 'ff' })).toBe(true)
   })

@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { tickDocumentRuntimeAsync } from '../simulation/documentRuntime'
 import {
   applySequentialInputs,
   createSequentialSimulator,
   getSequentialDemo,
   outputValue,
   pulseClock,
+  pulseClockAsync,
   signalLabel,
   snapshotSequentialSimulator,
   type SequentialDemoId,
@@ -26,6 +28,8 @@ export function SequentialWorkspace() {
   const [demoId, setDemoId] = useState<SequentialDemoId>('dff-clock')
   const demo = useMemo(() => getSequentialDemo(demoId), [demoId])
   const [simulator, setSimulator] = useState(() => createSequentialSimulator('dff-clock'))
+  const runAbortRef = useRef<AbortController | null>(null)
+  const [isRunning, setIsRunning] = useState(false)
   const [inputs, setInputs] = useState<Record<string, boolean>>({ d: false })
   const [timeline, setTimeline] = useState<SequentialSnapshot[]>(() => [
     snapshotSequentialSimulator(createSequentialSimulator('dff-clock')),
@@ -35,6 +39,10 @@ export function SequentialWorkspace() {
   const waveform = useMemo(() => buildWaveform(demo.watch, timeline), [demo.watch, timeline])
 
   function reset(nextDemoId: SequentialDemoId = demoId) {
+    runAbortRef.current?.abort()
+    runAbortRef.current = null
+    simulator.shutdown()
+    setIsRunning(false)
     const nextDemo = getSequentialDemo(nextDemoId)
     const nextSimulator = createSequentialSimulator(nextDemoId)
     applySequentialInputs(nextSimulator, nextDemo.initialInputs)
@@ -60,22 +68,45 @@ export function SequentialWorkspace() {
     setTimeline((currentTimeline) => appendSnapshots(currentTimeline, [snapshotSequentialSimulator(simulator)]))
   }
 
-  function runTicks() {
+  async function runTicks(): Promise<void> {
+    if (isRunning) return
+    const controller = new AbortController()
+    runAbortRef.current = controller
+    setIsRunning(true)
     const nextSnapshots: SequentialSnapshot[] = []
-    if (demo.controlMode === 'manual-clock') {
-      for (let index = 0; index < RUN_TICKS / 2; index += 1) {
-        nextSnapshots.push(...pulseClock(simulator, 'clk', demo.clockSettleTicks))
+    try {
+      if (demo.controlMode === 'manual-clock') {
+        for (let index = 0; index < RUN_TICKS / 2; index += 1) {
+          nextSnapshots.push(...await pulseClockAsync(simulator, 'clk', demo.clockSettleTicks, {
+            yieldEvery: 1,
+            timeoutMs: 5_000,
+            signal: controller.signal,
+          }))
+        }
+        setInputs((currentInputs) => ({ ...currentInputs, clk: false }))
+      } else {
+        applySequentialInputs(simulator, inputs)
+        for (let index = 0; index < RUN_TICKS; index += 1) {
+          await tickDocumentRuntimeAsync(simulator, 1, { yieldEvery: 1, timeoutMs: 5_000, signal: controller.signal })
+          nextSnapshots.push(snapshotSequentialSimulator(simulator))
+        }
       }
-      setInputs((currentInputs) => ({ ...currentInputs, clk: false }))
-    } else {
-      applySequentialInputs(simulator, inputs)
-      for (let index = 0; index < RUN_TICKS; index += 1) {
-        simulator.tick()
-        nextSnapshots.push(snapshotSequentialSimulator(simulator))
-      }
+      setTimeline((currentTimeline) => appendSnapshots(currentTimeline, nextSnapshots))
+    } finally {
+      if (runAbortRef.current === controller) runAbortRef.current = null
+      setIsRunning(false)
     }
-    setTimeline((currentTimeline) => appendSnapshots(currentTimeline, nextSnapshots))
   }
+
+  function cancelRun(): void {
+    runAbortRef.current?.abort()
+  }
+
+  useEffect(() => () => {
+    runAbortRef.current?.abort()
+    runAbortRef.current = null
+    simulator.shutdown()
+  }, [simulator])
 
   function manualPulse() {
     const nextSnapshots = pulseClock(simulator, 'clk', demo.clockSettleTicks)
@@ -141,7 +172,8 @@ export function SequentialWorkspace() {
           <button
             type="button"
             onClick={manualPulse}
-            className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+            disabled={isRunning}
+              className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
           >
             Pulso de clock
           </button>
@@ -150,6 +182,7 @@ export function SequentialWorkspace() {
           <button
             type="button"
             onClick={tickOnce}
+            disabled={isRunning}
             className="rounded-lg border border-brand-300 px-3 py-2 text-sm font-semibold text-brand-700 hover:border-brand-500 dark:border-brand-700 dark:text-brand-300"
           >
             Step · 1 tique
@@ -159,12 +192,20 @@ export function SequentialWorkspace() {
             onClick={runTicks}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200"
           >
-            {demo.controlMode === 'manual-clock' ? 'Continue · 4 pulsos' : 'Run · 8 tiques'}
+            {isRunning ? 'Executando…' : demo.controlMode === 'manual-clock' ? 'Continue · 4 pulsos' : 'Run · 8 tiques'}
           </button>
+          {isRunning && <button
+            type="button"
+            onClick={cancelRun}
+            className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 hover:border-rose-500 dark:border-rose-700 dark:text-rose-300"
+          >
+            Cancelar
+          </button>}
           <button
             type="button"
             onClick={() => reset()}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200"
+            disabled={isRunning}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Reset
           </button>

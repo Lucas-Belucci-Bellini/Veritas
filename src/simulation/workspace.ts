@@ -1,4 +1,4 @@
-import { Simulator } from './simulator'
+import { Simulator, type SimulatorAsyncOptions } from './simulator'
 import type { Netlist } from './components'
 
 export type SequentialDemoId = 'dff-clock' | 'tff-clock' | 'jk-clock' | 'sr-clock' | 'register-4bit' | 'counter-4bit' | 'delay' | 'feedback-counter'
@@ -289,6 +289,27 @@ export function pulseClock(
   const settled: SequentialSnapshot[] = []
   for (let index = 0; index < boundedSettleTicks; index += 1) {
     simulator.tick()
+    settled.push(snapshotSequentialSimulator(simulator))
+  }
+  return [high, low, ...settled]
+}
+
+export async function pulseClockAsync(
+  simulator: Simulator,
+  inputId: string,
+  settleTicks = 0,
+  options: SimulatorAsyncOptions = {},
+): Promise<readonly SequentialSnapshot[]> {
+  const boundedSettleTicks = Math.max(0, Math.floor(settleTicks))
+  simulator.setInput(inputId, true)
+  await simulator.tickAsync(1, options)
+  const high = snapshotSequentialSimulator(simulator)
+  simulator.setInput(inputId, false)
+  await simulator.tickAsync(1, options)
+  const low = snapshotSequentialSimulator(simulator)
+  const settled: SequentialSnapshot[] = []
+  for (let index = 0; index < boundedSettleTicks; index += 1) {
+    await simulator.tickAsync(1, options)
     settled.push(snapshotSequentialSimulator(simulator))
   }
   return [high, low, ...settled]
