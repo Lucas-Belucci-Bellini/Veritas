@@ -1,6 +1,6 @@
 # Fronteira de execução Worker/Desktop
 
-**Status:** proposta aprovada para investigação; Worker dedicado e comando Tauri ainda não implementados.
+**Status:** protocolo Worker e entrypoint implementados como slice isolado; orquestração de produto, Worker no Tauri e simulação Rust ainda não implementados.
 
 **Marco:** v2.7.0 — Execution Safety.
 
@@ -8,7 +8,7 @@
 
 O `Simulator` TypeScript continua sendo a engine canônica. Uma futura fronteira Worker não deve criar uma segunda engine, alterar a semântica de tiques ou transformar um resultado de benchmark bruto em suporte editorial para circuitos grandes. O Worker será um transporte isolado para uma execução já validada, com protocolo versionado, budgets explícitos, cancelamento cooperativo e resultado determinístico.
 
-A ponte Tauri 2/Rust permanece um shell técnico mínimo neste momento. `src-tauri/src/lib.rs` ainda não expõe comando de simulação, canal de progresso ou runtime nativo equivalente. Não há base suficiente para declarar `RUNTIME VERIFIED` no desktop nem para implementar uma ponte Rust sem contrato de paridade previamente testado.
+A ponte Tauri 2/Rust permanece um shell técnico mínimo neste momento. `src-tauri/src/lib.rs` ainda não expõe comando de simulação, canal de progresso ou runtime nativo equivalente. O Worker web agora possui contrato e entrypoint testados, mas isso não é evidência de `RUNTIME VERIFIED` no desktop nem substitui um contrato de paridade para uma futura ponte Rust.
 
 ## Escopo do futuro Worker
 
@@ -56,15 +56,15 @@ Antes de introduzir Worker ou Rust, cada fixture deverá produzir o mesmo snapsh
 
 O caminho de circuitos grandes permanece fora do contrato editorial atual. O documento [`LARGE_CIRCUITS.md`](./LARGE_CIRCUITS.md) mantém `256` nós, `512` conexões e `500.000` bytes como limites oficiais. Um Worker futuro poderá ser parte da arquitetura de escala, mas não autoriza elevar esses limites antes de haver formato escalável, renderização medida, persistência, cancelamento, benchmarks e smoke Windows/macOS/Linux.
 
-## Gates para iniciar implementação
+## Gates para integração de produto
 
-A implementação só deve começar depois de um protocolo mínimo versionado e testes de mensagem. O primeiro slice deverá provar, sem UI interativa, que uma execução normal devolve resultado determinístico, um abort antes do primeiro tique não executa, um abort entre yields libera o runtime, timeout e budget devolvem erro controlado, mensagens tardias são ignoradas e dois requests não misturam `requestId`.
+O slice isolado implementado prova, sem UI interativa, que uma execução normal devolve snapshots determinísticos, um abort antes do primeiro tique e um abort entre yields devolvem `cancelled`, timeout e budget devolvem erro controlado, mensagens tardias são ignoradas e dois requests não misturam `requestId`. Esses cenários estão cobertos por testes do protocolo; não provam ainda a interação de um host de navegador real.
 
-Depois disso, o caminho web deverá passar por build do Worker, testes de paridade e smoke em navegador. A ponte Tauri só poderá ser iniciada com comando Rust equivalente, teste de contrato, build nos três alvos e evidência separada de `BUILD VERIFIED`, `ARTIFACT VERIFIED`, `RUNTIME VERIFIED` e `SMOKE VERIFIED`. CI verde continuará sendo apenas evidência do workflow executado.
+O próximo passo do caminho web é passar por build explícito do Worker, testes de paridade direta versus Worker real e smoke em navegador. A ponte Tauri só poderá ser iniciada com comando Rust equivalente, teste de contrato, build nos três alvos e evidência separada de `BUILD VERIFIED`, `ARTIFACT VERIFIED`, `RUNTIME VERIFIED` e `SMOKE VERIFIED`. CI verde continuará sendo apenas evidência do workflow executado.
 
 ## Estado atual e próximos passos
 
-Neste commit, a decisão é documental: o repositório possui `tickAsync()`, budgets locais, quota compartilhável no mesmo contexto, adapter MCP cancelável e shell Tauri, mas **não possui Worker dedicado nem simulação Tauri/Rust**. O próximo incremento de implementação deve ser o protocolo isolado e seus testes, caso a fila de v2.7 seja mantida nessa direção. Até lá, Worker, canais Tauri, memória real, execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
+Neste slice, o repositório passou a possuir `workerProtocol.ts`, `simulation.worker.ts`, a factory `createSimulationWorker()` e testes de endpoint fake para contrato, snapshots, progresso, abort, timeout, budget, duplicidade e teardown. A UI ainda não orquestra esse Worker, não há supervisor cross-worker, não há canais Tauri nem simulação Tauri/Rust, e a memória real continua não medida. Execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
 
 ## Referências
 
