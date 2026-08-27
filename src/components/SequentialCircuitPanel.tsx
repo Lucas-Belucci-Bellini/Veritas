@@ -7,6 +7,7 @@ import {
   documentWatches,
   runtimeValue,
   snapshotDocumentRuntime,
+  tickDocumentRuntimeAsync,
   type DocumentRuntimeDiagnosticPreview,
   type DocumentRuntimeSnapshot,
   type DocumentRuntimeState,
@@ -78,6 +79,7 @@ interface SequentialCircuitPanelProps {
 
 export function SequentialCircuitPanel({ document, customChips = [], requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
+  const runAbortRef = useRef<AbortController | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
   const documentKey = useMemo(() => runtimeDocumentKey(document), [document])
@@ -85,6 +87,7 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
   const [clockPeriods, setClockPeriods] = useState<Record<string, number>>({})
   const [timeline, setTimeline] = useState<DocumentRuntimeSnapshot[]>([])
   const [diagnosticPreview, setDiagnosticPreview] = useState<DocumentRuntimeDiagnosticPreview | null>(null)
+  const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState('')
   const [persistenceStatus, setPersistenceStatus] = useState('inicializando')
   const inputIds = useMemo(() => documentInputIds(document), [document])
@@ -111,6 +114,11 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
   }
 
   function initializeRuntime(clearSaved: boolean, overrideClockPeriods?: Record<string, number>): void {
+    runAbortRef.current?.abort()
+    runAbortRef.current = null
+    simulatorRef.current?.shutdown()
+    simulatorRef.current = null
+    setIsRunning(false)
     if (clearSaved) clearRuntimeCheckpoint(documentKey, storage)
     try {
       const saved = clearSaved ? null : readRuntimeCheckpoint(documentKey, storage)
@@ -154,6 +162,13 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
     // O runtime deve reiniciar quando o documento visual mudar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentKey])
+
+  useEffect(() => () => {
+    runAbortRef.current?.abort()
+    runAbortRef.current = null
+    simulatorRef.current?.shutdown()
+    simulatorRef.current = null
+  }, [])
 
   useEffect(() => {
     if (!requestedClockPeriods) {
@@ -212,14 +227,22 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
     }
   }
 
-  function run(): void {
+  async function run(): Promise<void> {
+    if (isRunning) return
     const simulator = ensureSimulator()
     if (!simulator) return
+    const controller = new AbortController()
+    runAbortRef.current = controller
+    setIsRunning(true)
     try {
       for (const [id, value] of Object.entries(inputs)) simulator.setInput(id, value)
       const next: DocumentRuntimeSnapshot[] = []
       for (let index = 0; index < RUN_TICKS; index += 1) {
-        simulator.tick()
+        await tickDocumentRuntimeAsync(simulator, 1, {
+          yieldEvery: 1,
+          timeoutMs: 5_000,
+          signal: controller.signal,
+        })
         next.push(snapshotDocumentRuntime(simulator, document, customChips))
       }
       const nextTimeline = appendTimeline(timeline, next)
@@ -230,8 +253,20 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
       onSnapshot?.(next[next.length - 1])
       setError('')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível executar a simulação.')
+      if (controller.signal.aborted) {
+        setError('')
+        setPersistenceStatus('execução cancelada')
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Não foi possível executar a simulação.')
+      }
+    } finally {
+      if (runAbortRef.current === controller) runAbortRef.current = null
+      setIsRunning(false)
     }
+  }
+
+  function cancelRun(): void {
+    runAbortRef.current?.abort()
   }
 
   function applyRemoteRuntimeState(state: DocumentRuntimeState): void {
@@ -289,7 +324,7 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
     onClockPeriodsChange?.(nextClockPeriods)
   }
 
-  const statusText = error ? 'erro' : current ? `tique ${current.tick}` : 'preparando'
+  const statusText = error ? 'erro' : isRunning ? 'executando' : current ? `tique ${current.tick}` : 'preparando'
   const remoteStateTick = requestedRuntimeState?.snapshot.tick
   const remoteStateAge = requestedRuntimeStateSentAt ? runtimeFreshness(requestedRuntimeStateSentAt)?.ageMs ?? null : null
   const remoteStateIsCurrent = requestedRuntimeStateBaseVersion !== undefined && currentBaseVersion !== undefined && runtimeOfferDecision(requestedRuntimeStateBaseVersion, currentBaseVersion) === 'current'
@@ -306,10 +341,12 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
           {runtimeMetrics && runtimeMetrics.events.length > 0 && <details className="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><summary className="cursor-pointer">histórico local ({runtimeMetrics.events.length})</summary><div className="mt-1 max-h-24 overflow-auto space-y-0.5">{[...runtimeMetrics.events].reverse().map((event) => <div key={event.id}><span className="font-mono">{new Date(event.at).toLocaleTimeString('pt-BR')}</span> · {event.message}</div>)}</div></details>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="key text-xs" onClick={diagnosePreview} disabled={Boolean(error)}>Diagnosticar preview</button>
-          <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error)}>Step · 1 tique</button>
-          <button type="button" className="key text-xs" onClick={run} disabled={Boolean(error)}>Run · {RUN_TICKS} tiques</button>
-          <button type="button" className="key text-xs" onClick={() => initializeRuntime(true)}>Reset</button>
+          <button type="button" className="key text-xs" onClick={diagnosePreview} disabled={Boolean(error) || isRunning}>Diagnosticar preview</button>
+          <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error) || isRunning}>Step · 1 tique</button>
+          {isRunning
+            ? <button type="button" className="key text-xs" onClick={cancelRun}>Cancelar execução</button>
+            : <button type="button" className="key text-xs" onClick={run} disabled={Boolean(error)}>Run · {RUN_TICKS} tiques</button>}
+          <button type="button" className="key text-xs" onClick={() => initializeRuntime(true)} disabled={isRunning}>Reset</button>
         </div>
       </div>
 
