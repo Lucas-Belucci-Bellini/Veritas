@@ -8,7 +8,7 @@ import {
   listCustomChipProjects,
   updateCustomChipProject,
 } from './customChips'
-import { db } from './db'
+import { db, type NewCircuitProject } from './db'
 import {
   createCircuitProject,
   deleteCircuitProject,
@@ -243,6 +243,16 @@ describe('arquivo de circuitos', () => {
     })
 
     expect(() => parseCircuitFile(invalid)).toThrow('projeto 1')
+  })
+
+  it('faz rollback quando a importação falha no meio do lote', async () => {
+    const imported = [
+      { name: 'Primeiro', document, id: 901 } as unknown as NewCircuitProject,
+      { name: 'Segundo', document, id: 901 } as unknown as NewCircuitProject,
+    ]
+
+    await expect(importCircuitProjects(imported)).rejects.toBeDefined()
+    expect(await listCircuitProjects()).toHaveLength(0)
   })
 
   it('recusa width inválido antes de persistir o documento importado', () => {

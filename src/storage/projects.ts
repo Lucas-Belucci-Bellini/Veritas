@@ -133,7 +133,9 @@ export async function importProjects(projects: readonly NewProject[]): Promise<n
         updatedAt: now + index,
       }) as Project,
   )
-  await db.projects.bulkAdd(rows)
+  await db.transaction('rw', db.projects, async () => {
+    await db.projects.bulkAdd(rows)
+  })
   return rows.length
 }
 

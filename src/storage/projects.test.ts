@@ -140,7 +140,17 @@ describe('arquivo .veritas', () => {
     }))).toThrow('projeto 2')
   })
 
-  it('rejeita uma coleção vazia', () => {
+  it('faz rollback quando a importação falha no meio do lote', async () => {
+    const imported = [
+      { ...sample, id: 900 } as unknown as typeof sample & { id: number },
+      { ...sample, id: 900 } as unknown as typeof sample & { id: number },
+    ]
+
+    await expect(importProjects(imported)).rejects.toBeDefined()
+    expect(await listProjects()).toHaveLength(0)
+  })
+
+  it('rejeita coleção vazia', () => {
     expect(() => parseVeritasFile('{"format":"veritas","version":1,"projects":[]}'))
       .toThrow('nenhum projeto')
   })

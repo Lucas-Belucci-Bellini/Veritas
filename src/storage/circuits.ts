@@ -122,7 +122,9 @@ export async function importCircuitProjects(
         updatedAt: now + index,
       }) as CircuitProject,
   )
-  await db.circuitProjects.bulkAdd(rows)
+  await db.transaction('rw', db.circuitProjects, async () => {
+    await db.circuitProjects.bulkAdd(rows)
+  })
   return rows.length
 }
 

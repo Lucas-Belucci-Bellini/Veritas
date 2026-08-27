@@ -71,6 +71,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - Os envelopes `veritas` e `veritas-circuits` passaram a rejeitar campos desconhecidos no envelope e nos registros de projeto/documento dentro do schema v1. As regressões focais combinadas de circuitos e expressões passaram com **28 casos**; limites de bytes de arquivo, migração retroativa e formatos independentes de chips/testbenches/algoritmos ainda permanecem pendentes.
 - Os parsers locais agora rejeitam arquivos acima de **5.000.000 bytes** antes de parsear ou normalizar o conteúdo. As regressões focais combinadas de circuitos e expressões passaram com **30 casos**. Migração retroativa, preservação transacional da importação e envelopes independentes de chips/testbenches/algoritmos continuam pendentes.
 - `parseVeritasFile()` agora valida cada expressão com o parser canônico antes de devolver projetos para importação; expressões como `A AND` são rejeitadas sem gravar conteúdo inválido. O teste focal `.veritas` passou com **15 casos**; migração retroativa e preservação transacional continuam pendentes.
+- As importações de projetos `.veritas` e circuitos `veritas-circuits` passaram a gravar os lotes dentro de transações Dexie. Regressões com chave duplicada confirmam rollback completo, sem linha parcial no store; os testes focais combinados passaram com **33 casos**. Migração entre versões e dependências que cruzem múltiplos stores ainda permanecem pendentes.
 
 ### Trajetória de plataforma
 
