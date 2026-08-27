@@ -1,3 +1,4 @@
+import { hasValidationErrors, validateAlgorithmDocument } from '../algorithms'
 import { db, type AlgorithmProject, type NewAlgorithmProject } from './db'
 
 export async function listAlgorithmProjects(): Promise<AlgorithmProject[]> {
@@ -6,6 +7,7 @@ export async function listAlgorithmProjects(): Promise<AlgorithmProject[]> {
 }
 
 export async function createAlgorithmProject(input: NewAlgorithmProject): Promise<number> {
+  assertValidAlgorithmDocument(input.document)
   const now = Date.now()
   return db.algorithmProjects.add({
     ...input,
@@ -24,10 +26,18 @@ export async function updateAlgorithmProject(
   patch: Partial<NewAlgorithmProject>,
 ): Promise<void> {
   const clean = { ...patch }
+  if (clean.document !== undefined) assertValidAlgorithmDocument(clean.document)
   if (clean.name !== undefined) clean.name = clean.name.trim() || 'Algoritmo sem título'
   await db.algorithmProjects.update(id, { ...clean, updatedAt: Date.now() })
 }
 
 export async function deleteAlgorithmProject(id: number): Promise<void> {
   await db.algorithmProjects.delete(id)
+}
+
+function assertValidAlgorithmDocument(document: NewAlgorithmProject['document']): void {
+  const issues = validateAlgorithmDocument(document)
+  if (hasValidationErrors(issues)) {
+    throw new Error(`O algoritmo não pode ser salvo: ${issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message).join(' ')}`)
+  }
 }

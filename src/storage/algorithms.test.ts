@@ -25,6 +25,25 @@ describe('algoritmos salvos localmente', () => {
     expect(saved!.createdAt).toBeGreaterThan(0)
   })
 
+  it('recusa documento com entrada inexistente', async () => {
+    const invalid = { ...createAlgorithmDocument('Inválido'), entryNodeId: 'missing' }
+
+    await expect(createAlgorithmProject({
+      name: invalid.name,
+      document: invalid,
+    })).rejects.toThrow('não pode ser salvo')
+    expect(await listAlgorithmProjects()).toHaveLength(0)
+  })
+
+  it('recusa atualização para documento semanticamente inválido', async () => {
+    const valid = createAlgorithmDocument('Válido')
+    const id = await createAlgorithmProject({ name: valid.name, document: valid })
+    const invalid = { ...valid, entryNodeId: 'missing' }
+
+    await expect(updateAlgorithmProject(id, { document: invalid })).rejects.toThrow('não pode ser salvo')
+    expect((await getAlgorithmProject(id))?.document.entryNodeId).toBe('start')
+  })
+
   it('normaliza nomes vazios e atualiza updatedAt', async () => {
     const document = createAlgorithmDocument()
     const id = await createAlgorithmProject({ name: '   ', document })
