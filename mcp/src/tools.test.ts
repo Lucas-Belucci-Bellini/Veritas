@@ -20,6 +20,7 @@ import {
   normalForms,
   simplifyExpression,
   simulateCircuit,
+  simulateCircuitAsync,
   truthTable,
 } from './tools'
 import { createAlgorithmDocument } from '../../src/algorithms'
@@ -668,6 +669,50 @@ describe('simulate_circuit', () => {
     )
     expect(result.isError).toBe(true)
     expect(result.text).toContain('limite por chamada')
+  })
+
+  it('preserva o diagrama de tempo na variante assíncrona', async () => {
+    const result = await simulateCircuitAsync(
+      [{ id: 'clk', type: 'clock', options: { period: 2 } }],
+      [{ ticks: 4 }],
+      ['clk'],
+      { yieldEvery: 1 },
+    )
+
+    expect(result.isError).not.toBe(true)
+    expect(result.text).toContain('| tique | clk | evento |')
+    expect(result.text).toContain('| 4 | 0 |  |')
+  })
+
+  it('retorna erro controlado quando o request MCP já chega abortado', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    const result = await simulateCircuitAsync(
+      [{ id: 'a', type: 'input' }],
+      [{ ticks: 1 }],
+      ['a'],
+      { signal: controller.signal },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('execução do simulador foi abortada')
+  })
+
+  it('aborta entre yields sem executar todos os tiques', async () => {
+    const controller = new AbortController()
+    const resultPromise = simulateCircuitAsync(
+      [{ id: 'clk', type: 'clock', options: { period: 2 } }],
+      [{ ticks: 64 }],
+      ['clk'],
+      { signal: controller.signal, yieldEvery: 1 },
+    )
+
+    setTimeout(() => controller.abort(), 0)
+    const result = await resultPromise
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('execução do simulador foi abortada')
   })
 })
 

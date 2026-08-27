@@ -124,6 +124,8 @@ A partir da v2.6.0, o trabalho deixa de ser apenas a soma de features do editor 
 | **v4.0.0–v4.9.0** | Plataforma extensível e distribuível | Pacotes, reprodutibilidade, serviços opt-in, automação bounded e distribuição assinada |
 | **v5.0.0** | Digital Logic Platform madura | Produto integrado, migrável, reproduzível e validado em Windows/macOS/Linux |
 
+No avanço atual da v2.7.0, `simulate_circuit` passou a executar pela variante assíncrona do adapter e encaminhar o `AbortSignal` fornecido pelo `RequestHandlerExtra` do SDK MCP, mantendo budgets headless, timeout/yield e cleanup. Essa integração tem regressões unitárias do adapter e typecheck do handler; cancelamento observado por um cliente MCP externo, Worker dedicado, Tauri/desktop e medição real de heap continuam `NOT VERIFIED`.
+
 Nenhum desses marcos é considerado lançado apenas por existir no documento. Cada release exige código, testes, documentação, commit, tag, artefatos, checksums e evidência de plataforma proporcional à promessa.
 
 ## 10. Referências

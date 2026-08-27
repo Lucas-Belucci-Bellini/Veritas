@@ -17,7 +17,7 @@ import {
   listChips,
   normalForms,
   simplifyExpression,
-  simulateCircuit,
+  simulateCircuitAsync,
   truthTable,
   type ToolResult,
 } from './tools'
@@ -56,6 +56,17 @@ function toContent(result: ToolResult) {
 function guard(run: () => ToolResult) {
   try {
     return toContent(run())
+  } catch (error) {
+    return toContent({
+      isError: true,
+      text: error instanceof Error ? error.message : 'Erro desconhecido.',
+    })
+  }
+}
+
+async function guardAsync(run: () => Promise<ToolResult>) {
+  try {
+    return toContent(await run())
   } catch (error) {
     return toContent({
       isError: true,
@@ -508,10 +519,29 @@ server.registerTool(
         .max(128)
         .default([])
         .describe('Definições veritas-custom-chip portáteis usadas pelas instâncias custom-chip'),
+      yield_every: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .default(16)
+        .describe('Tiques entre yields cooperativos para não bloquear o processo'),
+      timeout_ms: z
+        .number()
+        .int()
+        .min(1)
+        .max(300000)
+        .default(30000)
+        .describe('Timeout máximo da execução assíncrona, em milissegundos'),
     },
   },
-  async ({ components, steps, watch, custom_chips }) =>
-    guard(() => simulateCircuit(components, steps, watch, { customChips: custom_chips })),
+  async ({ components, steps, watch, custom_chips, yield_every, timeout_ms }, extra) =>
+    guardAsync(() => simulateCircuitAsync(components, steps, watch, {
+      customChips: custom_chips,
+      yieldEvery: yield_every,
+      timeoutMs: timeout_ms,
+      signal: extra.signal,
+    })),
 )
 
 server.registerTool(

@@ -39,7 +39,13 @@ import {
   type TestbenchReport,
   type CustomChipLibraryEntry,
 } from '../../src/circuit/index'
-import { Simulator, type ComponentSpec } from '../../src/simulation/index'
+import {
+  DEFAULT_ASYNC_TIMEOUT_MS,
+  DEFAULT_ASYNC_YIELD_EVERY,
+  Simulator,
+  type ComponentSpec,
+  type SimulatorAsyncOptions,
+} from '../../src/simulation/index'
 import { resolveWirelessChannels } from '../../src/circuit/wirelessChannels'
 import {
   buildFullPropositionalTruthTable,
@@ -549,6 +555,8 @@ export interface SimulateCircuitOptions {
   maxMemoryBytes?: number
 }
 
+export interface SimulateCircuitAsyncOptions extends SimulateCircuitOptions, SimulatorAsyncOptions {}
+
 export const MAX_CUSTOM_CHIP_LIBRARY_ENTRIES = 128
 
 export interface CircuitEquivalenceToolQuery {
@@ -1049,6 +1057,120 @@ export function simulateCircuit(
       for (let index = 0; index < ticks; index += 1) {
         simulator.tick()
         record(simulator.tickCount, index === 0 ? note : '')
+      }
+    }
+
+    return {
+      text: [
+        `| tique | ${observed.join(' | ')} | evento |`,
+        `| --- | ${observed.map(() => '---').join(' | ')} | --- |`,
+        ...rows,
+      ].join('\n'),
+    }
+  } catch (error) {
+    return {
+      isError: true,
+      text: error instanceof Error ? error.message : 'Falha ao simular.',
+    }
+  } finally {
+    simulator.shutdown()
+  }
+}
+
+
+/**
+ * Variante cooperativa da simulação MCP. O transporte pode encaminhar o
+ * AbortSignal do request para interromper chamadas longas sem deixar estado
+ * vivo no processo.
+ */
+export async function simulateCircuitAsync(
+  components: ComponentSpec[],
+  steps: SimulationStep[],
+  watch: string[],
+  options: SimulateCircuitAsyncOptions = {},
+): Promise<ToolResult> {
+  const total = steps.reduce((sum, step) => sum + (step.ticks ?? 1), 0)
+  if (total > MAX_SIMULATION_TICKS) {
+    return {
+      isError: true,
+      text: `São ${total} tiques no total; o limite por chamada é ${MAX_SIMULATION_TICKS}.`,
+    }
+  }
+
+  let simulator: Simulator
+  let resolvedComponents: ComponentSpec[]
+  try {
+    const customChips = normalizeCustomChipLibrary(options.customChips)
+    const expandedComponents = expandCustomChipComponents(components, customChips, watch)
+    resolvedComponents = resolveWirelessComponentInputs(expandedComponents)
+    simulator = new Simulator({
+      components: resolvedComponents,
+    }, {
+      maxOperationsPerTick: options.maxOperationsPerTick ?? MAX_SIMULATION_OPERATIONS_PER_TICK,
+      maxTotalOperations: options.maxTotalOperations ?? MAX_SIMULATION_TOTAL_OPERATIONS,
+      maxMemoryBytes: options.maxMemoryBytes ?? MAX_SIMULATION_MEMORY_BYTES,
+    })
+  } catch (error) {
+    return {
+      isError: true,
+      text: error instanceof Error ? error.message : 'Circuito inválido.',
+    }
+  }
+
+  try {
+    const known = new Set(resolvedComponents.map((component) => component.id))
+    const unknown = watch.filter((id) => !known.has(id))
+    if (unknown.length > 0) {
+      return { isError: true, text: `Não existem no circuito: ${unknown.join(', ')}.` }
+    }
+
+    const observed = watch.length > 0 ? watch : resolvedComponents.map((component) => component.id)
+    const rows: string[] = []
+    const record = (tick: number, note: string) => {
+      const values = observed.map((id) => (simulator.read(id) ? '1' : '0'))
+      rows.push(`| ${tick} | ${values.join(' | ')} | ${note} |`)
+    }
+    const asyncOptions: SimulatorAsyncOptions = {
+      yieldEvery: options.yieldEvery,
+      timeoutMs: options.timeoutMs,
+      signal: options.signal,
+    }
+    const timeoutMs = options.timeoutMs ?? DEFAULT_ASYNC_TIMEOUT_MS
+    const yieldEvery = options.yieldEvery ?? DEFAULT_ASYNC_YIELD_EVERY
+    const startedAt = Date.now()
+    let completedTicks = 0
+    let ticksSinceYield = 0
+    const ensureRequestActive = () => {
+      if (options.signal?.aborted) {
+        throw new Error('A execução do simulador foi abortada.')
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw new Error(`A execução excedeu o timeout de ${timeoutMs} ms.`)
+      }
+    }
+
+    record(0, 'início')
+
+    for (const step of steps) {
+      const changes = Object.entries(step.set ?? {})
+      for (const [id, value] of changes) simulator.setInput(id, value)
+
+      const note = changes.length
+        ? changes.map(([id, value]) => `${id}=${value ? 1 : 0}`).join(', ')
+        : ''
+
+      const ticks = step.ticks ?? 1
+      for (let index = 0; index < ticks; index += 1) {
+        ensureRequestActive()
+        await simulator.tickAsync(1, asyncOptions)
+        record(simulator.tickCount, index === 0 ? note : '')
+        completedTicks += 1
+        ticksSinceYield += 1
+        if (completedTicks < total && ticksSinceYield >= yieldEvery) {
+          ticksSinceYield = 0
+          await new Promise<void>((resolve) => setTimeout(resolve, 0))
+          ensureRequestActive()
+        }
       }
     }
 
