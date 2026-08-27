@@ -1,0 +1,51 @@
+{
+  "request": {
+    "protocolVersion": 1,
+    "requestId": "shared-sequential-sr",
+    "components": [
+      { "id": "s", "type": "input" },
+      { "id": "r", "type": "input" },
+      { "id": "clk", "type": "clock", "options": { "period": 1 } },
+      {
+        "id": "ff",
+        "type": "sr",
+        "inputs": [
+          { "node": "s" },
+          { "node": "r" },
+          { "node": "clk" }
+        ]
+      },
+      {
+        "id": "qout",
+        "type": "output",
+        "inputs": [
+          { "node": "ff" }
+        ]
+      }
+    ],
+    "steps": [
+      { "set": { "s": true, "r": false }, "ticks": 1 },
+      { "set": { "s": true, "r": false }, "ticks": 1 },
+      { "ticks": 1 },
+      { "set": { "s": false, "r": true }, "ticks": 1 },
+      { "set": { "s": true, "r": true }, "ticks": 1 },
+      { "set": { "s": true, "r": true }, "ticks": 1 },
+      { "set": { "s": false, "r": false }, "ticks": 1 },
+      { "set": { "s": false, "r": false }, "ticks": 1 }
+    ],
+    "watch": ["s", "r", "clk", "ff", "qout"],
+    "yieldEvery": 1,
+    "timeoutMs": 30000
+  },
+  "expectedSnapshots": [
+    { "tick": 0, "values": { "s": [false], "r": [false], "clk": [false], "ff": [false], "qout": [false] } },
+    { "tick": 1, "values": { "s": [true], "r": [false], "clk": [true], "ff": [false], "qout": [false] } },
+    { "tick": 2, "values": { "s": [true], "r": [false], "clk": [false], "ff": [true], "qout": [false] } },
+    { "tick": 3, "values": { "s": [true], "r": [false], "clk": [true], "ff": [true], "qout": [true] } },
+    { "tick": 4, "values": { "s": [false], "r": [true], "clk": [false], "ff": [false], "qout": [true] } },
+    { "tick": 5, "values": { "s": [true], "r": [true], "clk": [true], "ff": [false], "qout": [false] } },
+    { "tick": 6, "values": { "s": [true], "r": [true], "clk": [false], "ff": [false], "qout": [false] } },
+    { "tick": 7, "values": { "s": [false], "r": [false], "clk": [true], "ff": [false], "qout": [false] } },
+    { "tick": 8, "values": { "s": [false], "r": [false], "clk": [false], "ff": [false], "qout": [false] } }
+  ]
+}

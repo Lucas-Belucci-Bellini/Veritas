@@ -929,6 +929,17 @@ mod tests {
     }
 
     #[test]
+    fn matches_shared_typescript_sr_golden_fixture() {
+        let fixture: SharedFixture = serde_json::from_str(include_str!(
+            "../../tests/fixtures/worker-sequential-sr.json"
+        ))
+        .expect("shared SR fixture should parse");
+        let result = execute_native(fixture.request, Arc::new(AtomicBool::new(false)))
+            .expect("shared SR fixture should execute");
+        assert_eq!(result.snapshots, fixture.expected_snapshots);
+    }
+
+    #[test]
     fn emits_bounded_progress_with_matching_request_id() {
         let mut request = dff_request();
         request.steps = vec![NativeStep {

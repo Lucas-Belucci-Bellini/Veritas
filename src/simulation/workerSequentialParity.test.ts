@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import dffFixture from '../../tests/fixtures/worker-sequential-dff.json'
 import tffFixture from '../../tests/fixtures/worker-sequential-tff.json'
 import jkFixture from '../../tests/fixtures/worker-sequential-jk.json'
+import srFixture from '../../tests/fixtures/worker-sequential-sr.json'
 import { Simulator } from './simulator'
 import { applySequentialInputs, snapshotSequentialSimulator } from './workspace'
 import {
@@ -51,6 +52,7 @@ const fixtures: readonly { name: string; fixture: SharedFixture }[] = [
   { name: 'DFF', fixture: dffFixture as SharedFixture },
   { name: 'TFF', fixture: tffFixture as SharedFixture },
   { name: 'JK', fixture: jkFixture as SharedFixture },
+  { name: 'SR', fixture: srFixture as SharedFixture },
 ]
 
 function toRequest(fixture: SharedFixture): SimulationWorkerRunRequest {
