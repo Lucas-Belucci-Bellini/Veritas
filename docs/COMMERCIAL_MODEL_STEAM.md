@@ -1,26 +1,39 @@
 # VERITAS — Modelo Comercial para Steam, DLCs e Serviços de Nuvem
 
-**Status:** política de produto planejada; não representa integração Steam, venda ou serviço de nuvem já disponível.
+**Status:** política de produto planejada; o código possui infraestrutura técnica de autenticação Supabase opcional, mas demo comercial, edição final paga, licenciamento, entitlements Steam e cobrança ainda não estão implementados.
 
 **Data:** 2026-08-27
 
-**Objetivo:** definir como o Veritas poderá ser distribuído como um Digital Logic Simulator próprio na Steam sem destruir o princípio local-first, sem transformar o núcleo educacional em uma barreira de pagamento e sem prometer armazenamento de código gratuito em infraestrutura que tem custo operacional.
+**Objetivo:** definir como o Veritas poderá ser distribuído como um Digital Logic Simulator próprio na Steam em duas etapas — demo/teste gratuita e edição final paga — com login, licença e entitlements verificáveis, sem perder local-first, privacy-first e recuperação dos projetos do usuário.
+
+## 0. Diretriz transversal da família de produtos
+
+Esta política nasceu no Veritas, mas a intenção comercial do proprietário é aplicá-la também a **Baluarte, Vanguard e outros produtos futuros**: cada produto poderá oferecer uma demo/teste gratuita para avaliação e reservar a versão final completa para uma compra/licença paga. Login, sessão, licença e entitlements devem ser projetados desde o início como fronteiras de produto, sem espalhar a autoridade comercial pelo domínio funcional.
+
+Esta seção é uma diretriz entre projetos, não uma afirmação de que Baluarte, Vanguard ou qualquer outro produto já possua login, pagamentos, licenças, página de loja ou backend comercial implementados. Cada repositório deverá registrar seu próprio estado, escopo da demo, edição final, política de dados, critérios de QA e integração de distribuição. Os boundaries reutilizáveis de conta, licença e entitlement estão especificados em [`PRODUCT_AUTH_LICENSE_BOUNDARY.md`](./PRODUCT_AUTH_LICENSE_BOUNDARY.md).
 
 ## 1. Decisão de produto
 
-O Veritas será planejado como um produto **free-to-play com núcleo local gratuito**, complementado por módulos avançados pagos e serviços online opcionais pagos. A versão básica deve ser útil por si só: o usuário poderá criar, editar, simular e salvar localmente circuitos digitais sem precisar criar conta, contratar nuvem ou manter conexão permanente.
+O Veritas será planejado como um produto comercial em duas edições: uma **demo/teste gratuita**, para avaliação controlada, e uma **versão final paga**, que será a edição completa e oficial do produto. Ambas terão sistema de login planejado para identificar sessão, versão e direitos de uso; a versão final exigirá licença/entitlement válido. A nuvem continuará sendo uma camada separada e opcional: login/licença não significam upload automático dos projetos nem conexão permanente durante a simulação local.
 
-A Steam documenta que jogos free-to-play podem oferecer conteúdo adicional por DLC ou por compras dentro do jogo, e que DLC pode ser conteúdo distribuído ou apenas uma licença/entitlement [1]. A decisão do Veritas é utilizar essa flexibilidade de modo simples e compreensível:
+A Steam documenta modelos de DLC e a necessidade de verificar a propriedade do conteúdo antes de habilitá-lo [1]. A decisão do Veritas é separar claramente avaliação gratuita, produto final pago, expansões e serviços, sem apresentar uma demo como se fosse a edição final:
 
 ```text
-Veritas Base — gratuito
-├── Editor e simulador local
-├── Circuitos combinacionais e sequenciais básicos
-├── Testbench local
-├── Save/reopen local
-├── Import/export local permitido
-├── PWA/web offline quando compatível
-└── Sem conta obrigatória e sem nuvem obrigatória
+Veritas Demo/Teste — gratuita, com login
+├── Fluxo de avaliação claramente limitado e documentado
+├── Editor e simulador local dentro do escopo da demo
+├── Exemplos, testbench e projetos de demonstração
+├── Salvamento local e exportação conforme os limites publicados
+├── Sem cobrança durante o período/escopo de teste
+└── Sem upload automático para a nuvem
+
+Veritas Final — paga, com login e licença
+├── Produto completo do marco comercial correspondente
+├── Editor, simulador, verification e formatos contratados
+├── Save/reopen local dos projetos autorizados
+├── Import/export local conforme compatibilidade
+├── Uso offline conforme licença cacheada e grace period publicado
+└── Nenhuma nuvem obrigatória para a simulação local
 
 DLCs/expansões — pagos, opcionais
 ├── Módulos profissionais de HDL e co-simulação
@@ -39,31 +52,33 @@ Serviços online — pagos, opcionais
 └── Serviços de compute/verification remoto quando existirem
 ```
 
-Essa política é um **plano de monetização**, não uma autorização para bloquear funcionalidades locais atuais nem uma confirmação de que a Steamworks ou um backend de cobrança já estejam implementados.
+Essa política é um **plano comercial**, não uma autorização para fingir que a demo ou a edição final já existem, nem uma confirmação de que Steamworks, licenciamento, cobrança ou backend de entitlements estejam implementados.
 
-## 2. O que fica gratuito
+## 2. Demo gratuita e limites de avaliação
 
-O núcleo gratuito deve ser suficientemente completo para que o Veritas continue sendo um Digital Logic Simulator legítimo mesmo sem DLC e sem conexão. O usuário não deve pagar para acessar a lógica básica, para abrir um arquivo local ou para continuar usando seus próprios projetos offline.
+A demo gratuita existe para que o usuário possa avaliar o produto antes de comprar a edição final. Ela deve ser funcional dentro de um escopo explicitamente publicado, com limites compreensíveis de recursos, tamanho, exemplos, exportação, duração ou módulos. Esses limites não podem ser escondidos nem usados para simular defeitos; devem aparecer antes do uso e antes da compra.
 
-| Capacidade | Base gratuita |
-| --- | --- |
-| Criar e editar circuitos básicos | Sim |
-| Simular combinacional e sequencial básico localmente | Sim |
-| Clocks, waveform e testbench básico local | Sim |
-| Salvar e reabrir no dispositivo | Sim |
-| Importar e exportar formatos locais suportados | Sim, sujeito aos limites e validação |
-| Usar o modo offline | Sim |
-| Abrir projetos próprios já baixados | Sim |
-| Usar o editor sem conta | Sim, quando o ambiente oferecer a aplicação local |
-| Verificar circuitos pequenos e médios localmente | Sim |
-| Receber correções e atualizações de segurança | Sim |
-| Acessar o projeto sem publicidade obrigatória | Sim |
+A edição final não será gratuita como regra de produto. Ela será uma versão comercial paga, com login e verificação de licença/entitlement. O login serve para a sessão e para o direito de uso; não autoriza a aplicação a enviar projetos para a nuvem sem consentimento.
 
-O armazenamento local não é uma concessão temporária. Ele é parte da identidade do produto. Os dados do projeto devem continuar sob controle do usuário e devem possuir exportação compreensível, mesmo quando o usuário nunca comprar uma expansão.
+| Capacidade | Demo gratuita | Edição final paga |
+| --- | --- | --- |
+| Criar e editar circuitos | Sim, dentro do escopo publicado | Sim, conforme o contrato da edição |
+| Simular combinacional e sequencial | Sim, dentro do escopo publicado | Sim, conforme o contrato da edição |
+| Clocks, waveform e testbench | Escopo de demonstração | Recursos contratados |
+| Salvar e reabrir localmente | Sim, com limites publicados | Sim, sem depender de cloud |
+| Importar e exportar formatos | Somente os formatos liberados | Formatos suportados pela licença |
+| Login | Planejado/necessário para a sessão demo | Planejado/necessário para licença e sessão |
+| Uso offline | Após sessão válida, conforme grace period | Após licença cacheada, conforme grace period |
+| Abrir projetos próprios baixados | Sim quando compatível com a demo | Sim quando compatível com a licença |
+| Verificar circuitos localmente | Escopo de demonstração | Escopo contratado |
+| Correções de segurança | Sim | Sim |
+| Publicidade intrusiva | Não | Não |
 
-O núcleo gratuito não deve ser artificialmente degradado para induzir a compra. O princípio é cobrar por **capacidade adicional, conteúdo adicional ou serviço de infraestrutura**, não por remover uma barreira criada de propósito.
+O armazenamento local não é uma concessão temporária. Ele é parte da identidade do produto. Os dados do projeto devem continuar sob controle do usuário, ter formato documentado e possuir exportação compreensível. A demo pode produzir projetos de avaliação; a edição final paga deve abrir os projetos compatíveis sem exigir contratação de cloud.
 
-## 3. O que pode ser DLC ou expansão paga
+A demo pode ter limitações comerciais, mas elas devem ser honestas e visíveis. A cobrança da edição final deve representar acesso ao produto completo e suporte/compatibilidade do marco contratado, não uma barreira artificial criada para punir o uso básico durante uma licença válida.
+
+## 3. Versão final paga, DLCs e expansões
 
 DLC deve conter uma unidade clara de valor. A Steam trata DLC como conteúdo adicional que pode ser gratuito ou pago e recomenda que o jogo verifique a propriedade do conteúdo [2]. No Veritas, cada DLC deve ter descrição própria, identificador estável, compatibilidade declarada e comportamento seguro quando ausente.
 
@@ -77,7 +92,7 @@ DLC deve conter uma unidade clara de valor. A Steam trata DLC como conteúdo adi
 | Veritas Collaboration Tools | Ferramentas de colaboração local/exportável e preparação de workspaces | Sim, mas colaboração hospedada é serviço separado |
 | Veritas HDL Backends | Pacotes ou adaptadores para Yosys/Verilator quando legal e tecnicamente distribuíveis | Depende do backend; sempre opt-in e isolado |
 
-Um DLC não deve ser usado para cobrar pela correção de bugs do núcleo, por segurança, por abrir projetos locais ou por evitar uma perda causada pelo próprio produto. Correções, compatibilidade e integridade do formato são responsabilidade da aplicação base.
+A edição final paga deve incluir as correções, a segurança e a compatibilidade prometidas para o seu marco. Um DLC não deve ser usado para cobrar pela correção de bugs do núcleo, por abrir um projeto compatível da edição licenciada ou por evitar uma perda causada pelo próprio produto. Correções, compatibilidade e integridade do formato são responsabilidade da aplicação base.
 
 A existência de um DLC no roadmap não significa que ele será lançado. Cada módulo precisa ter implementação, testes, documentação, compatibilidade com os formatos, verificação de ownership, política de atualização e critérios de saída próprios.
 
@@ -97,7 +112,7 @@ Os serviços de nuvem devem ser opcionais e separados do núcleo local:
 | Workspace de equipe | Serviço pago ou plano profissional, com controle de membros e permissões |
 | Recovery ampliado | Serviço pago opcional, mas o usuário deve manter exportação local básica |
 
-Nenhum serviço deve sugerir que o código do usuário será usado para treinar modelos, vendido ou exposto a outros usuários. O comportamento padrão deve ser minimização de dados, criptografia em trânsito e em repouso quando a nuvem for utilizada, controle de acesso e exclusão/exportação iniciada pelo usuário conforme a política publicada.
+Nenhum serviço deve sugerir que o código do usuário será usado para treinar modelos, vendido ou exposto a outros usuários. O login da demo ou da edição final não é consentimento para nuvem. O comportamento padrão deve ser minimização de dados, criptografia em trânsito e em repouso quando a nuvem for utilizada, controle de acesso e exclusão/exportação iniciada pelo usuário conforme a política publicada.
 
 O produto deve dizer claramente o que é armazenado, por quanto tempo, em qual região quando aplicável, qual é o limite do plano, como baixar os dados e o que acontece após cancelamento. Não será permitido esconder o limite de armazenamento em uma mensagem vaga como “nuvem premium”.
 
@@ -107,20 +122,21 @@ O modelo comercial deve ser entendível antes da compra. O usuário precisa sabe
 
 Regras:
 
-1. A funcionalidade básica continua utilizável offline.
-2. Projetos locais continuam abrindo sem autenticação externa.
-3. Exportação e importação locais não dependem de assinatura.
-4. O usuário não perde o arquivo local por expiração de nuvem.
-5. Um DLC pago não deve quebrar a abertura de um projeto que usa apenas recursos base.
-6. Se um projeto usa um DLC ausente, o Veritas deve oferecer diagnóstico e recuperação, não apagar componentes silenciosamente.
-7. A cobrança não pode substituir correções de segurança ou compatibilidade.
-8. Não haverá publicidade intrusiva dentro do editor.
-9. Não haverá paywall para continuar usando a simulação básica.
-10. Limites de nuvem, retenção e custo devem ser exibidos antes da operação.
+1. A demo gratuita deve ter escopo, limites e duração claramente informados.
+2. A edição final será paga e terá login/licença/entitlement verificáveis.
+3. Depois de uma sessão válida, o modo local deve continuar utilizável segundo a política de grace period publicada.
+4. Projetos locais compatíveis não podem depender de uma contratação de cloud.
+5. Exportação e importação locais não podem ser removidas apenas para forçar assinatura de nuvem.
+6. O usuário não perde o arquivo local por expiração de licença cloud ou indisponibilidade temporária do serviço.
+7. Um DLC pago não deve quebrar a abertura de um projeto que usa apenas recursos autorizados da edição final.
+8. Se um projeto usa um DLC ausente ou uma licença final ausente, o Veritas deve oferecer diagnóstico e recuperação, não apagar componentes silenciosamente.
+9. A cobrança não pode substituir correções de segurança ou compatibilidade prometidas.
+10. Não haverá publicidade intrusiva dentro do editor.
+11. Limites de demo, licença, nuvem, retenção e custo devem ser exibidos antes da operação.
 
 A documentação da Steam recomenda pensar em valor para o cliente e alerta contra barreiras artificiais e modelos que cobrem para eliminar frustração [3]. Essa orientação é compatível com o posicionamento do Veritas: os pagamentos devem financiar conteúdo adicional e infraestrutura escolhida, não punir o uso local.
 
-## 6. Steam: DLC, free-to-play e ownership
+## 6. Steam: demo, edição final paga, DLC e ownership
 
 A distribuição alvo é a Steam, mas a integração Steamworks ainda é um trabalho futuro. A Steam documenta que DLC possui app ID próprio, pode ser armazenado em depot próprio ou incluído com o jogo base, e que o aplicativo deve verificar a propriedade do DLC antes de habilitar o conteúdo [2].
 
@@ -142,7 +158,7 @@ has_entitlement("veritas-scale-lab")
 service_status("cloud-sync")
 ```
 
-O domínio continua validando se o projeto pode ser aberto, editado e simulado. A ausência de entitlement deve bloquear somente o módulo correspondente. Um projeto base não deve depender da presença do Steam client para avaliar uma porta AND.
+O domínio continua validando se o projeto pode ser aberto, editado e simulado. A ausência de entitlement deve bloquear somente a edição, o DLC ou o serviço correspondente, conforme o contrato publicado, e deve gerar uma mensagem recuperável. Um projeto autorizado não deve depender da presença permanente do Steam client para avaliar uma porta AND durante o grace period offline.
 
 A verificação de entitlement deve ocorrer:
 
@@ -157,9 +173,15 @@ Ownership local não é autorização para confiar em código arbitrário. O con
 
 ## 7. Nuvem, conta e sincronização
 
-A nuvem deve ser um adaptador de serviço, não uma dependência do `CircuitDocument` ou do `Simulator`.
+A nuvem deve ser um adaptador de serviço, não uma dependência do `CircuitDocument` ou do `Simulator`. O sistema de login/licença também deve ficar atrás de uma fronteira de aplicação, sem espalhar chamadas de provedor no domínio de simulação.
 
 ```text
+Product Account / License Adapter
+  ├── Authentication
+  ├── Demo session or paid entitlement
+  ├── Offline grace policy
+  └── Recovery / sign-out behavior
+
 Local Project
   ├── Structural document
   ├── Local testbenches
@@ -191,7 +213,7 @@ Quando o usuário cancelar o serviço:
 
 ## 8. Segurança, pagamentos e fraude
 
-Nenhuma cobrança deve ser implementada dentro do Veritas sem uma fronteira segura de entitlement. A aplicação cliente pode solicitar uma compra ou abrir a página oficial, mas não deve ser a autoridade final para concessão de serviços cloud ou itens de valor.
+Nenhuma cobrança ou desbloqueio da edição final deve ser implementado dentro do Veritas sem uma fronteira segura de entitlement. A aplicação cliente pode solicitar login, compra ou abrir a página oficial, mas não deve ser a autoridade final para conceder a edição final, DLCs ou serviços cloud.
 
 A documentação da Steam informa que compras dentro do jogo devem usar a API de microtransações/Steam Wallet e que um backend próprio deve reconciliar transações e considerar fraude/chargebacks [4]. Portanto, a ordem futura é:
 
@@ -231,7 +253,8 @@ DLCs locais devem declarar os sistemas suportados. A meta de distribuição do V
 
 | Camada | Windows | macOS | Linux |
 | --- | --- | --- | --- |
-| Núcleo gratuito | Build, runtime e smoke reais | Build, runtime e smoke reais | Build, runtime e smoke reais |
+| Demo gratuita | Build, login, runtime e smoke reais | Build, login, runtime e smoke reais | Build, login, runtime e smoke reais |
+| Edição final paga | Build, login/licença, runtime e smoke reais | Build, login/licença, runtime e smoke reais | Build, login/licença, runtime e smoke reais |
 | DLC local | Asset, entitlement, loading e execução | Asset, entitlement, loading e execução | Asset, entitlement, loading e execução |
 | Serviço cloud | Login, sync, conflito, offline e recovery | Login, sync, conflito, offline e recovery | Login, sync, conflito, offline e recovery |
 | Steam overlay/ownership | Verificação nativa | Verificação nativa | Verificação nativa |
@@ -241,7 +264,7 @@ Até que essas provas existam, a documentação deve usar `BUILD VERIFIED`, `ART
 
 ## 10. Relação com o roadmap técnico
 
-O modelo comercial não muda a ordem de segurança do roadmap. A infraestrutura de pagamento e nuvem só entra depois de o núcleo ser confiável.
+O modelo comercial não muda a ordem de segurança do roadmap. A autenticação/licença deve ser isolada da simulação, a demo deve ser honesta e a edição final só pode ser vendida depois que o núcleo e a recuperação local forem confiáveis. A infraestrutura de pagamento e nuvem só entra depois dos boundaries e dos gates técnicos.
 
 | Marco | Relação com o modelo comercial |
 | --- | --- |
@@ -253,7 +276,7 @@ O modelo comercial não muda a ordem de segurança do roadmap. A infraestrutura 
 | v3.1–v3.2 | Capabilities e plugins seguros para módulos adicionais |
 | v3.3–v3.8 | Workspace profissional, escala, HDL e possíveis DLCs locais |
 | v4.x | Packages, reprodutibilidade, serviços opt-in, entitlements e distribuição assinada |
-| v5.0.0 | Plataforma madura, Steam-ready, multiplataforma, com política comercial comprovada |
+| v5.0.0 | Plataforma madura, Steam-ready, multiplataforma, com demo gratuita, edição final paga e política comercial comprovada |
 
 A monetização não deve acelerar a promoção de releases. Uma versão só pode ser anunciada como estável quando os critérios técnicos, de QA, segurança e distribuição estiverem cumpridos, independentemente de haver um DLC planejado.
 
@@ -261,7 +284,7 @@ A monetização não deve acelerar a promoção de releases. Uma versão só pod
 
 Texto que poderá ser usado futuramente na descrição do produto, depois de validação comercial e aprovação da Steam:
 
-> **Veritas é um Digital Logic Simulator local-first.** A versão base é gratuita e permite criar, simular, testar e salvar circuitos localmente. Expansões opcionais adicionam ferramentas profissionais, conteúdos educacionais, HDL e recursos avançados. Serviços de nuvem, como backup, sincronização e colaboração hospedada, são opcionais e podem exigir um plano pago para cobrir armazenamento, segurança e operação. Seus projetos locais não dependem da nuvem para continuar funcionando.
+> **Veritas é um Digital Logic Simulator local-first.** Uma demo gratuita permite avaliar o produto dentro de um escopo claramente informado. A edição final é paga, exige login/licença para validar o direito de uso e entrega o conjunto completo do marco comercial adquirido. Expansões opcionais adicionam ferramentas profissionais, conteúdos educacionais, HDL e recursos avançados. Serviços de nuvem, como backup, sincronização e colaboração hospedada, são opcionais e podem exigir um plano pago. Projetos locais compatíveis não dependem de uma contratação de nuvem para continuar funcionando dentro das regras da licença.
 
 Esse texto não deve ser publicado na Steam antes de a integração comercial, a política de privacidade, a forma de cobrança e os limites dos serviços estarem aprovados e implementados.
 
@@ -269,11 +292,11 @@ Esse texto não deve ser publicado na Steam antes de a integração comercial, a
 
 O modelo comercial só estará implementado quando houver:
 
-1. definição formal do conteúdo gratuito e de cada DLC;
+1. definição formal do escopo da demo gratuita, da edição final paga e de cada DLC;
 2. módulos desacoplados por capability e versão;
-3. entitlements verificáveis e fail-closed;
-4. modo offline local funcional sem conta;
-5. exportação e recuperação dos projetos locais;
+3. login, licença e entitlements verificáveis e fail-closed;
+4. política de sessão, cache e grace period offline testada;
+5. exportação e recuperação dos projetos locais, sem dependência de cloud;
 6. serviço cloud separado e com quotas transparentes;
 7. autenticação, autorização e exclusão documentadas;
 8. reconciliação segura de compras e refunds quando aplicável;
@@ -282,10 +305,10 @@ O modelo comercial só estará implementado quando houver:
 11. documentação de preços, limites, privacidade e suporte;
 12. store pages e processo de revisão da Steam concluídos;
 13. verificação de `Veritas-Setup.exe`, DMG/app bundle e Linux packages;
-14. nenhuma regressão P0/P1 no núcleo gratuito;
+14. nenhuma regressão P0/P1 na demo, na edição final ou nos componentes compartilhados;
 15. plano de rollback para cliente, DLC e backend.
 
-Até lá, o estado correto é **PLANNED / NOT IMPLEMENTED**.
+Até lá, o estado correto é **PLANNED / NOT IMPLEMENTED**. A existência do `AuthProvider` técnico não equivale a uma licença comercial, integração Steam ou produto final pago publicado.
 
 ## 13. Referências
 

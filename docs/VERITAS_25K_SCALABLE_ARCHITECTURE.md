@@ -567,12 +567,12 @@ A validação de 25 mil chips só pode ser anunciada quando todos esses itens es
 [15]: https://verilator.org/guide/latest/ "Verilator — documentação oficial"
 
 
-## 15. Fronteira comercial: base gratuita, DLC e nuvem opt-in
+## 15. Fronteira comercial: demo, edição final, DLC e nuvem opt-in
 
-A escala de 25 mil chips continua sendo uma capacidade técnica do produto, não um motivo para bloquear o núcleo local. O Veritas base deve continuar funcionando offline, com edição, simulação, testbench e persistência local. Uma eventual expansão `Scale Lab` poderá empacotar o compiler/IR, viewport e profiling avançados como DLC local, mas a ausência desse DLC não pode corromper ou apagar projetos base.
+A escala de 25 mil chips continua sendo uma capacidade técnica do produto, não um motivo para corromper ou bloquear projetos locais. A demo poderá mostrar uma fatia controlada da escala; a edição final paga e uma eventual expansão `Scale Lab` poderão entregar o compiler/IR, viewport e profiling avançados como capacidades licenciadas. A ausência da edição final ou desse DLC deve produzir diagnóstico recuperável, nunca apagar projetos ou ocultar dados locais.
 
-Serviços de nuvem, incluindo backup, sincronização, histórico remoto, colaboração hospedada e compute remoto, ficam fora da autoridade do `CompiledNetlist` e do `Runtime`. Eles devem ser adaptadores opcionais com autenticação, quotas, entitlements, criptografia, exclusão/exportação e política de retenção. O documento estrutural e o arquivo local continuam sendo a fonte recuperável pelo usuário.
+Serviços de nuvem, incluindo backup, sincronização, histórico remoto, colaboração hospedada e compute remoto, ficam fora da autoridade do `CompiledNetlist` e do `Runtime`. Eles devem ser adaptadores opcionais com autenticação, quotas, entitlements, criptografia, exclusão/exportação e política de retenção. Login/licença não autorizam upload automático; o documento estrutural e o arquivo local continuam sendo a fonte recuperável pelo usuário.
 
-A integração futura com Steam deverá ficar em um `EntitlementProvider`, sem espalhar chamadas de Steamworks pelo domínio. Ownership habilita um módulo; não transforma conteúdo baixado em código confiável. Todos os DLCs e arquivos remotos continuam sujeitos a versão, checksum, schema, allowlist e budgets.
+A integração futura com Steam deverá ficar em um `EntitlementProvider`, sem espalhar chamadas de Steamworks pelo domínio. Ownership habilita uma edição, um DLC ou um serviço; não transforma conteúdo baixado em código confiável. Todos os DLCs e arquivos remotos continuam sujeitos a versão, checksum, schema, allowlist e budgets.
 
-O modelo comercial detalhado, incluindo Free-to-Play, DLC, Steam Wallet, cloud opt-in, privacidade e critérios de implementação, está em [`COMMERCIAL_MODEL_STEAM.md`](./COMMERCIAL_MODEL_STEAM.md).
+O modelo comercial detalhado, incluindo demo gratuita, edição final paga, DLC, Steam Wallet, cloud opt-in, privacidade e critérios de implementação, está em [`COMMERCIAL_MODEL_STEAM.md`](./COMMERCIAL_MODEL_STEAM.md).

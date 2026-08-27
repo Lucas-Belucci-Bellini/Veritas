@@ -6,8 +6,9 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 
 ### Modelo comercial planejado
 
-- Definido o modelo futuro para a Steam: núcleo local Free-to-Play gratuito, com criação, simulação, testbench e save/reopen local sem conta ou nuvem obrigatória; módulos avançados locais poderão ser DLCs/expansões pagos e backup, sincronização, histórico remoto, colaboração hospedada e compute remoto poderão ser serviços cloud opt-in pagos.
-- Registrada a política em `docs/COMMERCIAL_MODEL_STEAM.md`: não transformar o modo local em paywall, não cobrar por correções/segurança/compatibilidade, preservar exportação e recuperação local e manter Steamworks, entitlements, pagamentos, backend cloud e pricing como `PLANNED / NOT IMPLEMENTED` até existirem integração, QA e políticas de privacidade.
+- Definido o modelo futuro para a Steam: demo/teste gratuita para avaliação e versão final paga como edição completa e oficial, ambas com login planejado e a edição final com licença/entitlement verificável; escopo, limites e condições da demo deverão ser publicados antes do uso.
+- Registrada a política em `docs/COMMERCIAL_MODEL_STEAM.md`: login/licença não autorizam upload automático, projetos locais compatíveis não dependem de contratação de cloud e DLCs/serviços cloud continuam separados. Steamworks, licenciamento, pagamentos, backend comercial, pricing e cloud comercial permanecem `PLANNED / NOT IMPLEMENTED`; a diretriz também cobre Baluarte, Vanguard e futuros produtos sem afirmar que esses repositórios já tenham cobrança implementada.
+- Criado `docs/PRODUCT_AUTH_LICENSE_BOUNDARY.md` com a fronteira planejada entre conta, licença, entitlement, capabilities, armazenamento local e cloud. O `AuthProvider` Supabase atual é classificado como infraestrutura técnica opcional, não como licença paga ou ownership Steam.
 
 ### Verification no testbench — v2.6.0 em desenvolvimento
 

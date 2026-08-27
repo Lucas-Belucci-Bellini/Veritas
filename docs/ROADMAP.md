@@ -18,7 +18,7 @@ A versão de referência do repositório é a **v0.9.0-rc.18**, atualmente publi
 | MCP para uso headless por IAs | Entregue | `mcp/` e `plugins/veritas-logic/` |
 | Editor visual combinacional | Entregue em prévia | `src/components/CircuitEditor.tsx` e `src/circuit/` |
 | Tabela verdade e persistência local | Entregue | `src/circuit/truthTable.ts`, `src/storage/` e testes Vitest |
-| Autenticação, sync e histórico em nuvem | Entregue | `src/auth/`, `src/cloud/`, migrações Supabase e `docs/CLOUD-HISTORY.md` |
+| Autenticação, sync e histórico em nuvem | Entregue em prévia técnica | `src/auth/`, `src/cloud/`, migrações Supabase e `docs/CLOUD-HISTORY.md`; licença comercial e entitlement Steam ainda não existem |
 | Colaboração Realtime | Entregue em prévia | Broadcast, Presence, convite por papel e canvas visualizador |
 | Exportação Verilog/VHDL | Entregue em prévia | `src/circuit/export.ts` e testes determinísticos |
 | Monitoramento de IA | Entregue em prévia | `veritas_ai_metrics`, Realtime, cliente e painel |
@@ -34,6 +34,8 @@ O Veritas será construído primeiro como uma ferramenta **local-first, client-s
 A calculadora de expressões continua sendo uma experiência de entrada rápida. O próximo salto do produto não é adicionar mais painéis à tela atual, mas permitir que o usuário **edite o circuito visualmente**, simule esse circuito e converta o resultado para uma expressão ou tabela verdade quando isso for matematicamente possível.
 
 Recursos de nuvem, colaboração, agentes em larga escala, desktop nativo, renderização 3D e fabricação física serão tratados como linhas de produto posteriores. Eles só entram após existir uma base estável de projeto, eventos, validação, versionamento e limites de execução.
+
+A autenticação Supabase existente é uma prévia técnica de sessão e sync opt-in, não um sistema de licença paga. Para a demo e a edição final comercial, a aplicação deverá separar `AccountProvider`, `LicenseProvider` e `EntitlementProvider` do domínio do simulador, com cache offline limitado, revogação segura, recuperação de conta e nenhum upload automático dos projetos.
 
 ## 3. Roadmap por releases
 
@@ -1064,14 +1066,16 @@ O contrato aceita `TestbenchOptions.diagnosticTicks`, com padrão de 64 tiques e
 
 O `TestbenchPanel` apresenta o diagnóstico por caso com status acessível, sem substituir os badges existentes de passou/falhou. A ferramenta MCP `run_testbench` serializa o diagnóstico bounded sem alterar a tabela de divergências. A especificação detalhada está em [`docs/VERIFICATION.md`](./VERIFICATION.md).
 
-A implementação foi validada com 22 testes do domínio de testbench, 51 testes MCP, typecheck e lint. A validação visual interativa do painel, o smoke nativo e a release `v2.6.0` continuam pendentes; este registro é um marco `Unreleased`, não uma tag ou GitHub Release.
+A implementação foi validada com 25 testes do domínio de testbench, 51 testes MCP, typecheck e lint. A validação visual interativa do painel, o smoke nativo e a release `v2.6.0` continuam pendentes; este registro é um marco `Unreleased`, não uma tag ou GitHub Release.
 
 ## 11. Modelo comercial planejado para Steam
 
-O Veritas será planejado para distribuição futura na Steam como um produto free-to-play com núcleo local gratuito. A versão base deve permitir criar, editar, simular, testar e salvar circuitos localmente sem conta obrigatória, sem nuvem obrigatória e sem conexão permanente.
+O Veritas será planejado para distribuição futura na Steam em duas edições: uma **demo/teste gratuita**, para avaliação controlada, e uma **versão final paga**, que será a edição completa e oficial do produto. Demo e edição final terão sistema de login planejado; a edição final exigirá licença/entitlement válido. Login não significa upload automático dos projetos nem torna a nuvem obrigatória para simulação local.
 
-Módulos avançados locais poderão ser distribuídos como DLCs ou expansões opcionais, incluindo ferramentas profissionais de HDL, instrumentos, verification avançada, workspace de escala, conteúdos educacionais e backends controlados. Backup, sincronização, histórico remoto, colaboração hospedada e compute remoto serão serviços opcionais de nuvem, com limites transparentes e cobrança destinada a cobrir armazenamento, segurança, operação e manutenção. O modo local não será removido para forçar uma assinatura.
+A demo terá escopo, limites e duração/condições de avaliação publicados antes do uso. A edição final paga não será disponibilizada gratuitamente como regra de produto e deve representar o acesso ao conjunto completo do marco comercial contratado. O modo local, o save/reopen compatível e a simulação devem continuar disponíveis conforme a licença, a política de grace period offline e os limites publicados.
 
-Essa é uma decisão de produto planejada, não uma integração Steam implementada. A especificação detalhada está em [`COMMERCIAL_MODEL_STEAM.md`](./COMMERCIAL_MODEL_STEAM.md). DLC, ownership, microtransações, backend, refunds, privacidade, quotas e suporte somente serão implementados depois dos gates de segurança, formato, migration, distribuição e QA multiplataforma. O núcleo gratuito continuará sendo prioridade; correções de segurança, compatibilidade e integridade do formato não serão convertidas em paywall.
+Módulos avançados locais poderão ser distribuídos como DLCs ou expansões opcionais, incluindo ferramentas profissionais de HDL, instrumentos, verification avançada, workspace de escala, conteúdos educacionais e backends controlados. Backup, sincronização, histórico remoto, colaboração hospedada e compute remoto serão serviços opcionais de nuvem, com limites transparentes e cobrança destinada a cobrir armazenamento, segurança, operação e manutenção. A nuvem não será requisito para a simulação local.
 
-A documentação oficial da Steamworks distingue DLC de compras dentro do jogo e exige que o produto trate ownership, atualização e transações de forma apropriada [5]. O Veritas ainda não possui app Steam, App IDs de DLC, integração de Steam Wallet, backend de entitlement ou serviço cloud comercial.
+Essa é uma decisão de produto planejada, não uma integração Steam implementada. A especificação detalhada está em [`COMMERCIAL_MODEL_STEAM.md`](./COMMERCIAL_MODEL_STEAM.md), e os boundaries de conta/licença estão em [`PRODUCT_AUTH_LICENSE_BOUNDARY.md`](./PRODUCT_AUTH_LICENSE_BOUNDARY.md). Demo, edição final, DLC, ownership, microtransações, backend, refunds, privacidade, quotas e suporte somente serão implementados depois dos gates de segurança, formato, migration, distribuição e QA multiplataforma. Correções de segurança, compatibilidade e integridade do formato prometidas para a edição licenciada continuam sendo responsabilidade da aplicação base.
+
+A documentação oficial da Steamworks distingue DLC de compras dentro do jogo e exige que o produto trate ownership, atualização e transações de forma apropriada [5]. O Veritas ainda não possui app Steam, App IDs de DLC, integração de Steam Wallet, backend de entitlement ou serviço cloud comercial. O `AuthProvider` Supabase do código atual não deve ser interpretado como esses componentes comerciais.

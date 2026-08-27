@@ -1,8 +1,9 @@
 # Veritas
 
 Calculadora de tabelas verdade e ferramenta local-first para projetar circuitos lógicos que roda
-no navegador. O modo local funciona sem conta; quando configurado, o usuário pode autenticar
-com Supabase, sincronizar circuitos na nuvem e pedir análise assistida por IA.
+no navegador. O modo local funciona sem conta no build atual; quando configurado, o usuário pode autenticar
+com Supabase, sincronizar circuitos na nuvem e pedir análise assistida por IA. A estratégia comercial futura
+separa uma demo/teste gratuita de uma versão final paga com login e licença, conforme [`docs/COMMERCIAL_MODEL_STEAM.md`](./docs/COMMERCIAL_MODEL_STEAM.md).
 
 Você digita `(A AND B) OR NOT C` e recebe, no mesmo instante, a tabela verdade
 completa com os passos intermediários e o circuito de portas lógicas
@@ -15,7 +16,13 @@ com um resumo executivo em [`plano.md`](./plano.md).
 
 ## Comece aqui
 
-O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca abriu o Veritas. Ele mostra como escrever uma expressão, ler a tabela verdade, salvar no navegador, exportar uma cópia e decidir quando usar autenticação e sincronização. O primeiro uso não exige conta.
+O [guia de primeiros passos](./docs/ONBOARDING.md) foi escrito para quem nunca abriu o Veritas. Ele mostra como escrever uma expressão, ler a tabela verdade, salvar no navegador, exportar uma cópia e decidir quando usar autenticação e sincronização. O primeiro uso do build atual não exige conta. Isso descreve o estado técnico presente e não define a distribuição comercial futura.
+
+## Modelo comercial planejado
+
+O Veritas será preparado para oferecer uma **demo/teste gratuita**, com escopo e limites informados, e uma **versão final paga**, completa e licenciada. A edição final terá login e verificação de licença/entitlement. A nuvem será uma camada separada e opcional: login não autoriza upload automático, e projetos locais compatíveis não dependerão de um serviço cloud para simulação, salvamento ou recuperação conforme a licença.
+
+Esta política também orienta a família de produtos do proprietário, incluindo Baluarte, Vanguard e futuros projetos, mas não declara que esses produtos já tenham cobrança ou licenciamento implementados. No Veritas, demo comercial, edição final paga, integração Steam, entitlements, pagamentos e pricing permanecem planejados até os gates de produto, segurança, privacidade, distribuição e QA.
 
 ## O que já está pronto
 

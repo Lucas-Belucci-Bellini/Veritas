@@ -82,7 +82,8 @@ A `1.0.0` não será criada por calendário nem porque um instalador existe. Ela
 
 | Área | Estado atual | Gate futuro |
 |---|---|---|
-| Núcleo local gratuito | **PLANNED POLICY** | Criar, editar, simular, testar, salvar e reabrir sem conta ou nuvem obrigatória |
+| Demo/teste gratuita | **PLANNED POLICY** | Escopo, limites, login de sessão, criação, simulação, salvamento e exportação dentro das condições publicadas |
+| Edição final paga | **NOT IMPLEMENTED** | Login, licença/entitlement, grace period offline, criação, simulação, salvamento e recuperação verificados por plataforma |
 | DLC local | **NOT IMPLEMENTED** | Entitlement, conteúdo versionado, checksum, allowlist, fallback e execução verificados por plataforma |
 | Ownership Steam | **NOT IMPLEMENTED** | Testes nativos com licença presente, ausente, expirada e atualização |
 | Steam Wallet/microtransações | **NOT IMPLEMENTED** | API oficial, reconciliação, refund/chargeback e auditoria de transações |
@@ -93,4 +94,4 @@ A `1.0.0` não será criada por calendário nem porque um instalador existe. Ela
 | macOS/Steam | **NOT VERIFIED** | App bundle, ownership, DLC, assinatura/notarização e rollback reais |
 | Linux/Steam | **NOT VERIFIED** | Pacote, ownership, DLC, assinatura e rollback reais |
 
-A política completa está em [`docs/COMMERCIAL_MODEL_STEAM.md`](../../docs/COMMERCIAL_MODEL_STEAM.md). A presença desta seção não significa que cobrança, Steamworks ou nuvem comercial estejam implementadas.
+A política completa está em [`docs/COMMERCIAL_MODEL_STEAM.md`](../../docs/COMMERCIAL_MODEL_STEAM.md). A presença desta seção não significa que demo comercial, edição final paga, cobrança, Steamworks, licenciamento ou nuvem comercial estejam implementados.

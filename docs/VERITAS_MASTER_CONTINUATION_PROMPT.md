@@ -1458,7 +1458,7 @@ Quando o usuário abrir outra conversa e disser “continue o Veritas”, o agen
 2. Ler este arquivo `docs/VERITAS_MASTER_CONTINUATION_PROMPT.md`.
 3. Executar a auditoria de Git/GitHub da seção 3.
 4. Comparar o HEAD real com o snapshot escrito aqui.
-5. Ler `docs/ROADMAP.md`, `docs/VERITAS_V3_V5_ROADMAP.md`, `docs/VERITAS_MASTER_BUILD_QUEUE.md`, `CHANGELOG.md` e `tests/desktop/QA_MATRIX.md`.
+5. Ler `docs/ROADMAP.md`, `docs/VERITAS_V3_V5_ROADMAP.md`, `docs/VERITAS_MASTER_BUILD_QUEUE.md`, `docs/PRODUCT_AUTH_LICENSE_BOUNDARY.md`, `CHANGELOG.md` e `tests/desktop/QA_MATRIX.md`.
 6. Identificar qual foi o último commit funcional e o último commit documental.
 7. Confirmar se a árvore está limpa.
 8. Confirmar se alguma nova release foi criada desde o snapshot.
@@ -1585,8 +1585,8 @@ Construa corretamente até a **Veritas Digital Logic Platform v5.0.0**, sem ante
 
 ## Direção comercial planejada — Steam, DLC e serviços de nuvem
 
-O Veritas poderá ser distribuído futuramente na Steam como Free-to-Play com núcleo local gratuito. A base deve permitir criar, editar, simular, testar e salvar circuitos localmente sem conta obrigatória, nuvem obrigatória ou conexão permanente. Módulos avançados locais podem ser comercializados como DLCs/expansões opcionais; backup, sincronização, histórico remoto, colaboração hospedada e compute remoto são serviços cloud opt-in pagos para cobrir armazenamento, segurança, operação e manutenção.
+O Veritas poderá ser distribuído futuramente na Steam em duas edições: uma demo/teste gratuita, para avaliação controlada, e uma versão final paga, que será a edição completa e oficial do produto. Demo e edição final terão sistema de login planejado; a edição final exigirá licença/entitlement válido. A demo deve possuir escopo, limites e condições de avaliação publicados antes do uso. A versão final não será gratuita como regra de produto.
 
-Não transformar o modo local em paywall. O usuário não perde arquivos locais quando um serviço expira, não deve pagar para abrir projetos próprios e não deve depender de nuvem para a simulação básica. Correções de segurança, compatibilidade e integridade do formato pertencem ao núcleo gratuito.
+Login/licença servem para sessão e direito de uso, mas não autorizam upload automático nem tornam a nuvem obrigatória. Projetos locais compatíveis devem permanecer recuperáveis, e a simulação local deve funcionar conforme a política de grace period offline e os limites publicados. DLCs/expansões podem adicionar capacidades locais avançadas; backup, sincronização, histórico remoto, colaboração hospedada e compute remoto são serviços cloud opt-in pagos para cobrir infraestrutura.
 
-Antes de implementar qualquer monetização, ler `docs/COMMERCIAL_MODEL_STEAM.md`. Manter Steam/entitlements/cloud fora do domínio do `Simulator`, usando adapters e capabilities com ownership verificável, schema/checksum, quotas, privacidade, exportação, recovery, refunds/chargebacks e testes com rede/Steam indisponíveis. O estado atual é `PLANNED / NOT IMPLEMENTED`; não há Steam App ID, DLC App ID, Steam Wallet, backend comercial ou cloud comercial implementados.
+Antes de implementar qualquer monetização, ler `docs/COMMERCIAL_MODEL_STEAM.md` e `docs/PRODUCT_AUTH_LICENSE_BOUNDARY.md`. Manter Steam/entitlements/licença/cloud fora do domínio do `Simulator`, usando adapters e capabilities com ownership verificável, schema/checksum, quotas, privacidade, exportação, recovery, refunds/chargebacks e testes com rede/Steam indisponíveis. O estado comercial atual é `PLANNED / NOT IMPLEMENTED`; existe apenas infraestrutura técnica de autenticação Supabase opcional, sem licença paga, Steam App ID, DLC App ID, Steam Wallet, backend comercial ou cloud comercial implementados.
