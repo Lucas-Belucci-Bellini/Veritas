@@ -4,6 +4,7 @@ import {
   type CircuitDocument,
   type CustomChipLibraryEntry,
 } from '../circuit'
+import { SimulatorExecutionBudget } from './simulator'
 import {
   createDocumentRuntime,
   diagnoseDocumentRuntime,
@@ -125,6 +126,20 @@ describe('documentRuntime', () => {
     }
 
     expect(() => createDocumentRuntime(document, { maxMemoryBytes: 1024 * 1024 })).toThrow('orçamento de memória')
+  })
+
+  it('encaminha o budget agregado entre runtimes do mesmo documento', () => {
+    const budget = new SimulatorExecutionBudget({ maxTicks: 2 })
+    const first = createDocumentRuntime(feedbackDocument(), { executionBudget: budget })
+    const second = createDocumentRuntime(feedbackDocument(), { executionBudget: budget })
+
+    first.tick(2)
+    expect(budget.tickCount).toBe(2)
+    expect(() => second.tick()).toThrow('orçamento agregado de 2 tiques')
+    expect(second.tickCount).toBe(0)
+
+    first.shutdown()
+    second.shutdown()
   })
 
   it('encaminha o budget de operações e preserva rollback do documento', () => {

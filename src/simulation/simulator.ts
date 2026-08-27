@@ -45,6 +45,8 @@ export interface SimulatorOptions {
   signal?: AbortSignal
   /** Teto de memória estimada para o estado deste runtime. */
   maxMemoryBytes?: number
+  /** Budget compartilhável entre runtimes do mesmo documento ou operação. */
+  executionBudget?: SimulatorExecutionBudget
 }
 
 export interface SimulatorNodeState {
@@ -72,7 +74,7 @@ export interface SettleDiagnostic {
   cyclePeriod?: number
 }
 
-export type SimulatorExecutionErrorCode = 'aborted' | 'cancelled' | 'shutdown' | 'operation-budget' | 'timeout'
+export type SimulatorExecutionErrorCode = 'aborted' | 'cancelled' | 'shutdown' | 'operation-budget' | 'timeout' | 'document-budget'
 
 export class SimulatorExecutionError extends Error {
   readonly code: SimulatorExecutionErrorCode
@@ -99,6 +101,126 @@ export const MAX_ASYNC_YIELD_EVERY = 1_000
 export const DEFAULT_ASYNC_TIMEOUT_MS = 30_000
 export const MAX_ASYNC_TIMEOUT_MS = 300_000
 
+export interface SimulatorExecutionBudgetOptions {
+  /** Teto acumulado de tiques entre todos os runtimes que compartilham a quota. */
+  maxTicks?: number
+  /** Teto acumulado de operações entre todos os runtimes que compartilham a quota. */
+  maxOperations?: number
+  /** Teto de memória estimada mantida simultaneamente pelos runtimes compartilhados. */
+  maxMemoryBytes?: number
+}
+
+export interface SimulatorExecutionBudgetSnapshot {
+  ticks: number
+  operations: number
+  memoryBytes: number
+}
+
+/**
+ * Quota explícita para agregar o custo de vários runtimes de um mesmo documento
+ * ou operação. A quota é cumulativa para tiques/operações e reserva apenas a
+ * memória estimada enquanto cada runtime permanece vivo.
+ */
+export class SimulatorExecutionBudget {
+  readonly maxTicks: number
+  readonly maxOperations: number
+  readonly maxMemoryBytes: number
+  private ticks = 0
+  private operations = 0
+  private memoryBytes = 0
+
+  constructor(options: SimulatorExecutionBudgetOptions = {}) {
+    this.maxTicks = normalizeTotalTickBudget(options.maxTicks ?? DEFAULT_MAX_TOTAL_TICKS)
+    this.maxOperations = normalizeOperationBudget(
+      options.maxOperations ?? DEFAULT_MAX_TOTAL_OPERATIONS,
+      MAX_TOTAL_OPERATIONS,
+      'total',
+    )
+    this.maxMemoryBytes = normalizeMemoryBudget(options.maxMemoryBytes ?? DEFAULT_MAX_MEMORY_BYTES)
+  }
+
+  get tickCount(): number {
+    return this.ticks
+  }
+
+  get operationCount(): number {
+    return this.operations
+  }
+
+  get reservedMemoryBytes(): number {
+    return this.memoryBytes
+  }
+
+  reserveTicks(count: number): void {
+    validateBudgetDelta(count, 'tiques')
+    if (this.ticks + count > this.maxTicks) {
+      throw new SimulatorExecutionError(
+        'document-budget',
+        `A execução excederia o orçamento agregado de ${this.maxTicks} tiques.`,
+      )
+    }
+    this.ticks += count
+  }
+
+  reserveOperations(count: number): void {
+    validateBudgetDelta(count, 'operações')
+    if (this.operations + count > this.maxOperations) {
+      throw new SimulatorExecutionError(
+        'document-budget',
+        `A execução excederia o orçamento agregado de ${this.maxOperations} operações.`,
+      )
+    }
+    this.operations += count
+  }
+
+  releaseTicks(count: number): void {
+    validateBudgetDelta(count, 'tiques')
+    this.ticks = Math.max(0, this.ticks - count)
+  }
+
+  releaseOperations(count: number): void {
+    validateBudgetDelta(count, 'operações')
+    this.operations = Math.max(0, this.operations - count)
+  }
+
+  reserveMemory(bytes: number): void {
+    validateBudgetDelta(bytes, 'memória')
+    if (this.memoryBytes + bytes > this.maxMemoryBytes) {
+      throw new SimulatorExecutionError(
+        'document-budget',
+        `Os runtimes exigiriam ${this.memoryBytes + bytes} bytes, acima do orçamento agregado de memória de ${this.maxMemoryBytes} bytes.`,
+      )
+    }
+    this.memoryBytes += bytes
+  }
+
+  releaseMemory(bytes: number): void {
+    validateBudgetDelta(bytes, 'memória')
+    this.memoryBytes = Math.max(0, this.memoryBytes - bytes)
+  }
+
+  snapshot(): SimulatorExecutionBudgetSnapshot {
+    return {
+      ticks: this.ticks,
+      operations: this.operations,
+      memoryBytes: this.memoryBytes,
+    }
+  }
+
+  restore(snapshot: SimulatorExecutionBudgetSnapshot): void {
+    if (
+      !Number.isInteger(snapshot.ticks) || snapshot.ticks < 0 || snapshot.ticks > this.maxTicks ||
+      !Number.isInteger(snapshot.operations) || snapshot.operations < 0 || snapshot.operations > this.maxOperations ||
+      !Number.isInteger(snapshot.memoryBytes) || snapshot.memoryBytes < 0 || snapshot.memoryBytes > this.maxMemoryBytes
+    ) {
+      throw new RangeError('O snapshot da quota agregada é inválido ou excede seus limites.')
+    }
+    this.ticks = snapshot.ticks
+    this.operations = snapshot.operations
+    this.memoryBytes = snapshot.memoryBytes
+  }
+}
+
 /**
  * Simulador de circuitos por tiques.
  *
@@ -117,6 +239,7 @@ export class Simulator {
   private readonly maxTotalOperations: number
   private readonly maxMemoryBytes: number
   private readonly memoryEstimate: number
+  private readonly executionBudget?: SimulatorExecutionBudget
   private readonly signal?: AbortSignal
   private ticks = 0
   private operations = 0
@@ -133,32 +256,43 @@ export class Simulator {
     if (this.memoryEstimate > this.maxMemoryBytes) {
       throw new RangeError(`O runtime exigiria aproximadamente ${this.memoryEstimate} bytes, acima do orçamento de memória de ${this.maxMemoryBytes} bytes.`)
     }
+    this.executionBudget = options.executionBudget
     this.signal = options.signal
 
-    for (const spec of netlist.components) {
-      if (this.nodes.has(spec.id)) {
-        throw new Error(`Componente duplicado: "${spec.id}".`)
-      }
-      this.nodes.set(spec.id, createState(spec))
-      this.order.push(spec.id)
-    }
+    let memoryReserved = false
+    try {
+      // A quota agregada é reservada antes de criar nós e filas de delay.
+      this.executionBudget?.reserveMemory(this.memoryEstimate)
+      memoryReserved = this.executionBudget !== undefined
 
-    // Só dá para validar as ligações depois que todos existem.
-    for (const spec of netlist.components) {
-      for (const input of spec.inputs ?? []) {
-        const target = this.nodes.get(input.node)
-        if (!target) {
-          throw new Error(
-            `O componente "${spec.id}" está ligado em "${input.node}", que não existe.`,
-          )
+      for (const spec of netlist.components) {
+        if (this.nodes.has(spec.id)) {
+          throw new Error(`Componente duplicado: "${spec.id}".`)
         }
-        const port = input.port ?? 0
-        if (port >= outputCount(target.spec.type, target.spec.options)) {
-          throw new Error(
-            `"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`,
-          )
+        this.nodes.set(spec.id, createState(spec))
+        this.order.push(spec.id)
+      }
+
+      // Só dá para validar as ligações depois que todos existem.
+      for (const spec of netlist.components) {
+        for (const input of spec.inputs ?? []) {
+          const target = this.nodes.get(input.node)
+          if (!target) {
+            throw new Error(
+              `O componente "${spec.id}" está ligado em "${input.node}", que não existe.`,
+            )
+          }
+          const port = input.port ?? 0
+          if (port >= outputCount(target.spec.type, target.spec.options)) {
+            throw new Error(
+              `"${input.node}" não tem a saída ${port} que "${spec.id}" pede.`,
+            )
+          }
         }
       }
+    } catch (error) {
+      if (memoryReserved) this.executionBudget?.releaseMemory(this.memoryEstimate)
+      throw error
     }
   }
 
@@ -192,6 +326,7 @@ export class Simulator {
     if (this.shutdownState) return
     this.shutdownState = true
     this.cancelled = true
+    this.executionBudget?.releaseMemory(this.memoryEstimate)
     this.nodes.clear()
     this.order.length = 0
   }
@@ -291,23 +426,29 @@ export class Simulator {
 
     const before = this.exportState()
     const operationsBefore = this.operations
+    let budgetTicksReserved = 0
+    let budgetOperationsReserved = 0
     try {
       for (let index = 0; index < requested; index += 1) {
         this.ensureRunnable()
+        this.executionBudget?.reserveTicks(1)
+        budgetTicksReserved += this.executionBudget ? 1 : 0
         let operationsThisTick = 0
         this.evaluate(() => {
           operationsThisTick += 1
-          this.chargeOperation(operationsThisTick)
+          this.chargeOperation(operationsThisTick, () => { budgetOperationsReserved += 1 })
         })
         this.propagate(() => {
           operationsThisTick += 1
-          this.chargeOperation(operationsThisTick)
+          this.chargeOperation(operationsThisTick, () => { budgetOperationsReserved += 1 })
         })
         this.ticks += 1
       }
     } catch (error) {
       this.restoreStateUnchecked(before)
       this.operations = operationsBefore
+      this.executionBudget?.releaseOperations(budgetOperationsReserved)
+      this.executionBudget?.releaseTicks(budgetTicksReserved)
       throw error
     }
   }
@@ -331,6 +472,7 @@ export class Simulator {
     const startedAt = Date.now()
     const before = this.exportState()
     const operationsBefore = this.operations
+    const ticksBefore = this.ticks
     try {
       for (let index = 0; index < requested; index += 1) {
         this.ensureRunnable(options.signal)
@@ -346,8 +488,12 @@ export class Simulator {
         }
       }
     } catch (error) {
+      const ticksReserved = this.ticks - ticksBefore
+      const operationsReserved = this.operations - operationsBefore
       this.restoreStateUnchecked(before)
       this.operations = operationsBefore
+      this.executionBudget?.releaseOperations(operationsReserved)
+      this.executionBudget?.releaseTicks(ticksReserved)
       throw error
     }
   }
@@ -384,7 +530,7 @@ export class Simulator {
       try {
         this.tick()
       } catch (error) {
-        if (error instanceof SimulatorExecutionError && error.code === 'operation-budget') {
+        if (error instanceof SimulatorExecutionError && (error.code === 'operation-budget' || error.code === 'document-budget')) {
           return { status: 'budget-exhausted', ticksExecuted }
         }
         throw error
@@ -583,7 +729,7 @@ export class Simulator {
     }
   }
 
-  private chargeOperation(operationInTick: number): void {
+  private chargeOperation(operationInTick: number, onBudgetReserved?: () => void): void {
     this.ensureRunnable()
     if (operationInTick > this.maxOperationsPerTick) {
       throw new SimulatorExecutionError(
@@ -597,6 +743,8 @@ export class Simulator {
         `O simulador excederia o orçamento total de ${this.maxTotalOperations} operações.`,
       )
     }
+    this.executionBudget?.reserveOperations(1)
+    onBudgetReserved?.()
     this.operations += 1
   }
 
@@ -637,6 +785,12 @@ export class Simulator {
 
 function isBooleanArray(values: readonly unknown[]): values is boolean[] {
   return values.every((value) => typeof value === 'boolean')
+}
+
+function validateBudgetDelta(value: number, label: string): void {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError(`A reserva agregada de ${label} deve ser um inteiro finito não negativo.`)
+  }
 }
 
 function normalizeTickCount(value: number): number {

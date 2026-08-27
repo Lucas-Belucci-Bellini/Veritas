@@ -10,6 +10,7 @@ import {
   MAX_TOTAL_OPERATIONS,
   MAX_TOTAL_TICKS,
   Simulator,
+  SimulatorExecutionBudget,
 } from './simulator'
 import type { Netlist } from './components'
 
@@ -74,6 +75,46 @@ describe('lógica combinacional', () => {
     sim.setInput('b', true)
     expect(sim.settle()).toBe(true)
     expect(sim.read('out')).toBe(true)
+  })
+
+  it('agrega o budget de tiques entre runtimes compartilhados', () => {
+    const budget = new SimulatorExecutionBudget({ maxTicks: 2 })
+    const first = new Simulator(andCircuit, { executionBudget: budget })
+    const second = new Simulator(andCircuit, { executionBudget: budget })
+
+    first.tick(2)
+    expect(budget.tickCount).toBe(2)
+    expect(() => second.tick()).toThrow('orçamento agregado de 2 tiques')
+    expect(second.tickCount).toBe(0)
+    expect(budget.tickCount).toBe(2)
+
+    first.shutdown()
+    second.shutdown()
+  })
+
+  it('faz rollback da quota agregada quando o budget de operações falha', () => {
+    const budget = new SimulatorExecutionBudget({ maxOperations: 7 })
+    const sim = new Simulator(andCircuit, { executionBudget: budget })
+    sim.setInput('a', true)
+    sim.setInput('b', true)
+
+    expect(() => sim.tick()).toThrow('orçamento agregado de 7 operações')
+    expect(sim.tickCount).toBe(0)
+    expect(sim.operationCount).toBe(0)
+    expect(budget.tickCount).toBe(0)
+    expect(budget.operationCount).toBe(0)
+
+    sim.shutdown()
+  })
+
+  it('libera a memória estimada compartilhada ao encerrar o runtime', () => {
+    const budget = new SimulatorExecutionBudget()
+    const sim = new Simulator(andCircuit, { executionBudget: budget })
+
+    expect(budget.reservedMemoryBytes).toBe(sim.memoryEstimateBytes)
+    sim.shutdown()
+    sim.shutdown()
+    expect(budget.reservedMemoryBytes).toBe(0)
   })
 
   it('recusa budgets de settle não finitos, fracionários ou acima do teto', () => {
@@ -198,6 +239,22 @@ describe('lógica combinacional', () => {
 
     expect(sim.exportState()).toEqual(before)
     expect(sim.operationCount).toBe(0)
+  })
+
+  it('faz rollback da quota compartilhada quando AbortSignal cancela tardiamente', async () => {
+    const controller = new AbortController()
+    const budget = new SimulatorExecutionBudget({ maxTicks: 16 })
+    const sim = new Simulator(andCircuit, { executionBudget: budget })
+    const abortTimer = setTimeout(() => controller.abort(), 0)
+
+    await expect(sim.tickAsync(8, { yieldEvery: 1, signal: controller.signal })).rejects.toThrow('execução do simulador foi abortada')
+    clearTimeout(abortTimer)
+
+    expect(sim.tickCount).toBe(0)
+    expect(sim.operationCount).toBe(0)
+    expect(budget.tickCount).toBe(0)
+    expect(budget.operationCount).toBe(0)
+    sim.shutdown()
   })
 
   it('encerra tickAsync por timeout e valida opções assíncronas fail-closed', async () => {

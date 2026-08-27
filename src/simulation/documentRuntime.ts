@@ -6,7 +6,13 @@ import {
   type CircuitExecutionSafetyReport,
   type CustomChipLibraryEntry,
 } from '../circuit'
-import { Simulator, type SettleDiagnostic, type SimulatorAsyncOptions, type SimulatorState } from './simulator'
+import {
+  Simulator,
+  type SettleDiagnostic,
+  type SimulatorAsyncOptions,
+  type SimulatorState,
+  type SimulatorExecutionBudget,
+} from './simulator'
 
 export interface DocumentRuntimeSnapshot {
   tick: number
@@ -35,6 +41,8 @@ export interface DocumentRuntimeOptions {
   signal?: AbortSignal
   /** Teto de memória estimada para o runtime do documento. */
   maxMemoryBytes?: number
+  /** Quota agregada opcional compartilhada por runtimes do mesmo documento. */
+  executionBudget?: SimulatorExecutionBudget
 }
 
 export interface DocumentRuntimeState {
@@ -87,6 +95,7 @@ export function createDocumentRuntime(document: CircuitDocument, options: Docume
     maxTotalOperations: options.maxTotalOperations,
     signal: options.signal,
     maxMemoryBytes: options.maxMemoryBytes,
+    executionBudget: options.executionBudget,
   })
   for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {
@@ -124,14 +133,18 @@ export function diagnoseDocumentRuntimePreview(
 ): DocumentRuntimeDiagnosticPreview {
   const { inputs, simulatorState, maxTicks, ...runtimeOptions } = options
   const simulator = createDocumentRuntime(document, runtimeOptions)
-  if (simulatorState) simulator.restoreState(simulatorState)
-  for (const [id, value] of Object.entries(inputs ?? {})) simulator.setInput(id, value)
+  try {
+    if (simulatorState) simulator.restoreState(simulatorState)
+    for (const [id, value] of Object.entries(inputs ?? {})) simulator.setInput(id, value)
 
-  const diagnostic = diagnoseDocumentRuntime(simulator, maxTicks)
-  return {
-    diagnostic,
-    snapshot: snapshotDocumentRuntime(simulator, document, options.customChips),
-    simulatorState: simulator.exportState(),
+    const diagnostic = diagnoseDocumentRuntime(simulator, maxTicks)
+    return {
+      diagnostic,
+      snapshot: snapshotDocumentRuntime(simulator, document, options.customChips),
+      simulatorState: simulator.exportState(),
+    }
+  } finally {
+    simulator.shutdown()
   }
 }
 
