@@ -1,0 +1,112 @@
+name: Veritas desktop artifact verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch ou commit a verificar"
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }} artifact
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            os: ubuntu-22.04
+            args: "--bundles deb,appimage"
+            artifact_glob: |
+              src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/appimage/*.AppImage
+          - platform: windows
+            os: windows-latest
+            args: "--bundles nsis"
+            artifact_glob: "Veritas-Setup.exe"
+          - platform: macos
+            os: macos-latest
+            args: "--bundles app,dmg"
+            artifact_glob: |
+              src-tauri/target/release/bundle/dmg/*.dmg
+              Veritas_*.app.zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+
+      - name: Check Tauri CLI
+        run: npm exec -- tauri --version
+
+      - name: Build desktop bundles
+        run: npm exec -- tauri build ${{ matrix.args }}
+
+      - name: Normalize Windows installer name
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if ($null -eq $installer) { throw "Instalador NSIS não encontrado" }
+          Copy-Item $installer.FullName "Veritas-Setup.exe" -Force
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app"
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64) suffix="aarch64" ;;
+            x86_64) suffix="x86_64" ;;
+            *) suffix="$arch" ;;
+          esac
+          ditto -c -k --sequesterRsrc --keepParent "$app" "Veritas_0.1.0-alpha.1_${suffix}.app.zip"
+
+      - name: Verify expected artifact paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r pattern; do
+            [ -z "$pattern" ] && continue
+            compgen -G "$pattern" >/dev/null || { echo "Artefato ausente: $pattern"; exit 1; }
+          done <<'EOF'
+          ${{ matrix.artifact_glob }}
+          EOF
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: veritas-desktop-artifacts-${{ matrix.platform }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+          retention-days: 14
