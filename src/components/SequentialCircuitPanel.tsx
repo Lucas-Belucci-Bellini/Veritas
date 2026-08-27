@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CircuitDocument, CustomChipLibraryEntry } from '../circuit'
 import {
   createDocumentRuntime,
@@ -17,6 +17,7 @@ import { Simulator } from '../simulation/simulator'
 import { runtimeFreshness } from '../realtime/runtimeFreshness'
 import { runtimeOfferDecision } from '../realtime/runtimeOffer'
 import type { RuntimeMetrics } from '../realtime/runtimeMetrics'
+import { DocumentWorkerExecutor } from '../simulation/documentWorkerExecutor'
 import {
   clearRuntimeCheckpoint,
   createRuntimeStorage,
@@ -81,6 +82,8 @@ interface SequentialCircuitPanelProps {
 export function SequentialCircuitPanel({ document, customChips = [], requestedClockPeriods, requestedRuntimeState, requestedRuntimeStateSentAt, requestedRuntimeStateClientId, requestedRuntimeStateBaseVersion, currentBaseVersion, temporalPresenceCount = 0, temporalConnectionStatus = 'disabled', runtimeMetrics, readOnly = false, onSnapshot, onClockPeriodsChange, onRuntimeStateChange, onRuntimeStateApplied, onRuntimeStateStale, onRuntimeStateApplyFailed }: SequentialCircuitPanelProps) {
   const simulatorRef = useRef<Simulator | null>(null)
   const runAbortRef = useRef<AbortController | null>(null)
+  const workerPreviewAbortRef = useRef<AbortController | null>(null)
+  const workerPreviewExecutorRef = useRef<DocumentWorkerExecutor | null>(null)
   const appliedRemotePeriodsRef = useRef<string | null>(null)
   const storage = useMemo<CheckpointStorage | null>(() => createRuntimeStorage(), [])
   const documentKey = useMemo(() => runtimeDocumentKey(document), [document])
@@ -89,6 +92,9 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
   const [timeline, setTimeline] = useState<DocumentRuntimeSnapshot[]>([])
   const [diagnosticPreview, setDiagnosticPreview] = useState<DocumentRuntimeDiagnosticPreview | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [workerPreviewRunning, setWorkerPreviewRunning] = useState(false)
+  const [workerPreviewStatus, setWorkerPreviewStatus] = useState('')
+  const [workerPreviewTick, setWorkerPreviewTick] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [persistenceStatus, setPersistenceStatus] = useState('inicializando')
   const inputIds = useMemo(() => documentInputIds(document), [document])
@@ -115,9 +121,62 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
     setPersistenceStatus(saved ? 'salvo localmente' : 'somente memória')
   }
 
+  const cancelWorkerPreview = useCallback((): void => {
+    const wasActive = workerPreviewAbortRef.current !== null || workerPreviewExecutorRef.current !== null
+    workerPreviewAbortRef.current?.abort()
+    workerPreviewAbortRef.current = null
+    workerPreviewExecutorRef.current?.dispose()
+    workerPreviewExecutorRef.current = null
+    setWorkerPreviewRunning(false)
+    if (wasActive) setWorkerPreviewStatus('preview Worker cancelado')
+  }, [])
+
+  async function runWorkerPreview(): Promise<void> {
+    if (isRunning || workerPreviewRunning) return
+    const controller = new AbortController()
+    let executor: DocumentWorkerExecutor | null = null
+    setWorkerPreviewRunning(true)
+    setWorkerPreviewStatus('executando preview Worker')
+    setWorkerPreviewTick(null)
+    try {
+      executor = new DocumentWorkerExecutor({ timeoutMs: 5_000 })
+      workerPreviewAbortRef.current = controller
+      workerPreviewExecutorRef.current = executor
+      const execution = await executor.run(document, {
+        requestId: `worker-preview-${Date.now()}`,
+        customChips,
+        clockPeriods,
+        inputs,
+        ticks: RUN_TICKS,
+        watch: [...new Set(watches.map((watch) => watch.nodeId))],
+        yieldEvery: 1,
+        timeoutMs: 5_000,
+        signal: controller.signal,
+        onProgress: (progress) => setWorkerPreviewTick(progress.snapshot.tick),
+      })
+      if (controller.signal.aborted || execution.outcome.type === 'cancelled') {
+        setWorkerPreviewStatus('preview Worker cancelado')
+      } else if (execution.outcome.type === 'result') {
+        const last = execution.outcome.snapshots[execution.outcome.snapshots.length - 1]
+        setWorkerPreviewTick(last?.tick ?? null)
+        setWorkerPreviewStatus(`preview Worker concluído · ${last?.tick ?? 0} tiques · ${execution.preflight.status}`)
+      } else {
+        setWorkerPreviewStatus(`preview Worker falhou · ${execution.outcome.message}`)
+      }
+    } catch (cause) {
+      setWorkerPreviewStatus(cause instanceof Error ? `preview Worker falhou · ${cause.message}` : 'preview Worker falhou')
+    } finally {
+      if (workerPreviewAbortRef.current === controller) workerPreviewAbortRef.current = null
+      if (workerPreviewExecutorRef.current === executor) workerPreviewExecutorRef.current = null
+      executor?.dispose()
+      setWorkerPreviewRunning(false)
+    }
+  }
+
   function initializeRuntime(clearSaved: boolean, overrideClockPeriods?: Record<string, number>): void {
     runAbortRef.current?.abort()
     runAbortRef.current = null
+    cancelWorkerPreview()
     simulatorRef.current?.shutdown()
     simulatorRef.current = null
     setIsRunning(false)
@@ -168,9 +227,10 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
   useEffect(() => () => {
     runAbortRef.current?.abort()
     runAbortRef.current = null
+    cancelWorkerPreview()
     simulatorRef.current?.shutdown()
     simulatorRef.current = null
-  }, [])
+  }, [cancelWorkerPreview])
 
   useEffect(() => {
     if (!requestedClockPeriods) {
@@ -350,14 +410,18 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
           <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{statusText} · {persistenceStatus} · {presenceText} · {safetyText} · duas fases preservam feedback sem laço infinito.</p>
           {runtimeMetrics && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">local: {runtimeMetrics.received} recebidos · {runtimeMetrics.applied} aplicados · {runtimeMetrics.versionConflicts} conflitos · {runtimeMetrics.expired + runtimeMetrics.invalidOrStale} expirados/rejeitados · {runtimeMetrics.publishFailures} falhas</p>}
           {runtimeMetrics && runtimeMetrics.events.length > 0 && <details className="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><summary className="cursor-pointer">histórico local ({runtimeMetrics.events.length})</summary><div className="mt-1 max-h-24 overflow-auto space-y-0.5">{[...runtimeMetrics.events].reverse().map((event) => <div key={event.id}><span className="font-mono">{new Date(event.at).toLocaleTimeString('pt-BR')}</span> · {event.message}</div>)}</div></details>}
+          {workerPreviewStatus && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400" role="status" aria-live="polite">Worker experimental: {workerPreviewStatus}{workerPreviewTick !== null ? ` · último progresso: tique ${workerPreviewTick}` : ''}. O runtime ativo não é substituído.</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="key text-xs" onClick={diagnosePreview} disabled={Boolean(error) || isRunning}>Diagnosticar preview</button>
-          <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error) || isRunning}>Step · 1 tique</button>
+          <button type="button" className="key text-xs" onClick={diagnosePreview} disabled={Boolean(error) || isRunning || workerPreviewRunning}>Diagnosticar preview</button>
+          <button type="button" className="key text-xs" onClick={step} disabled={Boolean(error) || isRunning || workerPreviewRunning}>Step · 1 tique</button>
           {isRunning
             ? <button type="button" className="key text-xs" onClick={cancelRun}>Cancelar execução</button>
-            : <button type="button" className="key text-xs" onClick={run} disabled={Boolean(error)}>Run · {RUN_TICKS} tiques</button>}
-          <button type="button" className="key text-xs" onClick={() => initializeRuntime(true)} disabled={isRunning}>Reset</button>
+            : <button type="button" className="key text-xs" onClick={run} disabled={Boolean(error) || workerPreviewRunning}>Run · {RUN_TICKS} tiques</button>}
+          {workerPreviewRunning
+            ? <button type="button" className="key text-xs" onClick={cancelWorkerPreview}>Cancelar preview Worker</button>
+            : <button type="button" className="key text-xs" onClick={runWorkerPreview} disabled={Boolean(error) || isRunning}>Preview Worker</button>}
+          <button type="button" className="key text-xs" onClick={() => initializeRuntime(true)} disabled={isRunning || workerPreviewRunning}>Reset</button>
         </div>
       </div>
 
@@ -406,7 +470,7 @@ export function SequentialCircuitPanel({ document, customChips = [], requestedCl
                 checked={inputs[id] ?? false}
                 onChange={(event) => changeInput(id, event.target.checked)}
                 aria-label={`Alternar ${id}`}
-                disabled={Boolean(error)}
+                disabled={Boolean(error) || workerPreviewRunning}
               />
               {id}
             </label>
