@@ -77,6 +77,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - A importação de testbenches pelo hook da UI passou a encaminhar o nome do circuito selecionado; o backend confere existência e nome do destino dentro da transação Dexie. Regressões cobrem circuito inexistente e nome divergente, evitando associação silenciosa a outro circuito; o teste focal de testbench passou com **7 casos**.
 - O inventário v2.8 foi completado para chips e algoritmos: `veritas-custom-chip` v1 e `veritas-algorithm` v1 existem como documentos internos validados, mas não foram promovidos a envelopes portáteis de coleção. O pipeline DLS continua limitado à importação controlada, sem scripts/URLs/HDL arbitrários; exportação/migração dessas bibliotecas permanece `NOT VERIFIED`.
 - O store local de algoritmos passou a validar `AlgorithmDocument` na criação e atualização e rejeita entrada inexistente, sem gravar documentos semanticamente inválidos. O teste focal passou com **5 casos**; isso não promove `veritas-algorithm` a arquivo portátil nem habilita execução de código importado.
+- O envelope experimental `veritas-chip-library` v1 foi implementado com serializer determinístico, refs file-local, ordenação topológica, parser fechado/bounded, remapeamento para ids locais, colisão explícita e importação Dexie atômica. A suíte focal passou com **7 casos**, incluindo dependência ausente, ciclo, rollback e limite de bytes; a UI ainda não expõe esse fluxo.
 
 ### Trajetória de plataforma
 
