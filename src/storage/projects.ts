@@ -73,24 +73,35 @@ export function parseVeritasFile(text: string): NewProject[] {
     throw new Error('Esse arquivo não é um projeto do Veritas.')
   }
 
-  if (typeof data.version !== 'number' || data.version > VERITAS_FILE_VERSION) {
+  if (typeof data.version !== 'number' || !Number.isInteger(data.version) || data.version < 1) {
+    throw new Error('Esse arquivo tem uma versão inválida.')
+  }
+  if (data.version > VERITAS_FILE_VERSION) {
     throw new Error(
       'Esse arquivo foi salvo por uma versão mais nova do Veritas.',
     )
+  }
+  if (data.version < VERITAS_FILE_VERSION) {
+    throw new Error('Esse arquivo usa uma versão antiga sem migração disponível.')
   }
 
   if (!Array.isArray(data.projects)) {
     throw new Error('O arquivo não tem nenhum projeto dentro.')
   }
 
-  const projects = data.projects.filter(isProjectLike).map((project) => ({
-    name: String(project.name),
-    expression: String(project.expression),
-    notation: normalizeNotation(project.notation),
-  }))
+  const projects = data.projects.map((project, index) => {
+    if (!isProjectLike(project)) {
+      throw new Error(`O projeto ${index + 1} do arquivo é inválido.`)
+    }
+    return {
+      name: project.name.trim() || 'Sem nome',
+      expression: project.expression,
+      notation: normalizeNotation(project.notation),
+    }
+  })
 
   if (projects.length === 0) {
-    throw new Error('O arquivo não tem nenhum projeto válido.')
+    throw new Error('O arquivo não tem nenhum projeto.')
   }
 
   return projects
@@ -117,7 +128,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isProjectLike(
   value: unknown,
-): value is { name: unknown; expression: unknown; notation: unknown } {
+): value is { name: string; expression: string; notation: unknown } {
   return (
     isRecord(value) &&
     typeof value.name === 'string' &&

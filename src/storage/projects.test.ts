@@ -82,26 +82,33 @@ describe('arquivo .veritas', () => {
     )
   })
 
-  it('recusa versão futura do formato', () => {
+  it('recusa versões futura, antiga ou não inteira', () => {
     expect(() =>
       parseVeritasFile('{"format":"veritas","version":99,"projects":[]}'),
     ).toThrow('versão mais nova')
+    expect(() =>
+      parseVeritasFile('{"format":"veritas","version":0,"projects":[]}'),
+    ).toThrow('versão inválida')
+    expect(() =>
+      parseVeritasFile('{"format":"veritas","version":1.5,"projects":[]}'),
+    ).toThrow('versão inválida')
   })
 
-  it('descarta entradas sem expressão', () => {
-    const projects = parseVeritasFile(
-      JSON.stringify({
-        format: 'veritas',
-        version: 1,
-        projects: [
-          { name: 'ok', expression: 'A AND B', notation: 'math' },
-          { name: 'vazio', expression: '   ' },
-          { nada: true },
-        ],
-      }),
-    )
-    expect(projects).toHaveLength(1)
-    expect(projects[0].name).toBe('ok')
+  it('rejeita coleção com entrada inválida sem importação parcial', () => {
+    expect(() => parseVeritasFile(JSON.stringify({
+      format: 'veritas',
+      version: 1,
+      projects: [
+        { name: 'ok', expression: 'A AND B', notation: 'math' },
+        { name: 'vazio', expression: '   ' },
+        { nada: true },
+      ],
+    }))).toThrow('projeto 2')
+  })
+
+  it('rejeita uma coleção vazia', () => {
+    expect(() => parseVeritasFile('{"format":"veritas","version":1,"projects":[]}'))
+      .toThrow('nenhum projeto')
   })
 
   it('normaliza notação desconhecida para matemática', () => {

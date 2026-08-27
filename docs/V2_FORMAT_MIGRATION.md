@@ -10,7 +10,7 @@ Este documento inicia o inventário de formatos da fase **v2.8.0 — compatibili
 
 | Área | Implementação atual | Versão observada | Estado de compatibilidade |
 |---|---|---:|---|
-| Projetos de expressão | IndexedDB `projects`, com `name`, `expression`, `notation` e timestamps | Banco Dexie v5; envelope de arquivo `veritas` v1 | Exportação/importação v1 existe, mas o parser ainda precisa do mesmo endurecimento aplicado aos circuitos |
+| Projetos de expressão | IndexedDB `projects`, com `name`, `expression`, `notation` e timestamps | Banco Dexie v5; envelope de arquivo `veritas` v1 | Parser v1 rejeita versão não inteira/antiga/futura e coleção com projeto inválido; migração retroativa e shape fechado ainda pendentes |
 | Circuitos visuais | IndexedDB `circuitProjects`, com `CircuitDocument` validado e normalizado | Envelope de arquivo `veritas-circuits` v1; documento `veritas-circuit` v1 | Parser v1 exige versão inteira atual, rejeita versão antiga sem migrador, rejeita versão futura e não filtra projeto inválido silenciosamente |
 | Chips customizados | IndexedDB `customChipProjects`, definição derivada de circuito local | Banco Dexie v5 | Não há envelope de arquivo independente fechado no inventário atual; exportação/migração explícita permanece pendente |
 | Testbenches | IndexedDB `testbenchProjects`, associado a `circuitId` | Banco Dexie v5 | Não há envelope de arquivo independente fechado no inventário atual; associação por id precisa de política de importação |
@@ -23,7 +23,7 @@ Este documento inicia o inventário de formatos da fase **v2.8.0 — compatibili
 
 `parseCircuitFile()` mantém o envelope `format: "veritas-circuits"` e `version: 1`, valida que a versão é inteira e positiva, rejeita versão futura e rejeita uma versão anterior enquanto não houver migrador registrado. Cada item de `projects` é validado individualmente; uma coleção com projeto inválido não é reduzida silenciosamente a uma coleção parcial. O documento resultante ainda passa pela validação estrutural, pelos tipos de componente permitidos, pelas referências de conexão, pelos limites de width e pela validação semântica do circuito.
 
-Esse gate é uma **melhoria de segurança de importação**, não uma migração de versão. O fato de a versão atual aceitar um campo opcional `exportedAt` ausente em fixtures antigas não deve ser interpretado como autorização para aceitar qualquer shape legado. Campos, tipos e limites suportados devem continuar sendo determinados pelo contrato e pelos testes, não por correção heurística durante o carregamento.
+Esse gate é uma **melhoria de segurança de importação**, não uma migração de versão. O mesmo comportamento foi aplicado ao envelope `.veritas` de expressões: versões não inteiras, antigas ou futuras são rejeitadas, e uma coleção com entrada inválida não é reduzida silenciosamente. O fato de a versão atual aceitar um campo opcional `exportedAt` ausente em fixtures antigas não deve ser interpretado como autorização para aceitar qualquer shape legado. Campos, tipos e limites suportados devem continuar sendo determinados pelo contrato e pelos testes, não por correção heurística durante o carregamento.
 
 ## Política de migração planejada
 
@@ -42,7 +42,7 @@ Cada formato persistente deverá possuir um envelope com identificador estável,
 
 ## Próximos incrementos v2.8
 
-O próximo gate deve endurecer o envelope `veritas` de projetos de expressão com a mesma disciplina de versão inteira, projeto inválido e não filtragem silenciosa. Depois, cada formato que ganhar exportação deverá receber uma fixture atual, uma fixture de JSON quebrado, uma fixture de versão futura, uma fixture de versão antiga e uma fixture de shape semântico inválido. A migração de IndexedDB deve ser documentada separadamente da migração de arquivos, pois abrir uma versão de banco e importar um arquivo são operações com riscos e rollback diferentes.
+O próximo gate deve completar a disciplina estrutural do envelope `veritas` e de `veritas-circuits`, incluindo chaves permitidas, limites de bytes e tratamento de campos desconhecidos. Depois, cada formato que ganhar exportação deverá receber uma fixture atual, uma fixture de JSON quebrado, uma fixture de versão futura, uma fixture de versão antiga e uma fixture de shape semântico inválido. A migração de IndexedDB deve ser documentada separadamente da migração de arquivos, pois abrir uma versão de banco e importar um arquivo são operações com riscos e rollback diferentes.
 
 A associação entre circuito, chip customizado e testbench deve usar referências declaradas e validar dependências antes da escrita. Um arquivo de circuito não deve carregar uma definição de chip arbitrária por caminho, URL ou script; quando a dependência não estiver no envelope permitido, a importação deve parar e explicar o que falta. O checkpoint nativo continuará isolado até existir uma política de identidade, linhagem, budget e restore transacional.
 
