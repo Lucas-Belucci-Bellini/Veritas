@@ -34,6 +34,8 @@ export interface SimulatorOptions {
   maxTotalOperations?: number
   /** Sinal externo para cancelar entre tiques ou antes de uma execução. */
   signal?: AbortSignal
+  /** Teto de memória estimada para o estado deste runtime. */
+  maxMemoryBytes?: number
 }
 
 export interface SimulatorNodeState {
@@ -81,6 +83,8 @@ export const DEFAULT_MAX_OPERATIONS_PER_TICK = 1_000_000
 export const MAX_OPERATIONS_PER_TICK = 10_000_000
 export const DEFAULT_MAX_TOTAL_OPERATIONS = 1_000_000_000
 export const MAX_TOTAL_OPERATIONS = 10_000_000_000
+export const DEFAULT_MAX_MEMORY_BYTES = 64 * 1024 * 1024
+export const MAX_MEMORY_BYTES = 512 * 1024 * 1024
 
 /**
  * Simulador de circuitos por tiques.
@@ -98,6 +102,8 @@ export class Simulator {
   private readonly maxTotalTicks: number
   private readonly maxOperationsPerTick: number
   private readonly maxTotalOperations: number
+  private readonly maxMemoryBytes: number
+  private readonly memoryEstimate: number
   private readonly signal?: AbortSignal
   private ticks = 0
   private operations = 0
@@ -109,6 +115,11 @@ export class Simulator {
     this.maxTotalTicks = normalizeTotalTickBudget(options.maxTotalTicks ?? DEFAULT_MAX_TOTAL_TICKS)
     this.maxOperationsPerTick = normalizeOperationBudget(options.maxOperationsPerTick ?? DEFAULT_MAX_OPERATIONS_PER_TICK, MAX_OPERATIONS_PER_TICK, 'por tique')
     this.maxTotalOperations = normalizeOperationBudget(options.maxTotalOperations ?? DEFAULT_MAX_TOTAL_OPERATIONS, MAX_TOTAL_OPERATIONS, 'total')
+    this.maxMemoryBytes = normalizeMemoryBudget(options.maxMemoryBytes ?? DEFAULT_MAX_MEMORY_BYTES)
+    this.memoryEstimate = estimateNetlistMemory(netlist)
+    if (this.memoryEstimate > this.maxMemoryBytes) {
+      throw new RangeError(`O runtime exigiria aproximadamente ${this.memoryEstimate} bytes, acima do orçamento de memória de ${this.maxMemoryBytes} bytes.`)
+    }
     this.signal = options.signal
 
     for (const spec of netlist.components) {
@@ -151,6 +162,11 @@ export class Simulator {
   /** Quantos componentes permanecem ativos neste runtime. */
   get nodeCount(): number {
     return this.nodes.size
+  }
+
+  /** Estimativa determinística do estado alocado para este runtime. */
+  get memoryEstimateBytes(): number {
+    return this.memoryEstimate
   }
 
   /** Permite ao chamador cancelar uma execução futura de modo idempotente. */
@@ -591,6 +607,40 @@ function normalizeOperationBudget(value: number, maximum: number, scope: string)
   return value
 }
 
+function normalizeMemoryBudget(value: number): number {
+  if (!Number.isInteger(value) || value < 1024 || value > MAX_MEMORY_BYTES) {
+    throw new RangeError(`O orçamento de memória deve ser um inteiro entre 1024 e ${MAX_MEMORY_BYTES} bytes.`)
+  }
+  return value
+}
+
+function estimateNetlistMemory(netlist: Netlist): number {
+  let estimate = 128
+  for (const component of netlist.components) {
+    const outputs = outputCount(component.type, component.options)
+    const inputs = component.inputs?.length ?? 0
+    const delayTicks = component.type === 'delay' ? normalizeDelayTicks(component.options?.ticks) : 0
+    const widths = component.options?.widths?.reduce((sum, width) => sum + Math.max(0, width), 0) ?? 0
+    const componentBytes = 512
+      + outputs * 16
+      + inputs * 32
+      + delayTicks * 8
+      + widths * 8
+      + (component.id.length + (component.label?.length ?? 0)) * 2
+    estimate += componentBytes
+    if (!Number.isSafeInteger(estimate)) return Number.MAX_SAFE_INTEGER
+  }
+  return estimate
+}
+
+function normalizeDelayTicks(value: number | undefined): number {
+  if (value === undefined) return 0
+  if (!Number.isInteger(value) || value < 1) {
+    throw new RangeError('O atraso deve ser um inteiro positivo.')
+  }
+  return value
+}
+
 function normalizeSettleBudget(value: number, allowZero: boolean): number {
   const minimum = allowZero ? 0 : 1
   if (!Number.isInteger(value) || value < minimum || value > MAX_SETTLE_TICKS) {
@@ -609,7 +659,8 @@ function createState(spec: ComponentSpec): NodeState {
   outputs[0] = value
   if (size > 1) outputs[1] = !value
 
-  const extra = Math.max(1, spec.options?.ticks ?? 1) - 1
+  const delayTicks = spec.type === 'delay' ? normalizeDelayTicks(spec.options?.ticks ?? 1) : 0
+  const extra = Math.max(1, delayTicks) - 1
   const queue = spec.type === 'delay' ? new Array<boolean>(extra).fill(false) : []
 
   return {

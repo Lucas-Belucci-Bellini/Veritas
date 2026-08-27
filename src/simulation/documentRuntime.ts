@@ -33,6 +33,8 @@ export interface DocumentRuntimeOptions {
   maxTotalOperations?: number
   /** Sinal externo para cancelar a execução cooperativa. */
   signal?: AbortSignal
+  /** Teto de memória estimada para o runtime do documento. */
+  maxMemoryBytes?: number
 }
 
 export interface DocumentRuntimeState {
@@ -84,6 +86,7 @@ export function createDocumentRuntime(document: CircuitDocument, options: Docume
     maxOperationsPerTick: options.maxOperationsPerTick,
     maxTotalOperations: options.maxTotalOperations,
     signal: options.signal,
+    maxMemoryBytes: options.maxMemoryBytes,
   })
   for (const node of runtimeDocument.nodes) {
     if (node.type === 'input' && node.options?.initial !== undefined) {

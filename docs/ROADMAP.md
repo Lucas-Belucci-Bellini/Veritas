@@ -1074,7 +1074,7 @@ O primeiro slice de v2.7 adiciona ao `Simulator` budgets de operações por tiqu
 
 Também foram adicionados cancelamento cooperativo por `simulator.cancel()`, suporte a `AbortSignal`, `reset()` que limpa o cancelamento e `shutdown()` idempotente que libera nós e ordem interna. A ponte `documentRuntime` encaminha esses controles para o caminho real `CircuitDocument → Simulator`. O contrato e os limites estão em [`docs/FEEDBACK_HARDENING.md`](./FEEDBACK_HARDENING.md).
 
-Este é um incremento técnico publicado como `Unreleased`. A fase v2.7 ainda não está concluída: classificação estática de ciclos, budgets de memória, worker/desktop, cancelamento assíncrono de operações longas, smoke visual e QA nativo permanecem pendentes. Nenhuma tag ou GitHub Release foi criada.
+Este é um incremento técnico publicado como `Unreleased`. A fase v2.7 ainda não está concluída: o Simulator já possui budget de memória estimada, mas limites combinados por documento/worker, worker/desktop, cancelamento assíncrono de operações longas, smoke visual e QA nativo permanecem pendentes. Nenhuma tag ou GitHub Release foi criada.
 
 ## 11. Modelo comercial planejado para Steam
 

@@ -102,6 +102,21 @@ describe('documentRuntime', () => {
     expect(simulator.read('out')).toBe(false)
   })
 
+  it('encaminha o budget de memória e rejeita delays excessivos antes da alocação', () => {
+    const document: CircuitDocument = {
+      format: 'veritas-circuit',
+      version: 1,
+      name: 'Memory cross-layer',
+      nodes: [
+        { id: 'input', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'delay', type: 'delay', position: { x: 120, y: 0 }, options: { ticks: 1_000_000 } },
+      ],
+      connections: [{ source: { node: 'input' }, target: { node: 'delay', port: 0 } }],
+    }
+
+    expect(() => createDocumentRuntime(document, { maxMemoryBytes: 1024 * 1024 })).toThrow('orçamento de memória')
+  })
+
   it('encaminha o budget de operações e preserva rollback do documento', () => {
     const document: CircuitDocument = {
       format: 'veritas-circuit',

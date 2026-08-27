@@ -3,6 +3,8 @@ import { collectVariables, evaluate, parse } from '../engine'
 import { assignmentForRow } from '../engine/truthTable'
 import { netlistFromAst } from './fromAst'
 import {
+  DEFAULT_MAX_MEMORY_BYTES,
+  MAX_MEMORY_BYTES,
   MAX_OPERATIONS_PER_TICK,
   MAX_SETTLE_TICKS,
   MAX_TOTAL_OPERATIONS,
@@ -117,6 +119,18 @@ describe('lógica combinacional', () => {
     })
 
     expect(sim.diagnoseSettle(1)).toEqual({ status: 'budget-exhausted', ticksExecuted: 1 })
+  })
+
+  it('valida e expõe o budget de memória estimada antes da alocação', () => {
+    expect(() => new Simulator(andCircuit, { maxMemoryBytes: 1023 })).toThrow('orçamento de memória')
+    expect(() => new Simulator(andCircuit, { maxMemoryBytes: Number.POSITIVE_INFINITY })).toThrow('orçamento de memória')
+    expect(() => new Simulator(andCircuit, { maxMemoryBytes: MAX_MEMORY_BYTES + 1 })).toThrow('orçamento de memória')
+
+    const sim = new Simulator(andCircuit, { maxMemoryBytes: DEFAULT_MAX_MEMORY_BYTES })
+    expect(sim.memoryEstimateBytes).toBeGreaterThan(0)
+    expect(() => new Simulator({
+      components: [{ id: 'delay', type: 'delay', options: { ticks: 1_000_000 } }],
+    }, { maxMemoryBytes: 1024 * 1024 })).toThrow('orçamento de memória')
   })
 
   it('valida budgets de operações por tique e total', () => {
