@@ -1,0 +1,48 @@
+{
+  "request": {
+    "protocolVersion": 1,
+    "requestId": "shared-sequential-delay",
+    "components": [
+      { "id": "input", "type": "input" },
+      {
+        "id": "delay",
+        "type": "delay",
+        "options": { "ticks": 3 },
+        "inputs": [
+          { "node": "input" }
+        ]
+      },
+      {
+        "id": "out",
+        "type": "output",
+        "inputs": [
+          { "node": "delay" }
+        ]
+      }
+    ],
+    "steps": [
+      { "set": { "input": true }, "ticks": 1 },
+      { "ticks": 1 },
+      { "ticks": 1 },
+      { "ticks": 1 },
+      { "set": { "input": false }, "ticks": 1 },
+      { "ticks": 1 },
+      { "ticks": 1 },
+      { "ticks": 1 }
+    ],
+    "watch": ["input", "delay", "out"],
+    "yieldEvery": 1,
+    "timeoutMs": 30000
+  },
+  "expectedSnapshots": [
+    { "tick": 0, "values": { "input": [false], "delay": [false], "out": [false] } },
+    { "tick": 1, "values": { "input": [true], "delay": [false], "out": [false] } },
+    { "tick": 2, "values": { "input": [true], "delay": [false], "out": [false] } },
+    { "tick": 3, "values": { "input": [true], "delay": [true], "out": [false] } },
+    { "tick": 4, "values": { "input": [true], "delay": [true], "out": [true] } },
+    { "tick": 5, "values": { "input": [false], "delay": [true], "out": [true] } },
+    { "tick": 6, "values": { "input": [false], "delay": [true], "out": [true] } },
+    { "tick": 7, "values": { "input": [false], "delay": [false], "out": [true] } },
+    { "tick": 8, "values": { "input": [false], "delay": [false], "out": [false] } }
+  ]
+}

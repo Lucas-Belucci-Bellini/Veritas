@@ -940,6 +940,17 @@ mod tests {
     }
 
     #[test]
+    fn matches_shared_typescript_delay_golden_fixture() {
+        let fixture: SharedFixture = serde_json::from_str(include_str!(
+            "../../tests/fixtures/worker-sequential-delay.json"
+        ))
+        .expect("shared delay fixture should parse");
+        let result = execute_native(fixture.request, Arc::new(AtomicBool::new(false)))
+            .expect("shared delay fixture should execute");
+        assert_eq!(result.snapshots, fixture.expected_snapshots);
+    }
+
+    #[test]
     fn emits_bounded_progress_with_matching_request_id() {
         let mut request = dff_request();
         request.steps = vec![NativeStep {
