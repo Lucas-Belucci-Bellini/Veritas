@@ -2,6 +2,11 @@ pub mod simulation;
 
 use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc, Mutex};
+use std::time::Duration;
+use tauri::Manager;
+
+const NATIVE_SMOKE_REQUEST_ID: &str = "desktop-native-smoke";
+const NATIVE_SMOKE_MARKER_FILE: &str = "veritas-native-smoke-v1.json";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum NativeRegistryError {
@@ -66,11 +71,15 @@ impl Drop for NativeRequestCleanup<'_> {
 }
 
 pub mod commands {
-    use super::{Arc, AtomicBool, NativeCancellationRegistry, NativeRegistryError};
+    use super::{
+        Arc, AtomicBool, NativeCancellationRegistry, NativeRegistryError, NATIVE_SMOKE_MARKER_FILE,
+        NATIVE_SMOKE_REQUEST_ID,
+    };
     use crate::simulation::{
         execute_native_with_progress, NativeSimulationError, NativeSimulationRequest,
         NativeSimulationResult, NATIVE_SIMULATION_PROGRESS_EVENT,
     };
+    use serde::Serialize;
     use tauri::{Emitter, State};
 
     fn map_registry_error(error: NativeRegistryError) -> NativeSimulationError {
@@ -135,6 +144,116 @@ pub mod commands {
         registry: State<'_, NativeCancellationRegistry>,
     ) -> Result<(), NativeSimulationError> {
         registry.cancel(&request_id).map_err(map_registry_error)
+    }
+
+    #[derive(Serialize)]
+    struct NativeSmokeMarker {
+        #[serde(rename = "protocolVersion")]
+        protocol_version: u8,
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "progressEvents")]
+        progress_events: u64,
+        #[serde(rename = "snapshotCount")]
+        snapshot_count: u64,
+    }
+
+    #[derive(Serialize)]
+    struct NativeSmokeFailureMarker {
+        #[serde(rename = "protocolVersion")]
+        protocol_version: u8,
+        #[serde(rename = "requestId")]
+        request_id: String,
+        status: &'static str,
+        phase: String,
+        message: String,
+    }
+
+    fn write_native_smoke_marker(bytes: Vec<u8>) -> Result<(), NativeSimulationError> {
+        let path = std::env::temp_dir().join(NATIVE_SMOKE_MARKER_FILE);
+        std::fs::write(&path, bytes).map_err(|error| {
+            NativeSimulationError::new(
+                "execution",
+                format!(
+                    "Falha ao gravar o marcador do smoke nativo em {}: {error}",
+                    path.display()
+                ),
+            )
+        })
+    }
+
+    #[tauri::command]
+    pub fn is_native_smoke_enabled() -> bool {
+        std::env::args().any(|argument| argument == "--native-smoke")
+    }
+
+    #[tauri::command]
+    pub fn finish_native_smoke(
+        request_id: String,
+        progress_events: u64,
+        snapshot_count: u64,
+    ) -> Result<(), NativeSimulationError> {
+        if request_id != NATIVE_SMOKE_REQUEST_ID {
+            return Err(NativeSimulationError::new(
+                "invalid-request",
+                "requestId inválido para o smoke nativo.",
+            ));
+        }
+        if progress_events == 0 || snapshot_count != 3 {
+            return Err(NativeSimulationError::new(
+                "invalid-request",
+                "O smoke nativo exige pelo menos um progresso e exatamente três snapshots.",
+            ));
+        }
+
+        let marker = NativeSmokeMarker {
+            protocol_version: crate::simulation::NATIVE_PROTOCOL_VERSION,
+            request_id,
+            progress_events,
+            snapshot_count,
+        };
+        let bytes = serde_json::to_vec_pretty(&marker).map_err(|error| {
+            NativeSimulationError::new(
+                "execution",
+                format!("Falha ao serializar o marcador do smoke nativo: {error}"),
+            )
+        })?;
+        write_native_smoke_marker(bytes)?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn record_native_smoke_failure(
+        request_id: String,
+        phase: String,
+        message: String,
+    ) -> Result<(), NativeSimulationError> {
+        if request_id != NATIVE_SMOKE_REQUEST_ID {
+            return Err(NativeSimulationError::new(
+                "invalid-request",
+                "requestId inválido para o smoke nativo.",
+            ));
+        }
+        if phase.is_empty() || phase.len() > 64 || message.is_empty() || message.len() > 2_000 {
+            return Err(NativeSimulationError::new(
+                "invalid-request",
+                "diagnóstico de smoke inválido.",
+            ));
+        }
+        let marker = NativeSmokeFailureMarker {
+            protocol_version: crate::simulation::NATIVE_PROTOCOL_VERSION,
+            request_id,
+            status: "failed",
+            phase,
+            message,
+        };
+        let bytes = serde_json::to_vec_pretty(&marker).map_err(|error| {
+            NativeSimulationError::new(
+                "execution",
+                format!("Falha ao serializar falha do smoke nativo: {error}"),
+            )
+        })?;
+        write_native_smoke_marker(bytes)
     }
 }
 
@@ -327,11 +446,36 @@ mod tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let native_smoke_enabled = std::env::args().any(|argument| argument == "--native-smoke");
     tauri::Builder::default()
         .manage(NativeCancellationRegistry::default())
+        .setup(move |app| {
+            if native_smoke_enabled {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_secs(2));
+                    for attempt in 0..100 {
+                        if let Some(window) = handle.get_webview_window("main") {
+                            eprintln!("native smoke window ready on attempt {attempt}");
+                            match window.eval("window.location.hash = '#native-smoke'") {
+                                Ok(()) => eprintln!("native smoke hash dispatched"),
+                                Err(error) => eprintln!("native smoke eval failed: {error}"),
+                            }
+                            return;
+                        }
+                        std::thread::sleep(Duration::from_millis(100));
+                    }
+                    eprintln!("native smoke window was not available after retry budget");
+                });
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::simulate_circuit_native,
-            commands::cancel_circuit_native
+            commands::cancel_circuit_native,
+            commands::is_native_smoke_enabled,
+            commands::finish_native_smoke,
+            commands::record_native_smoke_failure
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o aplicativo Veritas");
