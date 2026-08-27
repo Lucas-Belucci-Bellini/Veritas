@@ -231,6 +231,7 @@ pub fn execute_native_with_progress(
         .sum();
     let progress_stride =
         (total_ticks.max(1) + MAX_NATIVE_PROGRESS_MESSAGES - 1) / MAX_NATIVE_PROGRESS_MESSAGES;
+    let yield_every = request.yield_every.unwrap_or(1);
     let mut completed_ticks = 0u64;
 
     for step in &request.steps {
@@ -241,6 +242,9 @@ pub fn execute_native_with_progress(
             simulator.tick(&cancel)?;
             snapshots.push(simulator.snapshot());
             completed_ticks += 1;
+            if completed_ticks % yield_every == 0 {
+                std::thread::yield_now();
+            }
             if completed_ticks % progress_stride == 0 || completed_ticks == total_ticks {
                 emit(NativeSimulationProgress {
                     protocol_version: NATIVE_PROTOCOL_VERSION,
@@ -946,6 +950,41 @@ mod tests {
         })
         .expect_err("callback cancellation should stop execution");
         assert_eq!(result.code, "cancelled");
+    }
+
+    #[test]
+    fn observes_external_cancellation_between_yields() {
+        use std::sync::mpsc;
+        use std::thread;
+
+        let mut request = dff_request();
+        request.steps = vec![NativeStep {
+            set: BTreeMap::new(),
+            ticks: Some(1_000),
+        }];
+        request.yield_every = Some(1);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let controller_cancel = cancel.clone();
+        let (ready_tx, ready_rx) = mpsc::channel();
+        let controller = thread::spawn(move || {
+            ready_rx.recv().expect("engine should report progress");
+            controller_cancel.store(true, Ordering::Relaxed);
+        });
+        let mut progress_count = 0usize;
+        let result = execute_native_with_progress(request, cancel, |event| {
+            progress_count += 1;
+            if progress_count == 1 {
+                ready_tx
+                    .send(event.snapshot.tick)
+                    .expect("controller should be alive");
+            }
+            Ok(())
+        })
+        .expect_err("external cancellation should stop execution");
+        controller.join().expect("controller should finish");
+        assert_eq!(result.code, "cancelled");
+        assert!(progress_count >= 1);
+        assert!(progress_count < MAX_NATIVE_PROGRESS_MESSAGES as usize);
     }
 
     #[test]
