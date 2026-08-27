@@ -1,0 +1,53 @@
+{
+  "request": {
+    "protocolVersion": 1,
+    "requestId": "shared-sequential-jk",
+    "components": [
+      { "id": "j", "type": "input" },
+      { "id": "k", "type": "input" },
+      { "id": "clk", "type": "clock", "options": { "period": 1 } },
+      {
+        "id": "ff",
+        "type": "jk",
+        "inputs": [
+          { "node": "j" },
+          { "node": "k" },
+          { "node": "clk" }
+        ]
+      },
+      {
+        "id": "qout",
+        "type": "output",
+        "inputs": [
+          { "node": "ff" }
+        ]
+      }
+    ],
+    "steps": [
+      { "set": { "j": false, "k": false }, "ticks": 1 },
+      { "set": { "j": true, "k": false }, "ticks": 1 },
+      { "ticks": 1 },
+      { "set": { "j": false, "k": true }, "ticks": 1 },
+      { "ticks": 1 },
+      { "set": { "j": true, "k": true }, "ticks": 1 },
+      { "ticks": 1 },
+      { "set": { "j": false, "k": false }, "ticks": 1 },
+      { "ticks": 1 }
+    ],
+    "watch": ["j", "k", "clk", "ff", "qout"],
+    "yieldEvery": 1,
+    "timeoutMs": 30000
+  },
+  "expectedSnapshots": [
+    { "tick": 0, "values": { "j": [false], "k": [false], "clk": [false], "ff": [false], "qout": [false] } },
+    { "tick": 1, "values": { "j": [false], "k": [false], "clk": [true], "ff": [false], "qout": [false] } },
+    { "tick": 2, "values": { "j": [true], "k": [false], "clk": [false], "ff": [true], "qout": [false] } },
+    { "tick": 3, "values": { "j": [true], "k": [false], "clk": [true], "ff": [true], "qout": [true] } },
+    { "tick": 4, "values": { "j": [false], "k": [true], "clk": [false], "ff": [false], "qout": [true] } },
+    { "tick": 5, "values": { "j": [false], "k": [true], "clk": [true], "ff": [false], "qout": [false] } },
+    { "tick": 6, "values": { "j": [true], "k": [true], "clk": [false], "ff": [true], "qout": [false] } },
+    { "tick": 7, "values": { "j": [true], "k": [true], "clk": [true], "ff": [true], "qout": [true] } },
+    { "tick": 8, "values": { "j": [false], "k": [false], "clk": [false], "ff": [true], "qout": [true] } },
+    { "tick": 9, "values": { "j": [false], "k": [false], "clk": [true], "ff": [true], "qout": [true] } }
+  ]
+}
