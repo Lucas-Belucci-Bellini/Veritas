@@ -149,6 +149,8 @@ Entregas:
 - preservar dados locais durante atualização e desinstalação;
 - documentar rollback e recuperação de arquivos inválidos.
 
+O primeiro incremento desta fase está documentado em `docs/V2_FORMAT_MIGRATION.md`. O inventário confirma Dexie v5 e os envelopes `veritas`/`veritas-circuits` v1. O parser de circuitos agora rejeita versões não inteiras, versões antigas sem migrador e projetos inválidos sem filtragem silenciosa; isso é hardening fail-closed, não uma migração retroativa. O envelope de expressões, chips customizados, testbenches e algoritmos ainda precisa de gates equivalentes. A fase permanece `Unreleased`.
+
 ### 6.4 Fase D — v2.9.0: preparação arquitetural
 
 Antes da v3.0.0, devem existir e estar aprovados no repositório `docs/V3_ARCHITECTURE.md`, `docs/V3_MIGRATION.md` e `docs/V3_MASTER_PLAN.md`. Esses documentos devem declarar boundaries, dependências permitidas, contratos de plugin, compatibilidade e estratégia de rollout.

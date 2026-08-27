@@ -156,11 +156,30 @@ describe('arquivo de circuitos', () => {
     expect((await listCircuitProjects())[0].document.connections).toHaveLength(3)
   })
 
-  it('recusa JSON quebrado e versão futura', () => {
+  it('recusa JSON quebrado e versões fora do contrato', () => {
     expect(() => parseCircuitFile('{nope')).toThrow('não é um JSON válido')
     expect(() =>
       parseCircuitFile('{"format":"veritas-circuits","version":99,"projects":[]}'),
     ).toThrow('versão mais nova')
+    expect(() =>
+      parseCircuitFile('{"format":"veritas-circuits","version":0,"projects":[]}'),
+    ).toThrow('versão inválida')
+    expect(() =>
+      parseCircuitFile('{"format":"veritas-circuits","version":1.5,"projects":[]}'),
+    ).toThrow('versão inválida')
+  })
+
+  it('não filtra silenciosamente projeto inválido durante a importação', () => {
+    const file = JSON.stringify({
+      format: 'veritas-circuits',
+      version: 1,
+      projects: [
+        { name: 'Válido', document },
+        { name: 'Inválido', document: { ...document, connections: [] } },
+      ],
+    })
+
+    expect(() => parseCircuitFile(file)).toThrow('projeto 2')
   })
 
   it('normaliza nome vazio ao importar um circuito válido', () => {
@@ -188,7 +207,7 @@ describe('arquivo de circuitos', () => {
       ],
     })
 
-    expect(() => parseCircuitFile(invalid)).toThrow('nenhum projeto válido')
+    expect(() => parseCircuitFile(invalid)).toThrow('projeto 1')
   })
 
   it('recusa width inválido antes de persistir o documento importado', () => {
@@ -204,6 +223,6 @@ describe('arquivo de circuitos', () => {
       }],
     })
 
-    expect(() => parseCircuitFile(invalid)).toThrow('nenhum projeto válido')
+    expect(() => parseCircuitFile(invalid)).toThrow('projeto 1')
   })
 })

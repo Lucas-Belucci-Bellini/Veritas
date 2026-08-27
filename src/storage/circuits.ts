@@ -68,21 +68,32 @@ export function parseCircuitFile(text: string): NewCircuitProject[] {
     throw new Error('Esse arquivo não é uma coleção de circuitos do Veritas.')
   }
 
-  if (typeof data.version !== 'number' || data.version > CIRCUIT_FILE_VERSION) {
+  if (typeof data.version !== 'number' || !Number.isInteger(data.version) || data.version < 1) {
+    throw new Error('Esse arquivo de circuitos tem uma versão inválida.')
+  }
+  if (data.version > CIRCUIT_FILE_VERSION) {
     throw new Error('Esse arquivo de circuitos foi salvo por uma versão mais nova do Veritas.')
+  }
+  if (data.version < CIRCUIT_FILE_VERSION) {
+    throw new Error('Esse arquivo de circuitos usa uma versão antiga sem migração disponível.')
   }
 
   if (!Array.isArray(data.projects)) {
     throw new Error('O arquivo de circuitos não tem projetos dentro.')
   }
 
-  const projects = data.projects.filter(isCircuitProjectLike).map((project) => ({
-    name: project.name.trim() || project.document.name.trim() || 'Circuito sem nome',
-    document: normalizeCircuitDocument(project.document),
-  }))
+  const projects = data.projects.map((project, index) => {
+    if (!isCircuitProjectLike(project)) {
+      throw new Error(`O projeto ${index + 1} do arquivo de circuitos é inválido.`)
+    }
+    return {
+      name: project.name.trim() || project.document.name.trim() || 'Circuito sem nome',
+      document: normalizeCircuitDocument(project.document),
+    }
+  })
 
   if (projects.length === 0) {
-    throw new Error('O arquivo de circuitos não tem nenhum projeto válido.')
+    throw new Error('O arquivo de circuitos não tem nenhum projeto.')
   }
 
   return projects
