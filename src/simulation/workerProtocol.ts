@@ -185,14 +185,6 @@ export function parseSimulationWorkerRequest(input: unknown): ParsedRequest | Pa
   }
 }
 
-/** Cria o Worker de simulação sob demanda; Step/Run canônicos ainda usam o runtime direto. */
-export function createSimulationWorker(): SimulationWorkerHandle {
-  type WorkerConstructor = new (url: string, options: { type: 'module' }) => SimulationWorkerHandle
-  const WorkerClass = (globalThis as typeof globalThis & { Worker?: WorkerConstructor }).Worker
-  if (!WorkerClass) throw new Error('A API Worker não está disponível neste ambiente.')
-  return new WorkerClass(new URL('./simulation.worker.ts', import.meta.url).href, { type: 'module' })
-}
-
 export function installSimulationWorker(endpoint: SimulationWorkerEndpoint): () => void {
   const active = new Map<string, AbortController>()
   let stopped = false

@@ -1,5 +1,5 @@
+import { createSimulationWorker } from './workerFactory'
 import {
-  createSimulationWorker,
   parseSimulationWorkerRequest,
   type SimulationWorkerCancelled,
   type SimulationWorkerError,
