@@ -1,6 +1,6 @@
 # Fronteira de execução Worker/Desktop
 
-**Status:** protocolo Worker e entrypoint implementados como slice isolado; orquestração de produto, Worker no Tauri e simulação Rust ainda não implementados.
+**Status:** protocolo Worker, entrypoint e cliente hospedeiro implementados como slice isolado; orquestração na UI, Worker no Tauri e simulação Rust ainda não implementados.
 
 **Marco:** v2.7.0 — Execution Safety.
 
@@ -64,7 +64,7 @@ O próximo passo do caminho web é passar por build explícito do Worker, testes
 
 ## Estado atual e próximos passos
 
-Neste slice, o repositório passou a possuir `workerProtocol.ts`, `simulation.worker.ts`, a factory `createSimulationWorker()` e testes de endpoint fake para contrato, snapshots, progresso, abort, timeout, budget, duplicidade e teardown. A UI ainda não orquestra esse Worker, não há supervisor cross-worker, não há canais Tauri nem simulação Tauri/Rust, e a memória real continua não medida. Execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
+Neste slice, o repositório possui `workerProtocol.ts`, `simulation.worker.ts`, `workerClient.ts`, a factory `createSimulationWorker()` e testes de endpoint fake para contrato, snapshots, progresso, abort, timeout, budget, duplicidade, teardown e encerramento do host. A UI ainda não orquestra esse cliente, não há supervisor cross-worker, não há canais Tauri nem simulação Tauri/Rust, e a memória real continua não medida. Execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
 
 ## Referências
 

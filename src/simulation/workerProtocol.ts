@@ -88,6 +88,7 @@ export type SimulationWorkerErrorCode =
   | 'timeout'
   | 'document-budget'
   | 'operation-budget'
+  | 'forced-termination'
   | 'execution'
 
 export interface SimulationWorkerError {
