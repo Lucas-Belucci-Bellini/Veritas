@@ -31,8 +31,8 @@ A implementação Rust só poderá ser considerada runtime quando houver compara
 | Canal de progresso | Eventos bounded por `requestId`, filtragem host-side, teardown e cancelamento | `PASSED` em testes Rust/TypeScript; emissão Tauri e teardown em runtime desktop `NOT VERIFIED` |
 | Engine Rust | Execução determinística escalar, budgets e snapshots finais | `PASSED` em testes Rust Linux; runtime interativo não verificado |
 | Paridade TypeScript/Rust | Golden fixtures e primeira divergência diagnóstica | `PASSED` para fixture DFF escalar compartilhada em testes TypeScript/Rust; cobertura ampla e runtime interativo `NOT VERIFIED` |
-| Windows/macOS/Linux | Build e smoke nativo proporcional por alvo | `BUILD VERIFIED` para Linux x86-64 com `deb`/`AppImage` inspecionados; Windows/macOS e smoke/instalação permanecem `NOT VERIFIED` |
-| Instalador Windows | `Veritas-Setup.exe` produzido e testado | `NOT VERIFIED` |
+| Windows/macOS/Linux | Build e smoke nativo proporcional por alvo | `BUILD VERIFIED` para Linux x86-64 com `deb`/`AppImage`; `SMOKE VERIFIED` limitado para instalar/iniciar/remover o `.deb` sob Xvfb. Windows/macOS têm artifacts `BUILD VERIFIED`; runtime/instalação nesses alvos permanecem `NOT VERIFIED` |
+| Instalador Windows | `Veritas-Setup.exe` produzido e testado | Artifact produzido no runner Windows; instalação e startup neste smoke `NOT VERIFIED` |
 
 ## Gates de implementação
 
