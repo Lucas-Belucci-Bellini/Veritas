@@ -12,6 +12,7 @@ import {
   getTestbenchProject,
   importTestbenchProjects,
   listTestbenchProjects,
+  MAX_TESTBENCH_FILE_BYTES,
   parseTestbenchFile,
   serializeTestbenchProjects,
   updateTestbenchProject,
@@ -133,6 +134,12 @@ describe('arquivo de testbench', () => {
       ),
     ).toThrow('versão mais nova')
     expect(() =>
+      parseTestbenchFile('{"format":"veritas-testbenches","version":0,"testbenches":[]}'),
+    ).toThrow('versão inválida')
+    expect(() =>
+      parseTestbenchFile('{"format":"veritas-testbenches","version":1.5,"testbenches":[]}'),
+    ).toThrow('versão inválida')
+    expect(() =>
       parseTestbenchFile(
         JSON.stringify({
           format: 'veritas-testbenches',
@@ -151,7 +158,7 @@ describe('arquivo de testbench', () => {
           ],
         }),
       ),
-    ).toThrow('nenhum documento válido')
+    ).toThrow('documento 1')
     expect(() =>
       parseTestbenchFile(
         JSON.stringify({
@@ -171,7 +178,7 @@ describe('arquivo de testbench', () => {
           ],
         }),
       ),
-    ).toThrow('nenhum documento válido')
+    ).toThrow('documento 1')
     expect(() =>
       parseTestbenchFile(
         JSON.stringify({
@@ -197,6 +204,39 @@ describe('arquivo de testbench', () => {
           ],
         }),
       ),
-    ).toThrow('nenhum documento válido')
+    ).toThrow('documento 1')
+  })
+
+  it('recusa arquivo acima do limite bounded', () => {
+    const oversized = JSON.stringify({
+      format: 'veritas-testbenches',
+      version: 1,
+      testbenches: [{
+        name: 'grande',
+        circuitName: 'circuito',
+        document: { ...document(), name: 'x'.repeat(MAX_TESTBENCH_FILE_BYTES) },
+      }],
+    })
+
+    expect(() => parseTestbenchFile(oversized)).toThrow('excede o limite')
+  })
+
+  it('recusa campos desconhecidos no envelope e no documento', () => {
+    expect(() => parseTestbenchFile(JSON.stringify({
+      format: 'veritas-testbenches',
+      version: 1,
+      testbenches: [{ name: 'x', circuitName: 'c', document: document() }],
+      unknown: true,
+    }))).toThrow('envelope')
+
+    expect(() => parseTestbenchFile(JSON.stringify({
+      format: 'veritas-testbenches',
+      version: 1,
+      testbenches: [{
+        name: 'x',
+        circuitName: 'c',
+        document: { ...document(), cases: [{ ...document().cases[0], unknown: true }] },
+      }],
+    }))).toThrow('documento 1')
   })
 })

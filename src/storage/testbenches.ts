@@ -11,6 +11,7 @@ import { db, type NewTestbenchProject, type TestbenchProject } from './db'
 
 export const TESTBENCH_FILE_FORMAT = 'veritas-testbenches'
 export const TESTBENCH_FILE_VERSION = 1 as const
+export const MAX_TESTBENCH_FILE_BYTES = 5_000_000
 
 export interface VeritasTestbenchFile {
   format: typeof TESTBENCH_FILE_FORMAT
@@ -98,6 +99,10 @@ export function parseTestbenchFile(text: string): Array<{
   circuitName: string
   document: TestbenchDocument
 }> {
+  if (new TextEncoder().encode(text).length > MAX_TESTBENCH_FILE_BYTES) {
+    throw new Error(`Esse arquivo de testbench excede o limite de ${MAX_TESTBENCH_FILE_BYTES} bytes.`)
+  }
+
   let data: unknown
   try {
     data = JSON.parse(text)
@@ -109,9 +114,19 @@ export function parseTestbenchFile(text: string): Array<{
     throw new Error('Esse arquivo não é uma coleção de testbenches do Veritas.')
   }
   if (
-    typeof data.version !== 'number' ||
-    data.version > TESTBENCH_FILE_VERSION
+    !hasOnlyKeys(data, ['format', 'version', 'exportedAt', 'testbenches']) ||
+    (data.exportedAt !== undefined && typeof data.exportedAt !== 'string')
   ) {
+    throw new Error('O envelope do arquivo de testbench contém campos desconhecidos ou inválidos.')
+  }
+  if (
+    typeof data.version !== 'number' ||
+    !Number.isInteger(data.version) ||
+    data.version < 1
+  ) {
+    throw new Error('Esse arquivo de testbench tem uma versão inválida.')
+  }
+  if (data.version > TESTBENCH_FILE_VERSION) {
     throw new Error(
       'Esse arquivo de testbench foi salvo por uma versão mais nova do Veritas.',
     )
@@ -120,16 +135,19 @@ export function parseTestbenchFile(text: string): Array<{
     throw new Error('O arquivo de testbench não tem documentos dentro.')
   }
 
-  const projects = data.testbenches
-    .filter(isTestbenchProjectLike)
-    .map((project) => ({
+  const projects = data.testbenches.map((project, index) => {
+    if (!isTestbenchProjectLike(project)) {
+      throw new Error(`O documento ${index + 1} do arquivo de testbench é inválido.`)
+    }
+    return {
       name: normalizeName(project.name, project.document),
       circuitName: project.circuitName.trim() || 'Circuito sem nome',
       document: normalizeTestbenchDocument(project.document),
-    }))
+    }
+  })
 
   if (projects.length === 0) {
-    throw new Error('O arquivo de testbench não tem nenhum documento válido.')
+    throw new Error('O arquivo de testbench não tem nenhum documento.')
   }
   return projects
 }
@@ -149,7 +167,9 @@ export async function importTestbenchProjects(
         updatedAt: now + index,
       }) as TestbenchProject,
   )
-  await db.testbenchProjects.bulkAdd(rows)
+  await db.transaction('rw', db.testbenchProjects, async () => {
+    await db.testbenchProjects.bulkAdd(rows)
+  })
   return rows.length
 }
 
@@ -202,6 +222,11 @@ function normalizeBooleanRecord(
   )
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedKeys = new Set(allowed)
+  return Object.keys(value).every((key) => allowedKeys.has(key))
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -220,6 +245,7 @@ function isTestbenchProjectLike(
 ): value is { name: string; circuitName: string; document: TestbenchDocument } {
   if (
     !isRecord(value) ||
+    !hasOnlyKeys(value, ['name', 'circuitName', 'document']) ||
     typeof value.name !== 'string' ||
     typeof value.circuitName !== 'string' ||
     !isTestbenchDocumentLike(value.document)
@@ -232,6 +258,7 @@ function isTestbenchProjectLike(
 function isTestbenchDocumentLike(value: unknown): value is TestbenchDocument {
   if (
     !isRecord(value) ||
+    !hasOnlyKeys(value, ['format', 'version', 'name', 'cases']) ||
     value.format !== TESTBENCH_FORMAT ||
     value.version !== TESTBENCH_VERSION ||
     typeof value.name !== 'string' ||
@@ -255,7 +282,7 @@ function isTestbenchDocumentLike(value: unknown): value is TestbenchDocument {
 }
 
 function isTestbenchCaseLike(value: unknown): value is TestbenchCase {
-  if (!isRecord(value)) return false
+  if (!isRecord(value) || !hasOnlyKeys(value, ['name', 'inputs', 'expect', 'steps'])) return false
   if (value.name !== undefined && typeof value.name !== 'string') return false
   if (value.inputs !== undefined && !isBooleanRecord(value.inputs)) return false
   if (value.expect !== undefined && !isBooleanRecord(value.expect)) return false
@@ -272,7 +299,7 @@ function isTestbenchCaseLike(value: unknown): value is TestbenchCase {
 }
 
 function isTestbenchStepLike(value: unknown): value is TestbenchStep {
-  if (!isRecord(value)) return false
+  if (!isRecord(value) || !hasOnlyKeys(value, ['set', 'ticks', 'expect'])) return false
   if (value.set !== undefined && !isBooleanRecord(value.set)) return false
   if (value.expect !== undefined && !isBooleanRecord(value.expect)) return false
   if (
