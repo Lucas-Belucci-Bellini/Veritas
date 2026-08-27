@@ -49,6 +49,21 @@ A exportação recebe projetos de chips locais e inclui todas as dependências n
 
 O formato não exporta algoritmos, testbenches, projetos de expressão, credenciais ou documentos externos. Ele também não promete compatibilidade direta com arquivos DLS. O pipeline DLS continua sendo uma entrada controlada separada, com seus limites e relatórios próprios. A UI de biblioteca agora oferece esse fluxo de forma opt-in e local, com os controles `Exportar local` e `Importar local`. O arquivo baixado usa o nome `veritas-chip-library-v1.json`; o seletor aceita JSON e o limite de 5.000.000 bytes é verificado antes da leitura e novamente pelo parser. O fluxo não envia chips para a nuvem, não conecta o engine Tauri/Rust e exibe a mensagem de erro sem gravar quando o parser ou a transação falham.
 
+## Smoke visual do fluxo local — 2026-08-27
+
+O preview de produção web local recebeu um smoke visual/manual limitado da rota opt-in. Após remover somente do origin local `127.0.0.1:4173` um service worker antigo e um cache que carregavam `index-DuaF5h59.js`, os controles atuais foram observados. A ocorrência do cache é uma condição do ambiente de teste; não é validação de atualização PWA nem evidência de falha funcional do contrato.
+
+| Cenário observado | Resultado |
+|---|---|
+| Biblioteca vazia e `Exportar local` | Mensagem segura exibida; nenhum arquivo foi gerado |
+| Adição do chip de catálogo `(8 Bits) 8-bit Adder` | Chip persistido no IndexedDB local com ID 1 |
+| Exportação válida | `~/Downloads/veritas-chip-library-v1.json`, 30.734 bytes, envelope `veritas-chip-library` v1 |
+| Importação de cópia local válida renomeada | Biblioteca passou a conter dois chips |
+| JSON inválido com campo desconhecido | Rejeitado com `O chip 1 do arquivo de chips é inválido.`; os dois chips existentes permaneceram |
+| Pós-condições | Input limpo, erro visível, `externalResources=[]` no Resource Timing e banner `Nuvem desativada` presente |
+
+A classificação é **`SMOKE VERIFIED` limitada ao preview web local e ao fluxo opt-in da `ChipLibrary`**. Ela não cobre Tauri, AppImage/deb/NSIS, Windows/macOS, cloud, login, sincronização, múltiplos perfis/dispositivos, persistência pós-reload, acessibilidade manual ampla, importação DLS arbitrária ou runtime de simulador.
+
 ## Critérios de aceitação
 
-O contrato de storage e a UI opt-in foram exercitados por round-trip determinístico, dependência aninhada, dependência ausente, ciclo, refs duplicadas, nomes duplicados, campo desconhecido, documento inválido, limite de bytes, colisão local e rollback transacional. Isso é **PASSED** para a API e o fluxo local experimental; não é `RUNTIME VERIFIED` para Tauri, distribuição desktop, cloud, sincronização ou bibliotecas compartilhadas.
+O contrato de storage e a UI opt-in foram exercitados por round-trip determinístico, dependência aninhada, dependência ausente, ciclo, refs duplicadas, nomes duplicados, campo desconhecido, documento inválido, limite de bytes, colisão local e rollback transacional. Isso é **PASSED** para a API e os testes automatizados; o smoke descrito acima é **`SMOKE VERIFIED` limitado** ao preview web local. Não é `RUNTIME VERIFIED` para Tauri, distribuição desktop, cloud, sincronização ou bibliotecas compartilhadas.
