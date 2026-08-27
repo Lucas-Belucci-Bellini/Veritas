@@ -64,7 +64,7 @@ O caminho web já passou por build explícito do Worker, smoke local em Chromium
 
 ## Estado atual e próximos passos
 
-Neste slice, o repositório possui `workerProtocol.ts`, `simulation.worker.ts`, `workerClient.ts`, a factory `createSimulationWorker()` e testes de endpoint fake para contrato, snapshots, progresso, abort, timeout, budget, duplicidade, teardown e encerramento do host. Um smoke adicional executou o Worker e o cliente reais no Chromium local, incluindo paridade do snapshot final e cancelamento após progresso; essa evidência é limitada a fixtures pequenas. A UI ainda não orquestra esse cliente, não há supervisor cross-worker, não há canais Tauri nem simulação Tauri/Rust, e a memória real continua não medida sob carga. Execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
+Neste slice, o repositório possui `workerProtocol.ts`, `simulation.worker.ts`, `workerClient.ts`, `documentWorker.ts` e `documentWorkerExecutor.ts`, além da factory `createSimulationWorker()` e testes de endpoint fake para contrato, snapshots, progresso, abort, timeout, budget, duplicidade, teardown, encerramento do host e ponte documental. Um smoke adicional executou o Worker e o cliente reais no Chromium local, incluindo paridade do snapshot final e cancelamento após progresso; essa evidência é limitada a fixtures pequenas. A UI ainda não orquestra esse executor, não há supervisor cross-worker, não há canais Tauri nem simulação Tauri/Rust, e a memória real continua não medida sob carga. Execução desktop interativa e suporte oficial a 5k/25k chips permanecem `NOT VERIFIED` ou `NOT SUPPORTED`, conforme o contrato aplicável.
 
 ## Referências
 

@@ -58,6 +58,9 @@ export function buildDocumentWorkerRequest(
     throw new RangeError(`ticks deve ser um inteiro entre 0 e ${MAX_WORKER_TICKS}.`)
   }
   const watch = options.watch ?? documentWatches(document).map((entry) => entry.nodeId)
+  const componentIds = new Set(netlist.components.map((component) => component.id))
+  const unknownWatches = watch.filter((id) => !componentIds.has(id))
+  if (unknownWatches.length > 0) throw new RangeError(`Watches inexistentes: ${unknownWatches.join(', ')}.`)
   const request: SimulationWorkerRunRequest = {
     type: 'run',
     protocolVersion: 1,

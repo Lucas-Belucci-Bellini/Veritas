@@ -69,4 +69,11 @@ describe('ponte CircuitDocument → Worker', () => {
 
     expect(() => buildDocumentWorkerRequest(document, { requestId: 'vector' })).toThrow('sinais escalares')
   })
+
+  it('rejeita watch que não existe no Netlist final', () => {
+    expect(() => buildDocumentWorkerRequest(simpleDocument(), {
+      requestId: 'unknown-watch',
+      watch: ['missing'],
+    })).toThrow('Watches inexistentes')
+  })
 })
