@@ -120,6 +120,14 @@ describe('arquivo .veritas', () => {
     }))).toThrow('projeto 1')
   })
 
+  it('rejeita expressão que o parser canônico não entende', () => {
+    expect(() => parseVeritasFile(JSON.stringify({
+      format: 'veritas',
+      version: 1,
+      projects: [{ name: 'inválido', expression: 'A AND', notation: 'math' }],
+    }))).toThrow('expressão inválida')
+  })
+
   it('rejeita coleção com entrada inválida sem importação parcial', () => {
     expect(() => parseVeritasFile(JSON.stringify({
       format: 'veritas',

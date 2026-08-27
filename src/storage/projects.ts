@@ -1,3 +1,4 @@
+import { tryParse } from '../engine/parser'
 import { db, type NewProject, type Project } from './db'
 
 /** Projetos do mais recente para o mais antigo. */
@@ -103,6 +104,9 @@ export function parseVeritasFile(text: string): NewProject[] {
   const projects = data.projects.map((project, index) => {
     if (!isProjectLike(project)) {
       throw new Error(`O projeto ${index + 1} do arquivo é inválido.`)
+    }
+    if (!tryParse(project.expression).ok) {
+      throw new Error(`O projeto ${index + 1} do arquivo contém uma expressão inválida.`)
     }
     return {
       name: project.name.trim() || 'Sem nome',

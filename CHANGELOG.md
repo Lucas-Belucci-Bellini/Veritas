@@ -70,6 +70,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - O parser `parseVeritasFile()` recebeu a mesma proteção para o envelope de expressões: versões não inteiras, antigas ou futuras são rejeitadas, e uma coleção com entrada sem expressão não é importada parcialmente. O teste focal de persistência passou com 12 casos; migrações retroativas e shape fechado dos envelopes permanecem pendentes.
 - Os envelopes `veritas` e `veritas-circuits` passaram a rejeitar campos desconhecidos no envelope e nos registros de projeto/documento dentro do schema v1. As regressões focais combinadas de circuitos e expressões passaram com **28 casos**; limites de bytes de arquivo, migração retroativa e formatos independentes de chips/testbenches/algoritmos ainda permanecem pendentes.
 - Os parsers locais agora rejeitam arquivos acima de **5.000.000 bytes** antes de parsear ou normalizar o conteúdo. As regressões focais combinadas de circuitos e expressões passaram com **30 casos**. Migração retroativa, preservação transacional da importação e envelopes independentes de chips/testbenches/algoritmos continuam pendentes.
+- `parseVeritasFile()` agora valida cada expressão com o parser canônico antes de devolver projetos para importação; expressões como `A AND` são rejeitadas sem gravar conteúdo inválido. O teste focal `.veritas` passou com **15 casos**; migração retroativa e preservação transacional continuam pendentes.
 
 ### Trajetória de plataforma
 
