@@ -14,6 +14,8 @@ import {
   runTestbenchTool,
   circuitVectorTruthTable,
   exportCircuitTool,
+  MAX_SIMULATION_MEMORY_BYTES,
+  MAX_SIMULATION_OPERATIONS_PER_TICK,
   MAX_SIMULATION_TICKS,
   normalForms,
   simplifyExpression,
@@ -627,6 +629,35 @@ describe('simulate_circuit', () => {
 
     expect(result.isError).toBe(true)
     expect(result.text).toContain('definição local')
+  })
+
+  it('recusa simulação quando o budget de operações headless é insuficiente', () => {
+    const result = simulateCircuit(
+      [{ id: 'a', type: 'input' }],
+      [{ ticks: 1 }],
+      ['a'],
+      { maxOperationsPerTick: 1 },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('orçamento de 1 operações')
+    expect(MAX_SIMULATION_OPERATIONS_PER_TICK).toBeGreaterThan(1)
+  })
+
+  it('recusa runtime MCP acima do budget de memória antes de alocar delay', () => {
+    const result = simulateCircuit(
+      [
+        { id: 'input', type: 'input' },
+        { id: 'delay', type: 'delay', inputs: [{ node: 'input' }], options: { ticks: 1_000_000 } },
+      ],
+      [{ ticks: 1 }],
+      ['input', 'delay'],
+      { maxMemoryBytes: 1024 * 1024 },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('orçamento de memória')
+    expect(MAX_SIMULATION_MEMORY_BYTES).toBeGreaterThan(1024 * 1024)
   })
 
   it('recusa simulação longa demais', () => {

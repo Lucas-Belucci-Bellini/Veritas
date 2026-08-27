@@ -541,6 +541,12 @@ export interface CustomChipToolDefinition {
 
 export interface SimulateCircuitOptions {
   customChips?: readonly CustomChipToolDefinition[]
+  /** Limite de operações por tique para testes headless determinísticos. */
+  maxOperationsPerTick?: number
+  /** Limite total de operações para a chamada MCP. */
+  maxTotalOperations?: number
+  /** Limite de memória estimada do runtime headless. */
+  maxMemoryBytes?: number
 }
 
 export const MAX_CUSTOM_CHIP_LIBRARY_ENTRIES = 128
@@ -946,6 +952,9 @@ export interface SimulationStep {
 
 /** Teto de tiques por chamada, para não deixar o servidor rodando à toa. */
 export const MAX_SIMULATION_TICKS = 1000
+export const MAX_SIMULATION_OPERATIONS_PER_TICK = 100_000
+export const MAX_SIMULATION_TOTAL_OPERATIONS = 100_000_000
+export const MAX_SIMULATION_MEMORY_BYTES = 64 * 1024 * 1024
 
 /**
  * Roda um circuito por alguns tiques e devolve o diagrama de tempo.
@@ -998,7 +1007,13 @@ export function simulateCircuit(
     const customChips = normalizeCustomChipLibrary(options.customChips)
     const expandedComponents = expandCustomChipComponents(components, customChips, watch)
     resolvedComponents = resolveWirelessComponentInputs(expandedComponents)
-    simulator = new Simulator({ components: resolvedComponents })
+    simulator = new Simulator({
+      components: resolvedComponents,
+    }, {
+      maxOperationsPerTick: options.maxOperationsPerTick ?? MAX_SIMULATION_OPERATIONS_PER_TICK,
+      maxTotalOperations: options.maxTotalOperations ?? MAX_SIMULATION_TOTAL_OPERATIONS,
+      maxMemoryBytes: options.maxMemoryBytes ?? MAX_SIMULATION_MEMORY_BYTES,
+    })
   } catch (error) {
     return {
       isError: true,
@@ -1006,22 +1021,22 @@ export function simulateCircuit(
     }
   }
 
-  const known = new Set(resolvedComponents.map((component) => component.id))
-  const unknown = watch.filter((id) => !known.has(id))
-  if (unknown.length > 0) {
-    return { isError: true, text: `Não existem no circuito: ${unknown.join(', ')}.` }
-  }
-
-  const observed = watch.length > 0 ? watch : resolvedComponents.map((component) => component.id)
-  const rows: string[] = []
-  const record = (tick: number, note: string) => {
-    const values = observed.map((id) => (simulator.read(id) ? '1' : '0'))
-    rows.push(`| ${tick} | ${values.join(' | ')} | ${note} |`)
-  }
-
-  record(0, 'início')
-
   try {
+    const known = new Set(resolvedComponents.map((component) => component.id))
+    const unknown = watch.filter((id) => !known.has(id))
+    if (unknown.length > 0) {
+      return { isError: true, text: `Não existem no circuito: ${unknown.join(', ')}.` }
+    }
+
+    const observed = watch.length > 0 ? watch : resolvedComponents.map((component) => component.id)
+    const rows: string[] = []
+    const record = (tick: number, note: string) => {
+      const values = observed.map((id) => (simulator.read(id) ? '1' : '0'))
+      rows.push(`| ${tick} | ${values.join(' | ')} | ${note} |`)
+    }
+
+    record(0, 'início')
+
     for (const step of steps) {
       const changes = Object.entries(step.set ?? {})
       for (const [id, value] of changes) simulator.setInput(id, value)
@@ -1036,18 +1051,20 @@ export function simulateCircuit(
         record(simulator.tickCount, index === 0 ? note : '')
       }
     }
+
+    return {
+      text: [
+        `| tique | ${observed.join(' | ')} | evento |`,
+        `| --- | ${observed.map(() => '---').join(' | ')} | --- |`,
+        ...rows,
+      ].join('\n'),
+    }
   } catch (error) {
     return {
       isError: true,
       text: error instanceof Error ? error.message : 'Falha ao simular.',
     }
-  }
-
-  return {
-    text: [
-      `| tique | ${observed.join(' | ')} | evento |`,
-      `| --- | ${observed.map(() => '---').join(' | ')} | --- |`,
-      ...rows,
-    ].join('\n'),
+  } finally {
+    simulator.shutdown()
   }
 }
