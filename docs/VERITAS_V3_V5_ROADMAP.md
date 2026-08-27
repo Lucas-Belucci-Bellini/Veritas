@@ -133,7 +133,7 @@ Entregas:
 - garantir que worker, UI, MCP e desktop não mantenham loop após cancelamento;
 - registrar diagnóstico acionável sem expor segredos ou dados remotos.
 
-**Estado de implementação atual:** classificação estática, budgets locais, quota agregada por documento/operação, cancelamento cooperativo do runtime, adapter MCP assíncrono e cleanup possuem código e regressões automatizadas. O fechamento da fase ainda depende de limites compartilhados por Worker, integração completa do preflight/cancelamento nas superfícies Worker/desktop, inspeção visual, medição real de heap e evidência nativa multiplataforma. Portanto, v2.7.0 continua `Unreleased`.
+**Estado de implementação atual:** classificação estática, budgets locais, quota agregada por documento/operação, cancelamento cooperativo do runtime, adapter MCP assíncrono e cleanup possuem código e regressões automatizadas. `docs/EXECUTION_WORKER_BOUNDARY.md` registra a proposta de protocolo e os gates prévios, mas não implementa Worker nem simulação Tauri/Rust. O fechamento da fase ainda depende de limites compartilhados por Worker, integração completa do preflight/cancelamento nas superfícies Worker/desktop, inspeção visual, medição de heap real e evidência nativa multiplataforma. Portanto, v2.7.0 continua `Unreleased`.
 
 ### 6.3 Fase C — v2.8.0: compatibilidade e migrações
 
