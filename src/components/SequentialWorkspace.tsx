@@ -30,6 +30,7 @@ export function SequentialWorkspace() {
   const [simulator, setSimulator] = useState(() => createSequentialSimulator('dff-clock'))
   const runAbortRef = useRef<AbortController | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [runError, setRunError] = useState('')
   const [inputs, setInputs] = useState<Record<string, boolean>>({ d: false })
   const [timeline, setTimeline] = useState<SequentialSnapshot[]>(() => [
     snapshotSequentialSimulator(createSequentialSimulator('dff-clock')),
@@ -43,6 +44,7 @@ export function SequentialWorkspace() {
     runAbortRef.current = null
     simulator.shutdown()
     setIsRunning(false)
+    setRunError('')
     const nextDemo = getSequentialDemo(nextDemoId)
     const nextSimulator = createSequentialSimulator(nextDemoId)
     applySequentialInputs(nextSimulator, nextDemo.initialInputs)
@@ -58,6 +60,8 @@ export function SequentialWorkspace() {
   }
 
   function updateInput(id: string, value: boolean) {
+    if (isRunning) return
+    setRunError('')
     simulator.setInput(id, value)
     setInputs((currentInputs) => ({ ...currentInputs, [id]: value }))
   }
@@ -92,6 +96,10 @@ export function SequentialWorkspace() {
         }
       }
       setTimeline((currentTimeline) => appendSnapshots(currentTimeline, nextSnapshots))
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setRunError(cause instanceof Error ? cause.message : 'Não foi possível executar a demonstração.')
+      }
     } finally {
       if (runAbortRef.current === controller) runAbortRef.current = null
       setIsRunning(false)
@@ -157,6 +165,7 @@ export function SequentialWorkspace() {
               type="checkbox"
               checked={inputs[id] ?? false}
               onChange={(event) => updateInput(id, event.target.checked)}
+              disabled={isRunning}
               aria-label={`Alternar ${id}`}
             />
             {id.toUpperCase()}
@@ -190,7 +199,8 @@ export function SequentialWorkspace() {
           <button
             type="button"
             onClick={runTicks}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200"
+            disabled={isRunning}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-brand-400 hover:text-brand-700 dark:border-slate-600 dark:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isRunning ? 'Executando…' : demo.controlMode === 'manual-clock' ? 'Continue · 4 pulsos' : 'Run · 8 tiques'}
           </button>
@@ -211,6 +221,7 @@ export function SequentialWorkspace() {
           </button>
         </div>
       </div>
+      {runError && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200" role="alert">{runError}</p>}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-live="polite">
