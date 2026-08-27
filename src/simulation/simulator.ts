@@ -110,12 +110,6 @@ export interface SimulatorExecutionBudgetOptions {
   maxMemoryBytes?: number
 }
 
-export interface SimulatorExecutionBudgetSnapshot {
-  ticks: number
-  operations: number
-  memoryBytes: number
-}
-
 /**
  * Quota explícita para agregar o custo de vários runtimes de um mesmo documento
  * ou operação. A quota é cumulativa para tiques/operações e reserva apenas a
@@ -175,12 +169,14 @@ export class SimulatorExecutionBudget {
 
   releaseTicks(count: number): void {
     validateBudgetDelta(count, 'tiques')
-    this.ticks = Math.max(0, this.ticks - count)
+    if (count > this.ticks) throw new RangeError('A liberação de tiques excede a quota agregada reservada.')
+    this.ticks -= count
   }
 
   releaseOperations(count: number): void {
     validateBudgetDelta(count, 'operações')
-    this.operations = Math.max(0, this.operations - count)
+    if (count > this.operations) throw new RangeError('A liberação de operações excede a quota agregada reservada.')
+    this.operations -= count
   }
 
   reserveMemory(bytes: number): void {
@@ -196,29 +192,10 @@ export class SimulatorExecutionBudget {
 
   releaseMemory(bytes: number): void {
     validateBudgetDelta(bytes, 'memória')
-    this.memoryBytes = Math.max(0, this.memoryBytes - bytes)
+    if (bytes > this.memoryBytes) throw new RangeError('A liberação de memória excede a quota agregada reservada.')
+    this.memoryBytes -= bytes
   }
 
-  snapshot(): SimulatorExecutionBudgetSnapshot {
-    return {
-      ticks: this.ticks,
-      operations: this.operations,
-      memoryBytes: this.memoryBytes,
-    }
-  }
-
-  restore(snapshot: SimulatorExecutionBudgetSnapshot): void {
-    if (
-      !Number.isInteger(snapshot.ticks) || snapshot.ticks < 0 || snapshot.ticks > this.maxTicks ||
-      !Number.isInteger(snapshot.operations) || snapshot.operations < 0 || snapshot.operations > this.maxOperations ||
-      !Number.isInteger(snapshot.memoryBytes) || snapshot.memoryBytes < 0 || snapshot.memoryBytes > this.maxMemoryBytes
-    ) {
-      throw new RangeError('O snapshot da quota agregada é inválido ou excede seus limites.')
-    }
-    this.ticks = snapshot.ticks
-    this.operations = snapshot.operations
-    this.memoryBytes = snapshot.memoryBytes
-  }
 }
 
 /**
