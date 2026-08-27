@@ -7,6 +7,7 @@ import {
   getProject,
   importProjects,
   listProjects,
+  MAX_VERITAS_FILE_BYTES,
   parseVeritasFile,
   serializeProjects,
   updateProject,
@@ -92,6 +93,16 @@ describe('arquivo .veritas', () => {
     expect(() =>
       parseVeritasFile('{"format":"veritas","version":1.5,"projects":[]}'),
     ).toThrow('versão inválida')
+  })
+
+  it('recusa arquivo acima do limite bounded', () => {
+    const oversized = JSON.stringify({
+      format: 'veritas',
+      version: 1,
+      projects: [{ name: 'grande', expression: 'A'.repeat(MAX_VERITAS_FILE_BYTES) }],
+    })
+
+    expect(() => parseVeritasFile(oversized)).toThrow('excede o limite')
   })
 
   it('recusa campos desconhecidos no envelope e no projeto', () => {

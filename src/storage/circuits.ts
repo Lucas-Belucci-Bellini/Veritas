@@ -4,6 +4,7 @@ import { MAX_BUS_WIDTH } from '../bus'
 import type { ComponentType } from '../simulation/components'
 
 export const CIRCUIT_FILE_VERSION = 1 as const
+export const MAX_CIRCUIT_FILE_BYTES = 5_000_000
 
 export interface VeritasCircuitFile {
   format: 'veritas-circuits'
@@ -57,6 +58,10 @@ export function serializeCircuitProjects(projects: readonly CircuitProject[]): s
 }
 
 export function parseCircuitFile(text: string): NewCircuitProject[] {
+  if (new TextEncoder().encode(text).length > MAX_CIRCUIT_FILE_BYTES) {
+    throw new Error(`Esse arquivo de circuitos excede o limite de ${MAX_CIRCUIT_FILE_BYTES} bytes.`)
+  }
+
   let data: unknown
   try {
     data = JSON.parse(text)

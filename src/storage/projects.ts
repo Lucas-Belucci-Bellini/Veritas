@@ -42,6 +42,7 @@ export interface VeritasFile {
 }
 
 export const VERITAS_FILE_VERSION = 1
+export const MAX_VERITAS_FILE_BYTES = 5_000_000
 
 export function serializeProjects(projects: readonly Project[]): string {
   const file: VeritasFile = {
@@ -62,6 +63,10 @@ export function serializeProjects(projects: readonly Project[]): string {
  * porque importar lixo silenciosamente é pior do que recusar.
  */
 export function parseVeritasFile(text: string): NewProject[] {
+  if (new TextEncoder().encode(text).length > MAX_VERITAS_FILE_BYTES) {
+    throw new Error(`Esse arquivo excede o limite de ${MAX_VERITAS_FILE_BYTES} bytes.`)
+  }
+
   let data: unknown
   try {
     data = JSON.parse(text)

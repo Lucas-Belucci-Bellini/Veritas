@@ -15,6 +15,7 @@ import {
   getCircuitProject,
   importCircuitProjects,
   listCircuitProjects,
+  MAX_CIRCUIT_FILE_BYTES,
   parseCircuitFile,
   serializeCircuitProjects,
   updateCircuitProject,
@@ -167,6 +168,19 @@ describe('arquivo de circuitos', () => {
     expect(() =>
       parseCircuitFile('{"format":"veritas-circuits","version":1.5,"projects":[]}'),
     ).toThrow('versão inválida')
+  })
+
+  it('recusa arquivo acima do limite bounded', () => {
+    const oversized = JSON.stringify({
+      format: 'veritas-circuits',
+      version: 1,
+      projects: [{
+        name: 'grande',
+        document: { ...document, name: 'x'.repeat(MAX_CIRCUIT_FILE_BYTES) },
+      }],
+    })
+
+    expect(() => parseCircuitFile(oversized)).toThrow('excede o limite')
   })
 
   it('recusa campos desconhecidos no envelope e no documento', () => {
