@@ -155,6 +155,7 @@ export function parseTestbenchFile(text: string): Array<{
 export async function importTestbenchProjects(
   circuitId: number,
   projects: readonly { name: string; document: TestbenchDocument }[],
+  expectedCircuitName?: string,
 ): Promise<number> {
   const now = Date.now()
   const rows = projects.map(
@@ -167,7 +168,17 @@ export async function importTestbenchProjects(
         updatedAt: now + index,
       }) as TestbenchProject,
   )
-  await db.transaction('rw', db.testbenchProjects, async () => {
+  await db.transaction('rw', db.circuitProjects, db.testbenchProjects, async () => {
+    const circuit = await db.circuitProjects.get(circuitId)
+    if (!circuit) {
+      throw new Error('O circuito de destino do testbench não existe mais.')
+    }
+    if (
+      expectedCircuitName !== undefined &&
+      circuit.name.trim() !== expectedCircuitName.trim()
+    ) {
+      throw new Error('O circuito de destino mudou durante a importação do testbench.')
+    }
     await db.testbenchProjects.bulkAdd(rows)
   })
   return rows.length

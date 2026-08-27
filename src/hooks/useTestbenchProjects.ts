@@ -31,6 +31,7 @@ interface UseTestbenchProjects {
 
 export function useTestbenchProjects(
   circuitId: number | '',
+  circuitName?: string,
 ): UseTestbenchProjects {
   const [projects, setProjects] = useState<TestbenchProject[]>([])
   const [ready, setReady] = useState(false)
@@ -105,6 +106,7 @@ export function useTestbenchProjects(
             document: TestbenchDocument
           }) => ({ name, document }),
         ),
+        circuitName,
       )
       await refresh()
       return count

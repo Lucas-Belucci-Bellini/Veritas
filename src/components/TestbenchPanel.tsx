@@ -58,9 +58,8 @@ export function TestbenchPanel() {
   const [report, setReport] = useState<TestbenchReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const testbenchFileInput = useRef<HTMLInputElement>(null)
-  const savedTestbenches = useTestbenchProjects(circuitId)
-
   const project = projects.find((item) => item.id === circuitId)
+  const savedTestbenches = useTestbenchProjects(circuitId, project?.name)
   const ports = useMemo(
     () => (project ? readPorts(project.document) : null),
     [project],

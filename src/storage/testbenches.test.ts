@@ -1,10 +1,13 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  createCircuitDocument,
   TESTBENCH_FORMAT,
   TESTBENCH_VERSION,
+  type CircuitDocument,
   type TestbenchDocument,
 } from '../circuit'
+import { createCircuitProject } from './circuits'
 import { db } from './db'
 import {
   createTestbenchProject,
@@ -17,6 +20,15 @@ import {
   serializeTestbenchProjects,
   updateTestbenchProject,
 } from './testbenches'
+
+const circuit: CircuitDocument = {
+  ...createCircuitDocument('Registrador local'),
+  nodes: [
+    { id: 'input', type: 'input', position: { x: 0, y: 0 } },
+    { id: 'output', type: 'output', position: { x: 180, y: 0 } },
+  ],
+  connections: [{ source: { node: 'input' }, target: { node: 'output', port: 0 } }],
+}
 
 function document(name = 'roteiro local'): TestbenchDocument {
   return {
@@ -35,6 +47,7 @@ function document(name = 'roteiro local'): TestbenchDocument {
 
 beforeEach(async () => {
   await db.open()
+  await db.circuitProjects.clear()
   await db.testbenchProjects.clear()
 })
 
@@ -87,13 +100,17 @@ describe('testbenchProjects', () => {
 
 describe('arquivo de testbench', () => {
   it('faz round-trip versionado e preserva o circuito de origem no arquivo', async () => {
+    const circuitId = await createCircuitProject({
+      name: 'Registrador local',
+      document: circuit,
+    })
     await createTestbenchProject({
-      circuitId: 42,
+      circuitId,
       name: 'Registrador',
       document: document('DFF'),
     })
     const text = serializeTestbenchProjects(
-      await listTestbenchProjects(42),
+      await listTestbenchProjects(circuitId),
       '  Registrador local  ',
     )
     const parsed = parseTestbenchFile(text)
@@ -111,16 +128,30 @@ describe('arquivo de testbench', () => {
 
     await db.testbenchProjects.clear()
     const count = await importTestbenchProjects(
-      99,
+      circuitId,
       parsed.map(({ name, document: savedDocument }) => ({
         name,
         document: savedDocument,
       })),
+      'Registrador local',
     )
     expect(count).toBe(1)
-    expect((await listTestbenchProjects(99))[0]?.document.cases).toEqual(
+    expect((await listTestbenchProjects(circuitId))[0]?.document.cases).toEqual(
       document('DFF').cases,
     )
+  })
+
+  it('recusa circuito inexistente ou nome de origem divergente', async () => {
+    await expect(importTestbenchProjects(999, [{ name: 'x', document: document() }]))
+      .rejects.toThrow('não existe mais')
+
+    const circuitId = await createCircuitProject({ name: 'Destino', document: circuit })
+    await expect(importTestbenchProjects(
+      circuitId,
+      [{ name: 'x', document: document() }],
+      'Origem',
+    )).rejects.toThrow('mudou durante')
+    expect(await listTestbenchProjects(circuitId)).toHaveLength(0)
   })
 
   it('recusa JSON quebrado, formato desconhecido, versão futura e documentos inválidos', () => {

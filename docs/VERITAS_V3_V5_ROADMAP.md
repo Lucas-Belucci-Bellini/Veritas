@@ -149,7 +149,7 @@ Entregas:
 - preservar dados locais durante atualização e desinstalação;
 - documentar rollback e recuperação de arquivos inválidos.
 
-O primeiro incremento desta fase está documentado em `docs/V2_FORMAT_MIGRATION.md`. O inventário confirma Dexie v5 e os envelopes `veritas`/`veritas-circuits` v1. O parser de circuitos agora rejeita versões não inteiras, versões antigas sem migrador e projetos inválidos sem filtragem silenciosa; isso é hardening fail-closed, não uma migração retroativa. O envelope de expressões, chips customizados, testbenches e algoritmos ainda precisa de gates equivalentes. A fase permanece `Unreleased`.
+O incremento atual desta fase está documentado em `docs/V2_FORMAT_MIGRATION.md`. O inventário confirma Dexie v5 e os envelopes `veritas`, `veritas-circuits` e `veritas-testbenches` v1. Os parsers rejeitam versões fora do contrato, campos desconhecidos, arquivos acima de 5.000.000 bytes e registros inválidos sem filtragem silenciosa; expressões usam o parser canônico, lotes de projetos/circuitos/testbenches usam transação Dexie e o hook de testbench confere existência/nome do circuito de destino. Isso é hardening fail-closed, não uma migração retroativa. Chips customizados e algoritmos ainda não têm envelope independente fechado; a fase permanece `Unreleased`.
 
 ### 6.4 Fase D — v2.9.0: preparação arquitetural
 

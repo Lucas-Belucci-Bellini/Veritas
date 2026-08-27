@@ -74,6 +74,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - As importações de projetos `.veritas` e circuitos `veritas-circuits` passaram a gravar os lotes dentro de transações Dexie. Regressões com chave duplicada confirmam rollback completo, sem linha parcial no store; os testes focais combinados passaram com **33 casos**. Migração entre versões e dependências que cruzem múltiplos stores ainda permanecem pendentes.
 - O envelope `veritas-testbenches` v1 recebeu o mesmo hardening: limite de 5.000.000 bytes, versão inteira, rejeição de campos desconhecidos e documentos inválidos sem filtragem silenciosa, além de importação em transação Dexie. O teste focal passou com **6 casos**; associação segura ao circuito, migração retroativa e falha entre linhas ainda precisam de gates adicionais.
 - A matriz v2.8 agora reconhece `veritas-testbenches` como terceiro envelope local com schema fechado e importação transacional. A cobertura focal desse formato passou com **6 casos**; a suíte combinada de projetos, circuitos e testbench totaliza **39 casos**. Migração retroativa e dependências entre stores continuam pendentes.
+- A importação de testbenches pelo hook da UI passou a encaminhar o nome do circuito selecionado; o backend confere existência e nome do destino dentro da transação Dexie. Regressões cobrem circuito inexistente e nome divergente, evitando associação silenciosa a outro circuito; o teste focal de testbench passou com **7 casos**.
 
 ### Trajetória de plataforma
 
