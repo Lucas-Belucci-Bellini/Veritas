@@ -3,10 +3,16 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createAlgorithmDocument } from '../algorithms'
 import { db } from './db'
 import {
+  ALGORITHM_FILE_FORMAT,
+  ALGORITHM_FILE_VERSION,
   createAlgorithmProject,
   deleteAlgorithmProject,
   getAlgorithmProject,
+  importAlgorithmFile,
   listAlgorithmProjects,
+  MAX_ALGORITHM_FILE_BYTES,
+  parseAlgorithmFile,
+  serializeAlgorithmProjects,
   updateAlgorithmProject,
 } from './algorithms'
 
@@ -42,6 +48,53 @@ describe('algoritmos salvos localmente', () => {
 
     await expect(updateAlgorithmProject(id, { document: invalid })).rejects.toThrow('não pode ser salvo')
     expect((await getAlgorithmProject(id))?.document.entryNodeId).toBe('start')
+  })
+
+  it('faz round-trip do envelope portátil e importa em novos ids locais', async () => {
+    const document = createAlgorithmDocument('Algoritmo portátil')
+    const id = await createAlgorithmProject({ name: document.name, document })
+    const text = serializeAlgorithmProjects(
+      await listAlgorithmProjects(),
+      '2026-08-27T00:00:00.000Z',
+    )
+    const parsed = parseAlgorithmFile(text)
+
+    expect(parsed).toMatchObject({
+      format: ALGORITHM_FILE_FORMAT,
+      version: ALGORITHM_FILE_VERSION,
+      projects: [{ ref: `algorithm-${id}`, name: 'Algoritmo portátil', document }],
+    })
+    await db.algorithmProjects.clear()
+    await expect(importAlgorithmFile(text)).resolves.toBe(1)
+    expect((await listAlgorithmProjects())[0]?.document).toEqual(document)
+  })
+
+  it('recusa colisão local, campos desconhecidos, versão inválida e arquivo grande', async () => {
+    const document = createAlgorithmDocument('Colisão')
+    await createAlgorithmProject({ name: document.name, document })
+    const text = serializeAlgorithmProjects(await listAlgorithmProjects(), '2026-08-27T00:00:00.000Z')
+    await expect(importAlgorithmFile(text)).rejects.toThrow('Já existe um algoritmo')
+    expect(await listAlgorithmProjects()).toHaveLength(1)
+
+    expect(() => parseAlgorithmFile('{nope')).toThrow('JSON válido')
+    expect(() => parseAlgorithmFile('{"format":"veritas-algorithms","version":0,"projects":[]}')).toThrow('versão inválida')
+    expect(() => parseAlgorithmFile('{"format":"veritas-algorithms","version":99,"projects":[]}')).toThrow('mais nova')
+    const unknown = JSON.parse(text)
+    unknown.unknown = true
+    expect(() => parseAlgorithmFile(JSON.stringify(unknown))).toThrow('campos desconhecidos')
+    expect(() => parseAlgorithmFile('x'.repeat(MAX_ALGORITHM_FILE_BYTES + 1))).toThrow('excede o limite')
+  })
+
+  it('recusa documento semântico inválido durante o parse do arquivo', () => {
+    const document = createAlgorithmDocument('Inválido')
+    document.entryNodeId = 'missing'
+    const file = {
+      format: ALGORITHM_FILE_FORMAT,
+      version: ALGORITHM_FILE_VERSION,
+      projects: [{ ref: 'algorithm-1', name: 'Inválido', document }],
+    }
+
+    expect(() => parseAlgorithmFile(JSON.stringify(file))).toThrow('não pode ser salvo')
   })
 
   it('normaliza nomes vazios e atualiza updatedAt', async () => {

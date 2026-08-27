@@ -79,6 +79,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - O store local de algoritmos passou a validar `AlgorithmDocument` na criação e atualização e rejeita entrada inexistente, sem gravar documentos semanticamente inválidos. O teste focal passou com **5 casos**; isso não promove `veritas-algorithm` a arquivo portátil nem habilita execução de código importado.
 - O envelope experimental `veritas-chip-library` v1 foi implementado com serializer determinístico, refs file-local, ordenação topológica, parser fechado/bounded, remapeamento para ids locais, colisão explícita e importação Dexie atômica. A suíte focal passou com **7 casos**, incluindo dependência ausente, ciclo, rollback e limite de bytes.
 - A `ChipLibrary` passou a oferecer `Exportar local` e `Importar local` para `veritas-chip-library` v1. O fluxo usa somente IndexedDB/Blob local, limpa o input após a operação, mostra erros sem persistência parcial e não faz upload para cloud nem invoke Tauri; validação visual/manual da distribuição continua pendente.
+- O envelope experimental `veritas-algorithms` v1 foi implementado com schema fechado, limite de 5.000.000 bytes, máximo de 256 projetos, validação canônica do grafo, serializer determinístico, colisão explícita e importação Dexie atômica. A suíte focal de algoritmos passou com **8 casos**; expressões importadas permanecem dados, sem `eval`, módulos ou comandos. A UI atual ainda não oferece biblioteca persistente de algoritmos.
 
 ### Trajetória de plataforma
 
