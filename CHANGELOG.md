@@ -75,6 +75,7 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 - O envelope `veritas-testbenches` v1 recebeu o mesmo hardening: limite de 5.000.000 bytes, versão inteira, rejeição de campos desconhecidos e documentos inválidos sem filtragem silenciosa, além de importação em transação Dexie. O teste focal passou com **6 casos**; associação segura ao circuito, migração retroativa e falha entre linhas ainda precisam de gates adicionais.
 - A matriz v2.8 agora reconhece `veritas-testbenches` como terceiro envelope local com schema fechado e importação transacional. A cobertura focal desse formato passou com **6 casos**; a suíte combinada de projetos, circuitos e testbench totaliza **39 casos**. Migração retroativa e dependências entre stores continuam pendentes.
 - A importação de testbenches pelo hook da UI passou a encaminhar o nome do circuito selecionado; o backend confere existência e nome do destino dentro da transação Dexie. Regressões cobrem circuito inexistente e nome divergente, evitando associação silenciosa a outro circuito; o teste focal de testbench passou com **7 casos**.
+- O inventário v2.8 foi completado para chips e algoritmos: `veritas-custom-chip` v1 e `veritas-algorithm` v1 existem como documentos internos validados, mas não foram promovidos a envelopes portáteis de coleção. O pipeline DLS continua limitado à importação controlada, sem scripts/URLs/HDL arbitrários; exportação/migração dessas bibliotecas permanece `NOT VERIFIED`.
 
 ### Trajetória de plataforma
 
