@@ -4,6 +4,12 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 
 ## [Unreleased]
 
+### Documentação arquitetural canônica
+
+- Criada a árvore `docs/00-VISION` … `docs/07-DECISIONS` com índice em `docs/README.md`: visão, escopo e non-goals; inventário de produto e casos de uso; arquitetura, modelo de domínio, documento canônico e duplicações; estratégia, integração e modelo de agentes de IA; tooling, MCP e interoperabilidade; contratos, modelo de evidência, roadmap por fundamentos e lacunas conhecidas; fronteiras de confiança; decision log com 24 decisões e 18 perguntas abertas.
+- Toda capacidade é classificada como `IMPLEMENTED`, `PARTIAL`, `EXPERIMENTAL`, `PLANNED`, `RESEARCH` ou `UNKNOWN`. Nenhum código foi alterado.
+- Registrados, sem correção, três defeitos reproduzidos na investigação: round-trip `.veritas-circuits` de circuitos vetoriais (K-01), HDL de circuitos sequenciais gerado inválido sem erro pela API e pelo MCP (K-02) e `debug_algorithm` ignorando `max_steps` com `state` fornecido pelo cliente (K-03).
+
 ### Modelo comercial planejado
 
 - Definido o modelo futuro para a Steam: demo/teste gratuita para avaliação e versão final paga como edição completa e oficial, ambas com login planejado e a edição final com licença/entitlement verificável; escopo, limites e condições da demo deverão ser publicados antes do uso.
