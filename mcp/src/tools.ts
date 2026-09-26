@@ -55,6 +55,8 @@ import {
   createExecutionState,
   runAlgorithm,
   stepAlgorithm,
+  hasValidationErrors,
+  validateAlgorithmDocument,
   type AlgorithmDocument,
   type ExecutionState,
   type RuntimeValue,
@@ -304,8 +306,55 @@ function normalizeDebugState(state: ExecutionState): ExecutionState {
   }
 }
 
+const EXECUTION_STATUSES: readonly string[] = ['ready', 'paused', 'awaiting-input', 'finished', 'error']
+
+/**
+ * O estado chega de volta do cliente entre chamadas, então é dado não
+ * confiável: precisa ter a forma que o executor espera e apontar para um nó
+ * que existe neste documento.
+ */
+function isExecutionStateFor(value: unknown, document: AlgorithmDocument): value is ExecutionState {
+  if (!isRecord(value)) return false
+  if (typeof value.status !== 'string' || !EXECUTION_STATUSES.includes(value.status)) return false
+  if (value.activeNodeId !== null) {
+    if (typeof value.activeNodeId !== 'string') return false
+    const activeNodeId = value.activeNodeId
+    if (!document.nodes.some((node) => node.id === activeNodeId)) return false
+  }
+  if (!Number.isSafeInteger(value.stepIndex) || (value.stepIndex as number) < 0) return false
+  if (value.error !== null && typeof value.error !== 'string') return false
+  for (const key of ['variables', 'variableTypes', 'inputQueues', 'inputCursors'] as const) {
+    if (!isRecord(value[key])) return false
+  }
+  if (!Object.values(value.inputQueues as Record<string, unknown>).every(Array.isArray)) return false
+  for (const key of ['output', 'trace', 'watch', 'branches'] as const) {
+    if (!Array.isArray(value[key])) return false
+  }
+  if (value.debug !== undefined) {
+    if (!isRecord(value.debug)) return false
+    const breakpoints = value.debug.breakpoints
+    if (breakpoints !== undefined && (!Array.isArray(breakpoints) || !breakpoints.every((id) => typeof id === 'string'))) return false
+  }
+  return true
+}
+
 export function debugAlgorithm(query: AlgorithmDebugQuery): ToolResult {
   try {
+    const document: unknown = query.document
+    if (!isRecord(document) || !Array.isArray(document.nodes)) {
+      return { isError: true, text: 'O documento não possui o formato veritas-algorithm esperado.' }
+    }
+    const issues = validateAlgorithmDocument(query.document)
+    if (hasValidationErrors(issues)) {
+      return {
+        isError: true,
+        text: issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message).join(' '),
+      }
+    }
+    if (query.state !== undefined && !isExecutionStateFor(query.state, query.document)) {
+      return { isError: true, text: 'O estado enviado não é um ExecutionState válido para este algoritmo.' }
+    }
+
     let state = query.state
       ? normalizeDebugState(query.state)
       : createExecutionState(query.document, {

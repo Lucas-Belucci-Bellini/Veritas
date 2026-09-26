@@ -22,6 +22,7 @@ describe('feedback de validação do editor', () => {
       'wireless-missing-transmitter',
       'wireless-channel-too-long',
       'custom-chip-missing-definition',
+      'unsupported-hdl-component',
     ]
     const guidance = buildCircuitIssueGuidance(codes.map((code) => ({ code, message: `erro ${code}` })))
 

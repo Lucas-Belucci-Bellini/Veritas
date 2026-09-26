@@ -274,6 +274,13 @@ export function stepAlgorithm(
   if (state.status === 'awaiting-input') return cloneState(state)
   if (!state.activeNodeId) return fail(state, 'O estado não possui um nó ativo.')
 
+  // O limite de passos compara com `stepIndex`; um índice negativo ou não
+  // inteiro vindo de fora (ex.: estado devolvido por um cliente MCP) anularia
+  // esse limite.
+  if (!Number.isSafeInteger(state.stepIndex) || state.stepIndex < 0) {
+    return fail(state, 'O estado de execução tem um índice de passo inválido.')
+  }
+
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
   if (state.stepIndex >= maxSteps) {
     return fail(state, `O algoritmo excedeu o limite de ${maxSteps} passos.`, 'max-steps')

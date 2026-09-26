@@ -123,6 +123,7 @@ export interface CircuitIssue {
   | 'wireless-missing-transmitter'
   | 'wireless-channel-too-long'
   | 'custom-chip-missing-definition'
+  | 'unsupported-hdl-component'
   message: string
   nodeId?: string
 }

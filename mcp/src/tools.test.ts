@@ -23,7 +23,7 @@ import {
   simulateCircuitAsync,
   truthTable,
 } from './tools'
-import { createAlgorithmDocument } from '../../src/algorithms'
+import { createAlgorithmDocument, createExecutionState, type AlgorithmDocument } from '../../src/algorithms'
 import { buildCustomChipDefinition, createCircuitDocument, type CircuitDifferentialStep, type CircuitDocument } from '../../src/circuit'
 
 describe('logic_case', () => {
@@ -66,6 +66,63 @@ describe('debug_algorithm', () => {
     expect(state.status).toBe('paused')
     expect(state.activeNodeId).toBe('end')
     expect(state.debug.lastPauseReason).toBe('breakpoint')
+  })
+
+  const infiniteLoop = (): AlgorithmDocument => ({
+    ...createAlgorithmDocument('MCP laço infinito'),
+    entryNodeId: 'start',
+    nodes: [
+      { id: 'start', type: 'start', position: { x: 0, y: 0 }, next: 'loop' },
+      { id: 'loop', type: 'while', position: { x: 160, y: 0 }, condition: 'true', bodyNext: 'loop', exitNext: 'end' },
+      { id: 'end', type: 'end', position: { x: 320, y: 0 } },
+    ],
+  })
+
+  it('continua a partir do estado devolvido numa chamada anterior', () => {
+    const document = createAlgorithmDocument('MCP retomada')
+    const first = JSON.parse(debugAlgorithm({ document, mode: 'step' }).text)
+    const second = debugAlgorithm({ document, state: first, mode: 'step' })
+    const state = JSON.parse(second.text) as { status: string; stepIndex: number }
+
+    expect(second.isError).not.toBe(true)
+    expect(state.status).toBe('finished')
+    expect(state.stepIndex).toBe(2)
+  })
+
+  it('mantém max_steps mesmo com stepIndex negativo vindo do cliente', () => {
+    const document = infiniteLoop()
+    const forged = { ...createExecutionState(document), stepIndex: -20_000 }
+    const result = debugAlgorithm({ document, state: forged, mode: 'run', maxSteps: 10 })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('ExecutionState válido')
+  })
+
+  it('para no limite de passos em um laço infinito', () => {
+    const result = debugAlgorithm({ document: infiniteLoop(), mode: 'run', maxSteps: 10 })
+    const state = JSON.parse(result.text) as { status: string; trace: unknown[]; debug: { lastPauseReason: string } }
+
+    expect(state.status).toBe('error')
+    expect(state.trace).toHaveLength(10)
+    expect(state.debug.lastPauseReason).toBe('max-steps')
+  })
+
+  it('valida o documento também quando o estado é enviado', () => {
+    const document = infiniteLoop()
+    const state = createExecutionState(document)
+    const broken = { ...document, entryNodeId: 'nao-existe', nodes: document.nodes.filter((node) => node.id !== 'end') }
+    const result = debugAlgorithm({ document: broken as AlgorithmDocument, state, mode: 'run', maxSteps: 10 })
+
+    expect(result.isError).toBe(true)
+  })
+
+  it('recusa estado que aponta para um nó inexistente', () => {
+    const document = infiniteLoop()
+    const state = { ...createExecutionState(document), activeNodeId: 'fantasma' }
+    const result = debugAlgorithm({ document, state, mode: 'step' })
+
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('ExecutionState válido')
   })
 })
 
@@ -545,6 +602,29 @@ describe('export_circuit_hdl', () => {
 
     expect(result.isError).toBe(true)
     expect(result.text).toContain('definição local')
+  })
+
+  it('recusa circuito sequencial em vez de devolver HDL inválido', () => {
+    const register: CircuitDocument = {
+      ...createCircuitDocument('Registrador MCP'),
+      nodes: [
+        { id: 'd', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'clk', type: 'clock', position: { x: 0, y: 100 } },
+        { id: 'ff', type: 'dff', position: { x: 200, y: 50 } },
+        { id: 'q', type: 'output', position: { x: 400, y: 50 } },
+      ],
+      connections: [
+        { source: { node: 'd' }, target: { node: 'ff', port: 0 } },
+        { source: { node: 'clk' }, target: { node: 'ff', port: 1 } },
+        { source: { node: 'ff', port: 0 }, target: { node: 'q', port: 0 } },
+      ],
+    }
+
+    for (const format of ['verilog', 'vhdl'] as const) {
+      const result = exportCircuitTool({ document: register, format })
+      expect(result.isError).toBe(true)
+      expect(result.text).toContain('apenas lógica combinacional')
+    }
   })
 })
 

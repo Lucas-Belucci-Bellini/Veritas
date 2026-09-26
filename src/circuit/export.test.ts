@@ -169,20 +169,21 @@ describe('exportCircuit', () => {
   })
 
   it('exporta Splitter e Combiner vetoriais em Verilog e VHDL', () => {
+    // `bus` é palavra reservada do VHDL: o rótulo BUS sai escapado como v_BUS.
     const verilog = exportVerilog(busDocument())
     const vhdl = exportVhdl(busDocument())
 
     expect(verilog).toContain('wire [2:0] split_out1;')
     expect(verilog).toContain('wire [4:0] split_out2;')
-    expect(verilog).toContain('assign split_out1 = BUS[7:5];')
-    expect(verilog).toContain('assign split_out2 = BUS[4:0];')
+    expect(verilog).toContain('assign split_out1 = v_BUS[7:5];')
+    expect(verilog).toContain('assign split_out2 = v_BUS[4:0];')
     expect(verilog).toContain('assign combine = {split_out1, split_out2};')
     expect(verilog).toContain('assign RESULT = combine;')
 
     expect(vhdl).toContain('signal split_out1 : std_logic_vector(2 downto 0);')
     expect(vhdl).toContain('signal split_out2 : std_logic_vector(4 downto 0);')
-    expect(vhdl).toContain('split_out1 <= BUS(7 downto 5);')
-    expect(vhdl).toContain('split_out2 <= BUS(4 downto 0);')
+    expect(vhdl).toContain('split_out1 <= v_BUS(7 downto 5);')
+    expect(vhdl).toContain('split_out2 <= v_BUS(4 downto 0);')
     expect(vhdl).toContain('combine <= split_out1 & split_out2;')
     expect(vhdl).toContain('RESULT <= combine;')
   })
@@ -232,5 +233,60 @@ describe('exportCircuit', () => {
     expect(vhdl).toContain('Y : out std_logic_vector(3 downto 0)')
     expect(vhdl).toContain('signal A_B : std_logic_vector(3 downto 0);')
     expect(vhdl).toContain('A_B <= A and B;')
+  })
+
+  it('recusa componentes com estado em vez de gerar HDL inválido', () => {
+    const register: CircuitDocument = {
+      ...createCircuitDocument('reg'),
+      nodes: [
+        { id: 'd', type: 'input', position: { x: 0, y: 0 } },
+        { id: 'clk', type: 'clock', position: { x: 0, y: 100 } },
+        { id: 'ff', type: 'dff', position: { x: 200, y: 50 } },
+        { id: 'q', type: 'output', position: { x: 400, y: 50 } },
+      ],
+      connections: [
+        { source: { node: 'd' }, target: { node: 'ff', port: 0 } },
+        { source: { node: 'clk' }, target: { node: 'ff', port: 1 } },
+        { source: { node: 'ff', port: 0 }, target: { node: 'q', port: 0 } },
+      ],
+    }
+
+    for (const exporter of [exportVerilog, exportVhdl]) {
+      let error: unknown
+      try {
+        exporter(register)
+      } catch (caught) {
+        error = caught
+      }
+      expect(error).toBeInstanceOf(CircuitValidationError)
+      const issues = (error as CircuitValidationError).issues
+      expect(issues.filter((issue) => issue.code === 'unsupported-hdl-component').map((issue) => issue.nodeId)).toEqual(['clk', 'ff'])
+    }
+  })
+
+  it('escapa palavras reservadas de Verilog e VHDL em módulos e sinais', () => {
+    const reserved: CircuitDocument = {
+      ...createCircuitDocument('reg'),
+      nodes: [
+        { id: 'a', type: 'input', position: { x: 0, y: 0 }, label: 'process' },
+        { id: 'b', type: 'input', position: { x: 0, y: 100 }, label: 'Signal' },
+        { id: 'gate', type: 'and', position: { x: 200, y: 50 }, label: 'always' },
+        { id: 'y', type: 'output', position: { x: 400, y: 50 }, label: 'std_logic' },
+      ],
+      connections: [
+        { source: { node: 'a' }, target: { node: 'gate', port: 0 } },
+        { source: { node: 'b' }, target: { node: 'gate', port: 1 } },
+        { source: { node: 'gate' }, target: { node: 'y', port: 0 } },
+      ],
+    }
+    const verilog = exportVerilog(reserved)
+    const vhdl = exportVhdl(reserved)
+
+    expect(verilog).toContain('module v_reg (')
+    expect(verilog).toContain('assign v_always = v_process & v_Signal;')
+    expect(verilog).toContain('output v_std_logic')
+    expect(vhdl).toContain('entity v_reg is')
+    expect(vhdl).toContain('v_process : in std_logic')
+    expect(vhdl).toContain('v_always <= v_process and v_Signal;')
   })
 })

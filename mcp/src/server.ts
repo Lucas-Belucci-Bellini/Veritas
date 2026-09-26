@@ -207,8 +207,9 @@ server.registerTool(
   {
     title: 'Exportar circuito HDL',
     description:
-      'Exporta um CircuitDocument validado para Verilog ou VHDL. Instâncias custom-chip ' +
-      'exigem suas definições veritas-custom-chip em custom_chips.',
+      'Exporta um CircuitDocument combinacional validado para Verilog ou VHDL. Circuitos com clock, ' +
+      'flip-flops (dff/tff/jk/sr) ou delay são recusados. Instâncias custom-chip exigem suas definições ' +
+      'veritas-custom-chip em custom_chips.',
     inputSchema: {
       document: z.unknown().describe('CircuitDocument serializável do formato veritas-circuit'),
       format: z.enum(['verilog', 'vhdl']).describe('Formato industrial de saída'),
