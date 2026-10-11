@@ -1,0 +1,3 @@
+# Veritas — prompt de engenharia
+
+Leia README, roadmap, auditoria, decisões, contratos do parser/circuito e testes. Preserve correção lógica e equivalência entre expressão, tabela e circuito; teste precedência, associatividade, bordas, entradas inválidas e paridade entre implementações. Mantenha engine independente da UI quando definido e valide netlists/imports. Veritas é local-first; não prometa privacidade sem verificar o caminho real nem torne cloud/IA obrigatórios. Siga decisões de autenticação/RLS/sync/licença; não envie circuitos a provedores sem consentimento/configuração. Use scripts reais de typecheck/build/Vitest/Rust conforme escopo. Preserve diffs e reporte evidências e riscos.
