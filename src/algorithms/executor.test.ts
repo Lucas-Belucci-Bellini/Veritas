@@ -208,4 +208,18 @@ describe('executor ALGO-001', () => {
     expect(result.error).toContain('limite de 4 passos')
     expect(result.debug.lastPauseReason).toBe('max-steps')
   })
+
+  it('recusa índice de passo negativo ou fracionário em vez de estender o limite', () => {
+    const document = createAlgorithmDocument('Estado adulterado')
+    for (const stepIndex of [-20_000, 0.5, Number.NaN]) {
+      const state = { ...createExecutionState(document), stepIndex }
+      const stepped = stepAlgorithm(document, state, { maxSteps: 10 })
+      const ran = runAlgorithm(document, state, { maxSteps: 10 })
+
+      expect(stepped.status).toBe('error')
+      expect(stepped.error).toContain('índice de passo inválido')
+      expect(ran.status).toBe('error')
+      expect(ran.trace).toHaveLength(0)
+    }
+  })
 })

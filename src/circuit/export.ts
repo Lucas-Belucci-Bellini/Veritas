@@ -1,4 +1,12 @@
-import { CircuitValidationError, editorInputCount, validateCircuit, type CircuitDocument, type CircuitNode } from './editorModel'
+import {
+  CircuitValidationError,
+  editorInputCount,
+  isStatefulEditorType,
+  validateCircuit,
+  type CircuitDocument,
+  type CircuitIssue,
+  type CircuitNode,
+} from './editorModel'
 import { elaborateCustomChipDocument } from './customChipElaboration'
 import type { CustomChipLibraryEntry } from './customChip'
 import { resolveWirelessChannels } from './wirelessChannels'
@@ -89,8 +97,23 @@ export function exportVhdl(document: CircuitDocument, options: CircuitExportOpti
 }
 
 function assertValid(document: CircuitDocument): void {
-  const issues = validateCircuit(document, { allowBuses: true })
+  const issues = [...validateCircuit(document, { allowBuses: true }), ...unsupportedHdlComponents(document)]
   if (issues.length > 0) throw new CircuitValidationError(issues)
+}
+
+/**
+ * A exportação gera somente atribuições contínuas: clock, flip-flops e delay
+ * não têm tradução aqui. Sem esta recusa, eles caíam no operador padrão e
+ * saíam como Verilog/VHDL inválido apresentado como sucesso.
+ */
+function unsupportedHdlComponents(document: CircuitDocument): CircuitIssue[] {
+  return document.nodes
+    .filter((node) => isStatefulEditorType(node.type))
+    .map((node) => ({
+      code: 'unsupported-hdl-component' as const,
+      nodeId: node.id,
+      message: `O componente sequencial "${node.label ?? node.id}" (${node.type}) ainda não pode ser exportado para Verilog/VHDL; a exportação cobre apenas lógica combinacional.`,
+    }))
 }
 
 interface ExportModel {
@@ -254,10 +277,42 @@ class NameAllocator {
   }
 }
 
+/**
+ * Palavras reservadas de Verilog-2001 e VHDL-2008, mais os nomes que o próprio
+ * arquivo gerado usa (biblioteca, tipos e a architecture `rtl`). VHDL não
+ * diferencia maiúsculas, então a comparação é feita em minúsculas.
+ */
+const HDL_RESERVED_WORDS: ReadonlySet<string> = new Set([
+  // Verilog-2001
+  'always', 'and', 'assign', 'automatic', 'begin', 'buf', 'bufif0', 'bufif1', 'case', 'casex', 'casez', 'cell',
+  'cmos', 'config', 'deassign', 'default', 'defparam', 'design', 'disable', 'edge', 'else', 'end', 'endcase',
+  'endconfig', 'endfunction', 'endgenerate', 'endmodule', 'endprimitive', 'endspecify', 'endtable', 'endtask',
+  'event', 'for', 'force', 'forever', 'fork', 'function', 'generate', 'genvar', 'highz0', 'highz1', 'if', 'ifnone',
+  'incdir', 'include', 'initial', 'inout', 'input', 'instance', 'integer', 'join', 'large', 'liblist', 'library',
+  'localparam', 'macromodule', 'medium', 'module', 'nand', 'negedge', 'nmos', 'nor', 'noshowcancelled', 'not',
+  'notif0', 'notif1', 'or', 'output', 'parameter', 'pmos', 'posedge', 'primitive', 'pull0', 'pull1', 'pulldown',
+  'pullup', 'pulsestyle_ondetect', 'pulsestyle_onevent', 'rcmos', 'real', 'realtime', 'reg', 'release', 'repeat',
+  'rnmos', 'rpmos', 'rtran', 'rtranif0', 'rtranif1', 'scalared', 'showcancelled', 'signed', 'small', 'specify',
+  'specparam', 'strong0', 'strong1', 'supply0', 'supply1', 'table', 'task', 'time', 'tran', 'tranif0', 'tranif1',
+  'tri', 'tri0', 'tri1', 'triand', 'trior', 'trireg', 'unsigned', 'use', 'vectored', 'wait', 'wand', 'weak0',
+  'weak1', 'while', 'wire', 'wor', 'xnor', 'xor',
+  // VHDL-2008
+  'abs', 'access', 'after', 'alias', 'all', 'architecture', 'array', 'assert', 'assume', 'assume_guarantee',
+  'attribute', 'block', 'body', 'buffer', 'bus', 'component', 'configuration', 'constant', 'context', 'cover',
+  'disconnect', 'downto', 'elsif', 'entity', 'exit', 'fairness', 'file', 'generic', 'group', 'guarded', 'impure',
+  'in', 'inertial', 'is', 'label', 'linkage', 'literal', 'loop', 'map', 'mod', 'new', 'next', 'null', 'of', 'on',
+  'open', 'others', 'out', 'package', 'port', 'postponed', 'procedure', 'process', 'property', 'protected', 'pure',
+  'range', 'record', 'register', 'reject', 'rem', 'report', 'restrict', 'restrict_guarantee', 'return', 'rol',
+  'ror', 'select', 'sequence', 'severity', 'shared', 'signal', 'sla', 'sll', 'sra', 'srl', 'strong', 'subtype',
+  'then', 'to', 'transport', 'type', 'unaffected', 'units', 'until', 'variable', 'vmode', 'vprop', 'vunit', 'when',
+  'with',
+  // Nomes usados pelo arquivo gerado
+  'ieee', 'std', 'std_logic_1164', 'std_logic', 'std_logic_vector', 'rtl',
+])
+
 function sanitizeIdentifier(value: string, fallback: string): string {
   const cleaned = value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_$]/g, '_').replace(/_+/g, '_')
   const candidate = cleaned.replace(/^_+|_+$/g, '') || fallback
   const prefixed = /^[0-9]/.test(candidate) ? `n_${candidate}` : candidate
-  const reserved = new Set(['module', 'input', 'output', 'wire', 'assign', 'begin', 'end', 'entity', 'architecture', 'signal', 'port', 'in', 'out', 'and', 'nand', 'or', 'nor', 'not', 'xor', 'xnor'])
-  return reserved.has(prefixed.toLowerCase()) ? `v_${prefixed}` : prefixed
+  return HDL_RESERVED_WORDS.has(prefixed.toLowerCase()) ? `v_${prefixed}` : prefixed
 }

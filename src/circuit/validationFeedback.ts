@@ -103,6 +103,10 @@ const GUIDANCE: Record<CircuitIssue['code'], Pick<CircuitIssueGuidance, 'title' 
     title: 'Definição de chip ausente',
     action: 'Recarregue a biblioteca local ou remova a instância que aponta para um chip indisponível.',
   },
+  'unsupported-hdl-component': {
+    title: 'Componente sem exportação HDL',
+    action: 'A exportação Verilog/VHDL cobre apenas lógica combinacional; remova clock, flip-flops e delay antes de exportar.',
+  },
 }
 
 export function buildCircuitIssueGuidance(issues: readonly CircuitIssue[]): CircuitIssueGuidance[] {

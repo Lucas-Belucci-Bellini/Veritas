@@ -4,6 +4,12 @@ As mudanças relevantes do Veritas são registradas neste arquivo. As versões `
 
 ## [Unreleased]
 
+### Correções — HDL sequencial e limite do `debug_algorithm`
+
+- `exportVerilog`/`exportVhdl` (e a ferramenta MCP `export_circuit_hdl`) agora recusam circuitos com `clock`, `dff`, `tff`, `jk`, `sr` ou `delay` com o novo código `unsupported-hdl-component`, em vez de devolver como sucesso Verilog/VHDL inválido (`assign clk = ;`, flip-flop exportado como XOR). A UI já bloqueava esse caso; a API e o MCP não.
+- O exportador passa a escapar a lista completa de palavras reservadas de Verilog-2001 e VHDL-2008 (e os nomes usados pelo próprio arquivo gerado). Rótulos como `reg`, `always`, `process` ou `BUS` agora saem como `v_reg`, `v_always`, `v_process`, `v_BUS`. Verificado com `iverilog` e `ghdl --std=08`: a saída antiga desses casos não compilava, a nova compila. Portas cujo rótulo é palavra reservada mudam de nome no HDL exportado.
+- `stepAlgorithm`/`runAlgorithm` recusam `stepIndex` negativo, fracionário ou não finito, que antes anulava `maxSteps`. A ferramenta MCP `debug_algorithm` também valida o `AlgorithmDocument` em toda chamada e rejeita `state` com forma inválida ou nó ativo inexistente. Antes, um `state` com `stepIndex: -20000` e `max_steps: 10` executava 20.010 passos.
+
 ### Modelo comercial planejado
 
 - Definido o modelo futuro para a Steam: demo/teste gratuita para avaliação e versão final paga como edição completa e oficial, ambas com login planejado e a edição final com licença/entitlement verificável; escopo, limites e condições da demo deverão ser publicados antes do uso.
